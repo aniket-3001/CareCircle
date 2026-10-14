@@ -6,7 +6,12 @@ services:
     environment:
       REDIS_ARGS: "--appendonly yes --appendfsync everysec"
     volumes: ["falkor-data:/var/lib/falkordb/data"]
-    ports: ["${FALKORDB_PORT:-6379}:6379"]
+    ports: ["${FALKORDB_PORT:-6379}:6379", "${BROWSER_PORT:-3000}:3000"]   # 3000 = FalkorDB Browser
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     restart: unless-stopped
   api:
     build: .
@@ -14,7 +19,8 @@ services:
       GRAPHMEM_ADMIN_KEY: ${GRAPHMEM_ADMIN_KEY:?set GRAPHMEM_ADMIN_KEY}
       FALKORDB_HOST: falkordb
     ports: ["${API_PORT:-8000}:8000"]
-    depends_on: [falkordb]
+    depends_on:
+      falkordb: {condition: service_healthy}
     restart: unless-stopped
 volumes:
   falkor-data:

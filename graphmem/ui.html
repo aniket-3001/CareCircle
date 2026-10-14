@@ -41,7 +41,7 @@
 <nav id="tabs">
   <button data-t="graph" class="on">Graph</button><button data-t="recall">Recall</button>
   <button data-t="history">History</button><button data-t="tasks">Tasks &amp; handoffs</button>
-  <button data-t="skills">Skills</button><button data-t="spaces">Shared spaces</button><button data-t="trace">Decision trace</button>
+  <button data-t="skills">Skills</button><button data-t="spaces">Shared spaces</button><button data-t="trace">Decision trace</button><button data-t="code">Code graph</button>
 </nav>
 <main>
   <section id="graph">
@@ -68,6 +68,18 @@
     <div class="row"><input id="pub" size="46" placeholder="fact ids to publish from the selected tenant (comma separated)"><button id="doPub" class="ghost">Publish</button></div>
     <p class="mute">Only the fact itself crosses into a space, never the conversation it came from. Forgetting a fact removes its published copies.</p>
     <div id="spaceOut"></div>
+  </section>
+  <section id="code" class="hide">
+    <div class="row"><input id="cpath" size="40" placeholder="file id, e.g. src/pkg/core.py">
+      <button class="ghost" data-tool="blast_radius">Blast radius</button><button class="ghost" data-tool="dependencies_of">Dependencies</button>
+      <button class="ghost" data-tool="co_changed">Co-changed</button><button class="ghost" data-tool="who_to_ask">Who to ask</button></div>
+    <div class="row"><button class="ghost" data-tool="criticality">Most critical (PageRank)</button>
+      <button class="ghost" data-tool="single_points_of_failure">Single points of failure (betweenness)</button>
+      <button class="ghost" data-tool="failure_domains">Failure domains (WCC)</button><button class="ghost" data-tool="communities">Communities (label propagation)</button></div>
+    <div class="row"><input id="cto" size="30" placeholder="target file (for routes)">
+      <button class="ghost" data-tool="failover_capacity">Independent routes (max flow)</button><button class="ghost" data-tool="cheapest_route">Cheapest route</button></div>
+    <p class="mute">Each answer shows the Cypher FalkorDB ran. Load a repo with <code>code_load</code> (see <code>graphmem/repo_loader.py</code>).</p>
+    <div id="codeOut"></div>
   </section>
   <section id="skills" class="hide"><div id="skillOut"></div></section>
   <section id="trace" class="hide">
@@ -174,6 +186,15 @@ $("#doExplain").onclick = guard(async () => {
   $("#traceOut").innerHTML = `<div class="card"><b>${esc(d.summary)}</b><div>${esc(d.answer || "")}</div><div class="mute">${esc(d.agent)} · ${fmt(d.ts)}</div></div>` +
     r.used.map(u => `<div class="card"><span class="tag">${esc(u.type)}</span>${esc(u.summary)} ${u.current === false ? '<span class="bad">outdated</span>' : ""}<div>${u.source_episodes.map(e => `<span class="tag">from episode ${esc(e)}</span>`).join("")}</div></div>`).join("");
 });
+document.querySelectorAll("[data-tool]").forEach(b => b.onclick = guard(async () => {
+  const t = b.dataset.tool, p = $("#cpath").value.trim(), to = $("#cto").value.trim();
+  const args = { blast_radius: { path: p }, dependencies_of: { path: p }, co_changed: { path: p }, who_to_ask: { path: p },
+    failover_capacity: { source: p, sink: to }, cheapest_route: { source: p, target: to } }[t] || {};
+  const r = await op(t, args);
+  const rows = Array.isArray(r.rows) ? r.rows : [r.rows];
+  $("#codeOut").innerHTML = `<div class="card"><b>${esc(t)}</b><pre>${esc(r.cypher)}</pre></div>` +
+    (rows.length ? rows.map(x => `<div class="card">${esc(typeof x === "object" ? JSON.stringify(x) : x)}</div>`).join("") : '<p class="mute">No results.</p>');
+}));
 if (KEY) $("#connect").click();
 </script>
 </body>
