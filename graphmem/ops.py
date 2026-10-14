@@ -25,6 +25,11 @@ OPS = {
     "get_task": "read", "open_tasks": "read", "create_plan": "write", "check_plan": "read", "rebase_plan": "write",
     "resume": "read",
     # traceability
+    # code graph + algorithms
+    "code_load": "write", "code_stats": "read", "blast_radius": "read", "dependencies_of": "read",
+    "criticality": "read", "single_points_of_failure": "read", "failure_domains": "read", "communities": "read",
+    "failover_capacity": "read", "cheapest_route": "read", "co_changed": "read", "who_to_ask": "read",
+    "change_impact": "read",
     "record_decision": "write", "explain": "read", "stats": "read", "graph_view": "read",
 }
 
