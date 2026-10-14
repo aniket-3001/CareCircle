@@ -96,6 +96,14 @@ async def test_mcp_tools_use_same_authorization(gm):
     assert (await run("remember", tenant=t, session="s", role="user", content="mcp works"))["seq"] == 1
     await run("call", tenant=t, op="assert_fact", args_json=json.dumps({"subject": "mcp", "predicate": "is", "obj": "ok"}))
     assert (await run("recall", tenant=t, query="mcp"))[0]["object"] == "ok"
+    fk = await run("fork_memory", tenant=t, label="mcp")
+    await run("fork_call", fork_id=fk["id"], op="assert_fact", args_json=json.dumps({"subject": "branch", "predicate": "is", "obj": "new"}))
+    assert not await run("call", tenant=t, op="recall", args_json=json.dumps({"query": "branch"}))      # isolated until merged
+    dry = await run("merge_fork", fork_id=fk["id"])
+    assert dry["would_apply"]["facts"] == 1 and not dry["applied"]
+    assert (await run("merge_fork", fork_id=fk["id"], apply=True))["status"] == "merged"
+    assert (await run("recall", tenant=t, query="branch"))[0]["object"] == "new"
+    assert "PermissionDenied" in (await run("fork_memory", tenant=other))["error"]
     denied = await run("call", tenant=other, op="history", args_json=json.dumps({"session": "s"}))
     assert "PermissionDenied" in denied["error"]
 

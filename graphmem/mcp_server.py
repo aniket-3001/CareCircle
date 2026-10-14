@@ -13,7 +13,7 @@ import sys
 
 from mcp.server.mcpserver import MCPServer
 
-from . import ops, spaces
+from . import branch, ops, spaces
 from .db import Db
 from .policy import GraphMem
 
@@ -57,6 +57,42 @@ def build(gm: GraphMem, agent: str) -> MCPServer:
         """Publish chosen facts from your tenant into a shared space. fact_ids_json is a JSON list of fact ids."""
         try:
             return json.dumps(await spaces.publish(gm, agent, tenant, space, json.loads(fact_ids_json)))
+        except Exception as e:
+            return json.dumps({"error": f"{type(e).__name__}: {e}"})
+
+    @server.tool()
+    async def fork_memory(tenant: str, label: str = "") -> str:
+        """Branch a tenant's memory (GRAPH.COPY). Work on the fork with fork_call; nothing touches the tenant until merge."""
+        try:
+            return json.dumps(await branch.fork(gm, agent, tenant, label))
+        except Exception as e:
+            return json.dumps({"error": f"{type(e).__name__}: {e}"})
+
+    @server.tool()
+    async def fork_call(fork_id: str, op: str, args_json: str = "{}") -> str:
+        """Run a memory operation on a fork (same operations as call)."""
+        try:
+            if op not in ops.OPS:
+                raise KeyError(f"unknown operation {op!r}")
+            fm = await branch.open_fork(gm, agent, fork_id)
+            return json.dumps(await getattr(fm, op)(**json.loads(args_json or "{}")), default=str)
+        except Exception as e:
+            return json.dumps({"error": f"{type(e).__name__}: {e}"})
+
+    @server.tool()
+    async def merge_fork(fork_id: str, apply: bool = False, on_conflict: str = "skip") -> str:
+        """Dry-run (default) or apply a fork's new work to its tenant. Reports conflicts and plans that would be stale."""
+        try:
+            return json.dumps(await branch.merge(gm, agent, fork_id, apply=apply, on_conflict=on_conflict), default=str)
+        except Exception as e:
+            return json.dumps({"error": f"{type(e).__name__}: {e}"})
+
+    @server.tool()
+    async def discard_fork(fork_id: str) -> str:
+        """Delete a fork without merging."""
+        try:
+            await branch.discard(gm, agent, fork_id)
+            return json.dumps({"ok": True})
         except Exception as e:
             return json.dumps({"error": f"{type(e).__name__}: {e}"})
 
