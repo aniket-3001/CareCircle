@@ -24,6 +24,13 @@ python scripts/seed_demo.py http://127.0.0.1:8000 change-me     # demo tenant th
 Create an agent with `POST /admin/agents`, grant it a tenant with `POST /admin/grants`, and use the returned `gm_...` key as a bearer
 token (HTTP) or `GRAPHMEM_API_KEY` (MCP: `python -m graphmem.mcp_server`). Keys are stored only as SHA-256 hashes.
 
+### Use it from Claude Code / any MCP client
+```bash
+claude mcp add graphmem -e GRAPHMEM_API_KEY=gm_... -e FALKORDB_HOST=localhost -- python -m graphmem.mcp_server
+```
+Tools: `whoami`, `list_ops`, `call(tenant, op, args_json)`, `remember`, `recall`, `fork_memory`, `fork_call`, `merge_fork`, `discard_fork`,
+`space_recall`, `publish_facts`. Walkthrough on a real repo: `PYTHONPATH=. python demo_crew.py path/to/python/repo`.
+
 ## Graph data model
 
 One graph per tenant (`mem__<tenant>`), a control graph `ctl` for policy, `shared__<space>` graphs for explicit sharing,
@@ -100,6 +107,12 @@ Branches: `POST /v1/tenants/{t}/forks`, `POST /v1/forks/{id}/{op}`, `POST /v1/fo
   near-best in two of three repos; co-change alone wins on click. We do not claim the graph beats history, only that both live in one graph.
 - **Load (B7):** 244 -> 448 req/s going from 1 to 4 API processes, 0 failed requests, every acknowledged write verified; survives `docker kill`.
 - **Isolation (B3):** 6 adversarial tests (forged keys, hostile tenant ids, foreign forks/spaces, injection strings, revocation): 0 leaks.
+
+## Is the graph decoration? (ablation, from the benchmarks above)
+Take the graph structure away and the same question gets worse: without `DERIVED_FROM`/`INFERRED_FROM` lineage, flat memory misses 54.8 stale
+plans (B1); without fork/merge, last-writer-wins silently overwrites every conflicting write (B2); without the import/co-change graph,
+recall@10 for "what changes with this file" falls to random or file-name similarity (B4); without per-tenant graphs and grant edges there
+is nothing for the isolation suite to test (B3). A dict-backed reimplementation of the whole product was not built.
 
 ## Security notes (what is and is not protected)
 Protected: tenant isolation (separate graphs plus a grant check on every query; revocation is immediate), hashed API keys, parameterised
