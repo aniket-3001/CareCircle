@@ -1,0 +1,20 @@
+# Durable deployment: FalkorDB with a named volume and append-only file, plus the API/UI.
+# Usage: GRAPHMEM_ADMIN_KEY=change-me docker compose up -d --build
+services:
+  falkordb:
+    image: falkordb/falkordb:latest
+    environment:
+      REDIS_ARGS: "--appendonly yes --appendfsync everysec"
+    volumes: ["falkor-data:/var/lib/falkordb/data"]
+    ports: ["${FALKORDB_PORT:-6379}:6379"]
+    restart: unless-stopped
+  api:
+    build: .
+    environment:
+      GRAPHMEM_ADMIN_KEY: ${GRAPHMEM_ADMIN_KEY:?set GRAPHMEM_ADMIN_KEY}
+      FALKORDB_HOST: falkordb
+    ports: ["${API_PORT:-8000}:8000"]
+    depends_on: [falkordb]
+    restart: unless-stopped
+volumes:
+  falkor-data:
