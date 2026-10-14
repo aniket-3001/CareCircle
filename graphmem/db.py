@@ -123,6 +123,12 @@ class Db:
             except Exception as e:  # idempotent: index may already exist from an earlier process
                 if "already indexed" not in str(e).lower() and "already exists" not in str(e).lower():
                     raise
+        if name != CTL_GRAPH:   # full-text index for search_text (DDL form; the procedure form is rejected by FalkorDB 6.x)
+            try:
+                await g.query("CREATE FULLTEXT INDEX FOR (e:Episode) ON (e.content)")
+            except Exception as e:
+                if "already" not in str(e).lower():
+                    raise
 
     async def drop_tenant(self, tenant: str) -> None:
         name = self.graph_name(tenant)

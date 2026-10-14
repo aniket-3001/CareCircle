@@ -253,3 +253,15 @@ async def test_transitive_staleness_through_inferred_facts(gm):
     assert chk["changes"][0]["upstream"]["was"] == "100" and chk["changes"][0]["now"][0]["value"] == "20"
     rb = await m.rebase_plan(plan)
     assert (await m.check_plan(rb["plan"]))["stale"] is False                                     # re-derived from current facts
+
+
+async def test_fulltext_search_and_redaction(gm):
+    t = tid(gm)
+    await gm.grant("a", t)
+    m = gm.open("a", t)
+    await m.add_episode("s", "user", "The client moved the report deadline to Wednesday")
+    await m.add_episode("s", "user", "Carol owns the finance dashboards")
+    hits = await m.search_text("deadlines report")
+    assert len(hits) == 1 and "deadline" in hits[0]["content"]
+    assert {h["session"] for h in await m.search_text("carol dashboard")} == {"s"}
+    assert await m.search_text("zzzz") == [] and await m.search_text("a") == []

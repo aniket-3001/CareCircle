@@ -16,7 +16,7 @@ open http://localhost:8000          # UI (paste an agent key)        |   http://
 ```
 ```bash
 python -m venv .venv && .venv/bin/pip install falkordb pytest pytest-asyncio fastapi uvicorn mcp httpx   # Windows: .venv/Scripts
-python -m pytest -q                       # 48 tests against a live FalkorDB on :6379
+python -m pytest -q                       # 49 tests against a live FalkorDB on :6379
 PYTHONPATH=. python demo.py               # handoff + stale plan + decision trace walkthrough
 PYTHONPATH=. python bench/proof.py        # 8 end-to-end scenarios
 python scripts/seed_demo.py http://127.0.0.1:8000 change-me     # demo tenant through the real admin API
@@ -66,12 +66,13 @@ Everything below is a real query in `graphmem/` (file and function in the right 
 | Independent routes | `algo.maxFlow` with `capacityProperty` | `failover_capacity` |
 | Cheapest route | `algo.SPpaths` | `cheapest_route` |
 | Who to ask, what co-changes | `(Person)-[:AUTHORED]->(Commit)-[:TOUCHED]->(Code)` aggregations | `who_to_ask`, `co_changed`, `change_impact` |
+| Full-text search over conversation | `CREATE FULLTEXT INDEX FOR (e:Episode) ON (e.content)` + `CALL db.idx.fulltext.queryNodes` | `search_text` |
 | Authorization | `(Agent)-[:GRANTED]->(Tenant)` read on every query, so revocation is immediate | `policy.py` |
 
 Every code-graph tool returns the Cypher it ran. FalkorDB features used: graph per tenant (multi-graph), indexes, `GRAPH.COPY`,
 variable-length paths, `algo.BFS/pageRank/betweenness/WCC/labelPropagation/maxFlow/SPpaths`, `FOREACH`, `UNWIND` bulk loads,
-append-only persistence. Not used: vector and full-text indexes (recall is lexical + graph expansion; the 6.0.2 server rejected
-Graphiti's fulltext DDL, see `docs/DECISION.md`).
+full-text index (`db.idx.fulltext.queryNodes`, `search_text`), append-only persistence. Not used: vector indexes (recall is
+lexical + graph expansion; no embedding model is bundled).
 
 ## Interfaces
 HTTP API (FastAPI: bearer auth, admin plane gated by `GRAPHMEM_ADMIN_KEY`, per-agent rate limit, 503 + `Retry-After` when

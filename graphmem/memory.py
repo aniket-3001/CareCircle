@@ -128,6 +128,19 @@ class TenantMemory(CodeGraphMixin):
         return [dict(id=r[0], session=r[1], seq=r[2], role=r[3], content=r[4], ts=r[5], score=round(s, 3))
                 for s, r in scored[:limit]]
 
+    async def search_text(self, query: str, limit: int = 10) -> list[dict]:
+        """Full-text search over episode content (FalkorDB full-text index, prefix match on every word, best score first)."""
+        toks = tokens(query)
+        if not toks:
+            return []
+        q = "|".join(f"{t}*" for t in toks)
+        rows = await self._q(
+            """CALL db.idx.fulltext.queryNodes('Episode', $q) YIELD node, score
+               WHERE node.redacted = false
+               RETURN node.id, node.session, node.seq, node.role, node.content, node.ts, score
+               ORDER BY score DESC LIMIT $n""", {"q": q, "n": limit}, scope="read")
+        return [dict(id=r[0], session=r[1], seq=r[2], role=r[3], content=r[4], ts=r[5], score=round(r[6], 3)) for r in rows]
+
     # ---------------------------------------------------------------- semantic
     async def assert_fact(self, subject: str, predicate: str, obj: str, *, sources: Iterable[str] = (),
                           conf: float = 1.0, exclusive: bool = False, valid_from: Optional[int] = None,
