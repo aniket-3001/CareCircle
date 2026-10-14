@@ -16,7 +16,7 @@ open http://localhost:8000          # UI (paste an agent key)        |   http://
 ```
 ```bash
 python -m venv .venv && .venv/bin/pip install falkordb pytest pytest-asyncio fastapi uvicorn mcp httpx   # Windows: .venv/Scripts
-python -m pytest -q                       # 49 tests against a live FalkorDB on :6379
+python -m pytest -q                       # 50 tests against a live FalkorDB on :6379
 PYTHONPATH=. python demo.py               # handoff + stale plan + decision trace walkthrough
 PYTHONPATH=. python bench/proof.py        # 8 end-to-end scenarios
 python scripts/seed_demo.py http://127.0.0.1:8000 change-me     # demo tenant through the real admin API
@@ -69,7 +69,7 @@ Everything below is a real query in `graphmem/` (file and function in the right 
 | Full-text search over conversation | `CREATE FULLTEXT INDEX FOR (e:Episode) ON (e.content)` + `CALL db.idx.fulltext.queryNodes` | `search_text` |
 | Authorization | `(Agent)-[:GRANTED]->(Tenant)` read on every query, so revocation is immediate | `policy.py` |
 
-Every code-graph tool returns the Cypher it ran. FalkorDB features used: graph per tenant (multi-graph), indexes, `GRAPH.COPY`,
+Every code-graph tool returns the Cypher it ran. FalkorDB features used: graph per tenant (multi-graph), indexes, UNIQUE constraints (`GRAPH.CONSTRAINT`), `GRAPH.COPY`,
 variable-length paths, `algo.BFS/pageRank/betweenness/WCC/labelPropagation/maxFlow/SPpaths`, `FOREACH`, `UNWIND` bulk loads,
 full-text index (`db.idx.fulltext.queryNodes`, `search_text`), append-only persistence. Not used: vector indexes (recall is
 lexical + graph expansion; no embedding model is bundled).

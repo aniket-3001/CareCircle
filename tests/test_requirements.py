@@ -265,3 +265,17 @@ async def test_fulltext_search_and_redaction(gm):
     assert len(hits) == 1 and "deadline" in hits[0]["content"]
     assert {h["session"] for h in await m.search_text("carol dashboard")} == {"s"}
     assert await m.search_text("zzzz") == [] and await m.search_text("a") == []
+
+
+async def test_database_enforces_unique_keys(gm):
+    t = tid(gm)
+    await gm.grant("a", t)
+    m = gm.open("a", t)
+    await m.assert_fact("x", "is", "y")
+    g = await gm.db.tenant_graph(t)
+    await asyncio.sleep(0.5)                                   # constraints are built asynchronously (PENDING -> OPERATIONAL)
+    with pytest.raises(Exception, match="unique constraint"):
+        await g.query("CREATE (:Entity {key:'x'})")
+    tid1 = await m.create_task("one")
+    with pytest.raises(Exception, match="unique constraint"):
+        await g.query("CREATE (:Task {id:$i})", {"i": tid1})

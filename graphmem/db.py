@@ -28,6 +28,10 @@ TENANT_INDEXES = [
     ("Code", "id"), ("Commit", "sha"), ("Person", "id"),
 ]
 CTL_INDEXES = [("Tenant", "id"), ("Agent", "id"), ("ApiKey", "hash"), ("Fork", "id")]
+# UNIQUE constraints enforced by FalkorDB itself (need the matching exact-match index above): even a buggy writer cannot
+# create two Entities with one key, two Tasks with one id, two keys with one hash.
+TENANT_UNIQUE = [("Entity", "key"), ("Task", "id"), ("Session", "id"), ("Episode", "id"), ("Plan", "id")]
+CTL_UNIQUE = [("Tenant", "id"), ("Agent", "id"), ("ApiKey", "hash"), ("Fork", "id")]
 
 
 def now_ms() -> int:
@@ -122,6 +126,12 @@ class Db:
                 await g.query(f"CREATE INDEX FOR (n:{label}) ON (n.{prop})")
             except Exception as e:  # idempotent: index may already exist from an earlier process
                 if "already indexed" not in str(e).lower() and "already exists" not in str(e).lower():
+                    raise
+        for label, prop in (CTL_UNIQUE if name == CTL_GRAPH else TENANT_UNIQUE):
+            try:
+                await self.client.execute_command("GRAPH.CONSTRAINT", "CREATE", name, "UNIQUE", "NODE", label, "PROPERTIES", "1", prop)
+            except Exception as e:  # idempotent
+                if "already" not in str(e).lower():
                     raise
         if name != CTL_GRAPH:   # full-text index for search_text (DDL form; the procedure form is rejected by FalkorDB 6.x)
             try:
