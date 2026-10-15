@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { CheckResult } from '../api/types';
 import { SEVERITY, levelVars, sevKey, worstSeverity } from '../design/levels';
 import { pct, title } from '../lib/format';
+import { useT } from '../lib/i18n';
 import { useSettle } from '../lib/useSettle';
 import { FaceIcon } from './Face';
 
@@ -21,6 +22,7 @@ export interface Chip {
 /** The status card: how many things the record flags, what that means, the most serious one, and the circle at a glance.
  *  It never says "safe": with nothing flagged it says what the data does and does not cover. */
 export function Hero({ check, chips }: { check: CheckResult; chips: Chip[] }): React.JSX.Element {
+  const t = useT();
   const j = check.judgement;
   const n = check.direct.length + check.enzyme_paths.length;
   const shown = useSettle(n);
@@ -38,12 +40,12 @@ export function Hero({ check, chips }: { check: CheckResult; chips: Chip[] }): R
             {shown}
           </span>
           <span className="badge-unit" aria-hidden="true">
-            {n === 1 ? 'FLAG' : 'FLAGS'}
+            {t(n === 1 ? 'FLAG' : 'FLAGS')}
           </span>
         </div>
         <div>
           <h2 id="hero-title" className="hero-level">
-            {noData ? 'Nothing to check yet' : HEAD[sev]}
+            {t(noData ? 'Nothing to check yet' : HEAD[sev])}
           </h2>
           <p className="hero-line">{j.statement}</p>
         </div>
@@ -52,7 +54,7 @@ export function Hero({ check, chips }: { check: CheckResult; chips: Chip[] }): R
       {j.reasons.length > 0 && <p className="hero-fine">{j.reasons.join(' · ')}</p>}
       {top && (
         <dl className="hero-main">
-          <dt>Most serious</dt>
+          <dt>{t('Most serious')}</dt>
           <dd>
             <span>
               {title(top.drugs[0])} + {title(top.drugs[1])}
@@ -79,7 +81,7 @@ export function Hero({ check, chips }: { check: CheckResult; chips: Chip[] }): R
           </li>
         ))}
       </ul>
-      <p className="hero-fine">Flags are for discussion with a prescriber or pharmacist. No flag does not mean safe. DDInter 2.0 · FDA CYP table.</p>
+      <p className="hero-fine">{t('Flags are for discussion with a prescriber or pharmacist. No flag does not mean safe. DDInter 2.0 · FDA CYP table.')}</p>
     </section>
   );
 }

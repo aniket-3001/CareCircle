@@ -1,6 +1,7 @@
 import { CirclePlus, History, ListChecks, Share2, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 
+import { useT } from '../lib/i18n';
 import type { TabId } from '../state';
 
 export type { TabId };
@@ -15,13 +16,14 @@ const TABS = [
 
 /** The five places to go, in a floating pill at the bottom of the screen; the highlight slides between them. */
 export function TabBar({ current, onSelect }: { current: TabId; onSelect: (t: TabId) => void }): React.JSX.Element {
+  const t = useT();
   return (
-    <nav className="tabbar" aria-label="Main">
+    <nav className="tabbar" aria-label={t('Main')}>
       {TABS.map(({ id, label, Icon }) => (
         <button key={id} type="button" className="tab-link" aria-current={id === current ? 'page' : undefined} onClick={() => onSelect(id)}>
           {id === current && <motion.span layoutId="tab-pill" className="tab-pill" transition={{ type: 'spring', stiffness: 520, damping: 40 }} />}
           <Icon size={22} strokeWidth={1.75} aria-hidden="true" />
-          <span>{label}</span>
+          <span>{t(label)}</span>
         </button>
       ))}
     </nav>

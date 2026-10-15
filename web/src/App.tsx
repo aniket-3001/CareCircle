@@ -10,6 +10,7 @@ import { TabBar } from './components/TabBar';
 import { ToastProvider } from './components/Toast';
 import { levelVars, worstSeverity, type SeverityKey } from './design/levels';
 import { nameOf } from './lib/format';
+import { setLang, useLang, useT } from './lib/i18n';
 import { loadSession, saveSession } from './lib/session';
 import { AccountScreen } from './screens/AccountScreen';
 import { AddScreen } from './screens/AddScreen';
@@ -28,6 +29,8 @@ const fromHash = (): TabId => {
 };
 
 export function App(): React.JSX.Element {
+  const t = useT();
+  const lang = useLang();
   const [session, setSession] = useState<Session | null>(loadSession);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -139,7 +142,7 @@ export function App(): React.JSX.Element {
             <div className="topline">
               <span className="wordmark">
                 <span className="logo" aria-hidden="true"><ShieldCheck size={18} strokeWidth={2} /></span>
-                Care Circle
+                {t('Care Circle')}
               </span>
               <div className="topline-actions">
                 {profile && profile.circles.length > 0 && (
@@ -162,17 +165,18 @@ export function App(): React.JSX.Element {
                 )}
                 {!session && (
                   <>
-                    <button type="button" className="btn btn--ghost btn--sm" onClick={() => openAuth('signin')} data-testid="top-signin">Sign in</button>
-                    <button type="button" className="btn btn--sm" onClick={() => openAuth('signup')} data-testid="top-signup" aria-label="Create account"><span className="wide-only">Create account</span><span className="narrow-only">Sign up</span></button>
+                    <button type="button" className="btn btn--ghost btn--sm" onClick={() => openAuth('signin')} data-testid="top-signin">{t('Sign in')}</button>
+                    <button type="button" className="btn btn--sm" onClick={() => openAuth('signup')} data-testid="top-signup" aria-label="Create account"><span className="wide-only">{t('Create account')}</span><span className="narrow-only">{t('Sign up')}</span></button>
                   </>
                 )}
-                {session && <button type="button" className="btn btn--ghost btn--sm" onClick={() => void signOut()} data-testid="top-signout"><LogOut size={16} aria-hidden="true" /> Sign out</button>}
+                {session && <button type="button" className="btn btn--ghost btn--sm" onClick={() => void signOut()} data-testid="top-signout"><LogOut size={16} aria-hidden="true" /> {t('Sign out')}</button>}
                 {profile && (
                   <button type="button" className="avatar-btn" onClick={() => go('account')} aria-label={`Account: ${profile.name}`} data-testid="open-account">
                     {profile.name.charAt(0).toUpperCase()}
                   </button>
                 )}
-                <button type="button" className="icon-btn" onClick={() => setAbout(true)} aria-label="About and safety">
+                <button type="button" className="btn btn--ghost btn--sm lang-btn" onClick={() => setLang(lang === 'hi' ? 'en' : 'hi')} aria-label={t('Language')} title="English / हिन्दी" data-testid="lang-toggle">{lang === 'hi' ? 'EN' : 'हिं'}</button>
+                <button type="button" className="icon-btn" onClick={() => setAbout(true)} aria-label={t('About and safety')}>
                   <Info size={20} strokeWidth={1.75} aria-hidden="true" />
                 </button>
               </div>
@@ -199,21 +203,21 @@ export function App(): React.JSX.Element {
             )}
           </div>
 
-          <Sheet open={about} title="About and safety" onClose={() => setAbout(false)}>
+          <Sheet open={about} title={t('About and safety')} onClose={() => setAbout(false)}>
             <section>
-              <h3>What this is</h3>
-              <p>A shared record of a person's medicines for the people who look after them. It records what carers add, cross-checks it against public data, and shows who has not seen a change.</p>
+              <h3>{t('What this is')}</h3>
+              <p>{t("A shared record of a person's medicines for the people who look after them. It records what carers add, cross-checks it against public data, and shows who has not seen a change.")}</p>
             </section>
             <section>
-              <h3>What it will not do</h3>
-              <p>It never tells anyone what to take, stop, skip or change. Flags are for discussion with a prescriber or pharmacist. No flag does not mean safe. The helper answers only from the record and refuses to advise.</p>
+              <h3>{t('What it will not do')}</h3>
+              <p>{t('It never tells anyone what to take, stop, skip or change. Flags are for discussion with a prescriber or pharmacist. No flag does not mean safe. The helper answers only from the record and refuses to advise.')}</p>
             </section>
             <section>
-              <h3>Your data</h3>
+              <h3>{t('Your data')}</h3>
               <p>Everything in an account (profile, circles, medicines, who has seen what, the helper conversation) is stored on the server, in a graph database, and you can export or delete it. Only a sign-in token is kept in this browser.</p>
             </section>
             <section>
-              <h3>Where the data comes from</h3>
+              <h3>{t('Where the data comes from')}</h3>
               <dl className="meta">
                 <div><dt>Interactions</dt><dd>DDInter 2.0, licence CC BY-NC-SA 4.0 (non-commercial). About a quarter of pairs have no severity and are shown as unrated.</dd></div>
                 <div><dt>Enzyme paths</dt><dd>FDA drug-interaction index table (not exhaustive) plus a small list marked “curated (unverified)”.</dd></div>
@@ -222,7 +226,7 @@ export function App(): React.JSX.Element {
               </dl>
             </section>
             <section>
-              <h3>AI use</h3>
+              <h3>{t('AI use')}</h3>
               <p>Built with substantial help from Claude via Claude Code. At runtime an optional Amazon Bedrock model structures text that OCR or speech recognition already read, and may phrase a helper answer from the record's facts; every quoted line must appear in the source text, answers are checked for advice and invented numbers, and a person confirms every entry.</p>
             </section>
           </Sheet>

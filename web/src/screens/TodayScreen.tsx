@@ -8,6 +8,7 @@ import { PageHead } from '../components/PageHead';
 import { Pill } from '../components/Pill';
 import { Scale } from '../components/Scale';
 import { ago, nameOf, plural, title } from '../lib/format';
+import { useT } from '../lib/i18n';
 import { useApp, useLoad } from '../state';
 
 const SOURCE = { typed: 'typed in', photo: 'from a photo', voice: 'from a voice note', document: 'from a document' } as const;
@@ -15,13 +16,14 @@ const SRC_ICON = { typed: Type, photo: Camera, voice: Mic, document: FileText } 
 
 export function TodayScreen(): React.JSX.Element {
   const app = useApp();
+  const t = useT();
   const state = useLoad((a) => a.api.check());
   const div = useLoad((a) => a.api.divergence(a.now()), [app.warp]);
   const carers = div.data ? Object.keys(div.data.carers).length : 0;
   const unseen = div.data ? Object.values(div.data.carers).reduce((n, c) => n + c.unacknowledged.length, 0) : 0;
   return (
     <div className="screen">
-      <PageHead crumb={`${title(app.session.person)} · shared medicines record`} title="Today" lede="What the record says, checked against public interaction data. It records and cross-checks; it never advises." />
+      <PageHead crumb={`${title(app.session.person)} · ${t('shared medicines record')}`} title="Today" lede="What the record says, checked against public interaction data. It records and cross-checks; it never advises." />
       <Async state={state}>
         {(c) => (
           <div className="layout">
@@ -38,7 +40,7 @@ export function TodayScreen(): React.JSX.Element {
               </motion.div>
               <section className="card" aria-labelledby="reg-title">
                 <div className="card-head">
-                  <h2 id="reg-title">On record for {title(app.session.person)}</h2>
+                  <h2 id="reg-title">{t('On record for')} {title(app.session.person)}</h2>
                   <Pill tone="info">{plural(c.regimen.length, 'medicine')}</Pill>
                 </div>
                 {c.regimen.length === 0 ? (
@@ -46,10 +48,10 @@ export function TodayScreen(): React.JSX.Element {
                     <span className="ico">
                       <PillIcon size={26} strokeWidth={1.75} aria-hidden="true" />
                     </span>
-                    <b>Nothing on record yet</b>
-                    <span>Add a medicine from a photo, a voice note, a document or by typing.</span>
+                    <b>{t('Nothing on record yet')}</b>
+                    <span>{t('Add a medicine from a photo, a voice note, a document or by typing.')}</span>
                     <button type="button" className="btn" onClick={() => app.go('add')}>
-                      Add a medicine
+                      {t('Add a medicine')}
                     </button>
                   </div>
                 ) : (
@@ -72,7 +74,7 @@ export function TodayScreen(): React.JSX.Element {
                           </div>
                           <div className="row no-print">
                             <button type="button" className="btn btn--ghost btn--sm" onClick={() => app.go('graph')}>
-                              In graph
+                              {t('In graph')}
                             </button>
                             <MedActions r={r} />
                           </div>
@@ -86,7 +88,7 @@ export function TodayScreen(): React.JSX.Element {
             <div className="col">
               <Scale check={c} />
               <section className="card" aria-labelledby="sources-title">
-                <h2 id="sources-title">Where the flags come from</h2>
+                <h2 id="sources-title">{t('Where the flags come from')}</h2>
                 <ul className="steps">
                   <li><span><b>Direct pairs:</b> DDInter 2.0, a curated interaction database, with its severity.</span></li>
                   <li><span><b>Enzyme paths:</b> one medicine slows or speeds a liver enzyme that clears another (FDA table, a two-step graph path).</span></li>
@@ -96,7 +98,7 @@ export function TodayScreen(): React.JSX.Element {
             </div>
             {(c.direct.length > 0 || c.enzyme_paths.length > 0 || c.unrated.length > 0) && (
               <section className="card wide" aria-labelledby="flags-title">
-                <h2 id="flags-title">Flags, with their sources</h2>
+                <h2 id="flags-title">{t('Flags, with their sources')}</h2>
                 <Flags check={c} />
                 <p className="muted small">{c.notice}</p>
               </section>

@@ -49,7 +49,7 @@ export function apiFor(s: Session) {
     receipts: () => op<Receipt[]>('care_receipts'),
     fhir: () => op<FhirBundle>('care_export_fhir', { person: p }),
     chat: () => op<ChatMessage[]>('care_chat_history', { limit: 60 }),
-    ask: (question: string) => op<ChatMessage>('care_chat_ask', { person: p, question }),
+    ask: (question: string, lang = '') => op<ChatMessage>('care_chat_ask', { person: p, question, lang }),
     clearChat: () => op<{ cleared: boolean }>('care_chat_clear'),
     members: () => get<Member[]>(`/v1/circles/${encodeURIComponent(s.circle)}/members`, token),
     intake: async (body: FormData): Promise<IntakeResult> => {
