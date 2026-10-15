@@ -41,7 +41,7 @@ with sync_playwright() as p:
 
     # a photo is read, quoted and verified; saving needs a click
     tab(pg, "Add")
-    pg.get_by_text("Use a sample label").click()
+    pg.get_by_role("button", name="Sample label").click()
     card = pg.locator("[data-testid=proposal]").first
     expect(card).to_be_visible(timeout=90000)
     expect(card).to_contain_text("quote verified")
@@ -77,16 +77,16 @@ with sync_playwright() as p:
 
     # circle: who has not seen the change; time warp shows a reminder
     tab(pg, "Circle")
-    expect(pg.get_by_text("Carers and their unseen changes")).to_be_visible()
-    pg.locator(".segmented__option", has_text="+13 h").click()
+    expect(pg.get_by_text("Who has seen what")).to_be_visible()
+    pg.locator(".seg label", has_text="+13 h").click()
     expect(pg.get_by_text("is not yet acknowledged").first).to_be_visible(timeout=15000)
     shot(pg, "5_circle.png", full_page=True)
-    pg.locator(".segmented__option", has_text="Now").click()
+    pg.locator(".seg label", has_text="Now").click()
 
     # a dose slot can be recorded once, by whoever gets there first
     pg.get_by_role("button", name="Record as Ravi").click()
     expect(pg.get_by_text("Nothing recorded yet.")).to_have_count(0, timeout=10000)
-    pg.locator(".segmented__option", has_text="Meena").click()
+    pg.locator(".actor", has_text="Meena").click()
     pg.get_by_role("button", name="Record as Meena").click()
     expect(pg.locator("[data-testid=duplicate]")).to_contain_text("Already recorded by Ravi")
 
