@@ -29,6 +29,16 @@ async def gm():
     yield mem
     for t in created:
         await db.drop_tenant(t)
+    for g in await db.client.list_graphs():          # forks made by the test (graph + control node)
+        if g.startswith("fork__tt-") or any(g.startswith(f"fork__{t}__") for t in created):
+            try:
+                await db.client.select_graph(g).delete()
+            except Exception:
+                pass
+    try:
+        await ctl.query("MATCH (f:Fork) WHERE f.tenant STARTS WITH 'tt-' OR f.tenant IN $ts DETACH DELETE f", {"ts": created})
+    except Exception:
+        pass
     new = sorted(await _ctl_ids(db) - before)
     try:
         if new:

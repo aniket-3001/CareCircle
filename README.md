@@ -115,6 +115,14 @@ Branches: `POST /v1/tenants/{t}/forks`, `POST /v1/forks/{id}/{op}`, `POST /v1/fo
 - **Retrieval (B6):** recall@3 on paraphrased questions 0.17 (graph only) -> 1.00 (hybrid); multi-hop 0.50 (graph) vs 0.00 (vector only). Small hand-written set.
 - **Isolation (B3):** 6 adversarial tests (forged keys, hostile tenant ids, foreign forks/spaces, injection strings, revocation): 0 leaks.
 
+## Real agents, not a script
+`scripts/agent_crew.py` launches two headless Claude Code agents (`claude -p`, Haiku) that see only graphmem's MCP tools. The planner
+inspects the blast radius of a ticket on click's code graph, records the scope as a fact, writes a plan derived from it and hands the task
+off; the script then re-scopes the ticket behind its back; the implementer resumes, finds the plan stale, rebases it and records a decision.
+The script then verifies in the graph (not from what the agents said) that the handoff, the revised plan and the decision trace exist. One
+run: planner 8 turns, implementer 7 turns, about $0.015 total, 3/3 checks passed. This is one run of one scenario with a small model; it shows
+that an unmodified agent can use the tools to coordinate, not how reliably it does so (run it repeatedly to see the variance).
+
 ## Is the graph decoration? (ablation, from the benchmarks above)
 Take the graph structure away and the same question gets worse: without `DERIVED_FROM`/`INFERRED_FROM` lineage, flat memory misses 54.8 stale
 plans (B1); without fork/merge, last-writer-wins silently overwrites every conflicting write (B2); without the import/co-change graph,
