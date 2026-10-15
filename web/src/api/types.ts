@@ -109,6 +109,12 @@ export interface IntakeResult {
   proposals: Proposal[];
 }
 
+export interface Counts {
+  load: { medicines: number; times_of_day: number; special_directions: number; statement: string };
+  anticholinergic: { total: number; medicines: { drug: string; score: number }[]; source: string; statement: string };
+  coverage: { statement: string; rated: number; unrated: number; not_listed: number; pairs_possible: number };
+  note: string;
+}
 export interface Handover { id: string; text: string; by: string; at: number }
 export interface GiveRecord {
   witness?: string | null;

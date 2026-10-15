@@ -20,6 +20,7 @@ export const HI_MORE: Record<string, string> = {
   'Notifications are on for this browser.': 'इस ब्राउज़र के लिए सूचनाएँ चालू हैं।', 'Notifications are off for this browser.': 'इस ब्राउज़र के लिए सूचनाएँ बंद हैं।', 'Notifications are blocked in this browser. Allow them in the site settings.': 'इस ब्राउज़र में सूचनाएँ बंद हैं। साइट सेटिंग में उन्हें अनुमति दें।',
   'A second carer confirms each dose of this medicine': 'इस दवा की हर खुराक की पुष्टि दूसरा देखभालकर्ता करता है', 'Handover notes': 'हैंडओवर नोट्स', 'Write a note for the next carer': 'अगले देखभालकर्ता के लिए नोट लिखें', 'Add note': 'नोट जोड़ें',
   'A note cannot be edited or removed once saved: add another to correct it.': 'सहेजने के बाद नोट बदला या हटाया नहीं जा सकता: सुधारने के लिए नया नोट जोड़ें।', 'No notes yet.': 'अभी कोई नोट नहीं।',
+  'How the record adds up': 'रिकॉर्ड का हिसाब', 'Plain counts for a talk with a pharmacist.': 'फ़ार्मासिस्ट से बात के लिए सीधी गिनती।',
   'Show fewer': 'कम दिखाएँ',
   // Graph
   'Replay animation': 'एनीमेशन दोबारा चलाएँ', 'Most hazard-connected in this regimen': 'इस सूची में सबसे ज़्यादा जोखिम-जुड़ी दवाएँ',

@@ -1,4 +1,4 @@
-import type { Handover, AllergyCheck, Appointment, CareProfile, Visit, DrugInfo, Reading, Trend, Recalls, SoleKnowers,
+import type { Counts, Handover, AllergyCheck, Appointment, CareProfile, Visit, DrugInfo, Reading, Trend, Recalls, SoleKnowers,
   Account, AuthConfig, CareGraph, ChatMessage, CheckResult, Divergence, FhirBundle, GiveRecord, GiveResult, Hubs, IntakeResult, Invite, Member, Reminder, People,
   Profile, Receipt, RegimenEntry, Session, TimelineEvent, CircleInfo,
 } from './types';
@@ -56,6 +56,7 @@ export function apiFor(s: Session) {
       op<{ id: string; status: string; warning?: string }>('care_record', { person: p, confirm: false, ...args }),
     confirm: (dose_id: string) => op<{ id: string }>('care_confirm', { dose_id }),
     give: (drug: string, slot: string) => op<GiveResult>('care_give', { person: p, drug, slot }),
+    counts: () => op<Counts>('care_summary_counts', { person: p }),
     watched: () => op<string[]>('care_watched', { person: p }),
     watch: (drug: string, on: boolean) => op<{ drug: string; watched: boolean }>('care_watch', { person: p, drug, on }),
     witness: (drug: string, slot: string) => op<{ witnessed: boolean; by: string }>('care_witness', { person: p, drug, slot }),
