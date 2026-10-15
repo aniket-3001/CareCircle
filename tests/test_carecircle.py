@@ -365,3 +365,29 @@ async def test_fhir_bundle_shape_and_free_text_only(gm):
     assert "coding" not in cla["medicationCodeableConcept"] and cla["dosage"][0]["text"] == "500 mg twice daily"
     assert "Quote verified" in cla["note"][0]["text"] and "photo" in cla["note"][0]["text"]
     json.dumps(b)
+
+
+async def test_pending_proposal_survives_a_restart(gm, monkeypatch):
+    monkeypatch.setenv("CC_LLM", "0")
+    t, c = await circle(gm, "ravi")
+    key = await gm.issue_key("ravi")
+    api = FakeApi()
+    await Bot(gm, api, Checker()).handle({"message": {"chat": {"id": 5}, "text": f"/link {key} {t}"}})
+    await Bot(gm, api, Checker()).handle({"message": {"chat": {"id": 5}, "text": "Please start warfarin 5 mg once daily"}})
+    btn = api.out[-1][2][0][0]["callback_data"]
+    fresh = Bot(gm, api, Checker())                       # a new process: nothing in memory
+    await fresh.handle({"callback_query": {"message": {"chat": {"id": 5}}, "data": btn}})
+    assert "Saved warfarin" in api.out[-1][1]
+    await fresh.handle({"callback_query": {"message": {"chat": {"id": 5}}, "data": btn}})          # a second tap does nothing
+    assert "expired" in api.out[-1][1]
+    await fresh.handle({"message": {"chat": {"id": 5}, "text": "/history"}})
+    assert "recorded Warfarin 5 mg once daily" in api.out[-1][1]
+
+
+def test_label_frequency_two_lines_below_the_drug_is_read():
+    ch = Checker()
+    text = "DEMO PHARMACY\nPatient: Asha\nClarithromycin 500 mg tablets\nTake ONE tablet twice daily for 7 days\nQty 14"
+    p = intake.rule_proposals(text, ch)[0]
+    assert p["dose_text"] == "500 mg" and p["freq_text"] == "twice daily"
+    assert intake.quote_in_source(p["quote"], text)
+    assert intake.rule_proposals("Warfarin 5 mg\nQty 30\nTake once daily", ch)[0]["freq_text"] == "once daily"

@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
 import urllib.request
 from typing import Optional
 
@@ -18,7 +19,7 @@ from carecircle.safety import scan_advice
 
 HELP = ("Care Circle records and cross-checks medicines for the person you look after. It never says what to take or stop.\n"
         "/link <key> <circle> - connect this chat\n/who - people in the circle\n/regimen <person> - what is on record now\n"
-        "/check <person> - possible interactions (with sources)\n/ack - acknowledge pending changes\n"
+        "/check <person> - possible interactions (with sources)\n/history - what happened, newest first\n/ack - acknowledge pending changes\n"
         "/gave <person> <medicine> <slot> - record a dose given\nSend a photo, voice note or text about a medicine to add it.")
 
 
@@ -45,7 +46,17 @@ class TgApi:
 class Bot:
     def __init__(self, gm, api, checker):
         self.gm, self.api, self.checker = gm, api, checker
-        self.pending: dict[str, dict] = {}                 # callback id -> proposal awaiting a human
+
+    async def _hold(self, cid: str, chat: int, data: dict) -> None:
+        """Proposals wait for a human in the control graph, not in memory, so a restart or deploy does not expire the Confirm button."""
+        g = await self.gm._ctl()
+        await g.query("MATCH (o:TgPending) WHERE o.at < $old DELETE o", {"old": int(time.time()) - 7 * 86400})
+        await g.query("CREATE (:TgPending {id:$i, chat:$c, data:$d, at:$t})", {"i": cid, "c": chat, "d": json.dumps(data), "t": int(time.time())})
+
+    async def _take(self, cid: str, chat: int) -> Optional[dict]:
+        g = await self.gm._ctl()
+        r = (await g.query("MATCH (o:TgPending {id:$i, chat:$c}) WITH o, o.data AS d DELETE o RETURN d", {"i": cid, "c": chat})).result_set
+        return json.loads(r[0][0]) if r else None
 
     async def _link(self, chat: int) -> Optional[dict]:
         g = await self.gm._ctl()
@@ -69,7 +80,7 @@ class Bot:
             return self.api.send(chat, "Please link this chat first: /link <key> <circle>")
         mem = self.gm.open(link["agent"], link["circle"])
         arg = (text.split() + ["", ""])[1]
-        if not arg and text.startswith(("/regimen", "/check", "/ack")):
+        if not arg and text.startswith(("/regimen", "/check", "/ack", "/history")):
             arg = await self._patient(mem)                          # "/regimen" alone means the circle's person
         try:
             if text.startswith("/who"):
@@ -81,6 +92,9 @@ class Bot:
                                                      for r in reg) or "Nothing on record yet.")
             if text.startswith("/check"):
                 return self.api.send(chat, self._format_check(await mem.care_check(arg)))
+            if text.startswith("/history"):
+                tl = await mem.care_timeline(arg or await self._patient(mem), limit=8)
+                return self.api.send(chat, chr(10).join(f"- {e['text']} ({e['ago']})" for e in tl) or "Nothing recorded yet.")
             if text.startswith("/ack"):
                 return await self._cmd_ack(chat, mem, arg)
             if text.startswith("/gave"):
@@ -131,8 +145,8 @@ class Bot:
         for p in props[:4]:
             cid = os.urandom(4).hex()
             top = p["drug_candidates"][0]["name"]
-            self.pending[cid] = {"drug": top, "dose_text": p.get("dose_text", ""), "freq_text": p.get("freq_text", ""),
-                                 "quote": p["quote"], "source_text": src["text"], "source_type": kinds.get(src["kind"], "typed")}
+            await self._hold(cid, chat, {"drug": top, "dose_text": p.get("dose_text", ""), "freq_text": p.get("freq_text", ""),
+                                 "quote": p["quote"], "source_text": src["text"], "source_type": kinds.get(src["kind"], "typed")})
             alt = ", ".join(c["name"] for c in p["drug_candidates"][1:])
             self.api.send(chat, f"I read: {top} {p.get('dose_text', '')} {p.get('freq_text', '')}\nFrom: \"{p['quote'][:120]}\""
                                 f"{' (quote verified)' if p.get('verified') else ' (could not verify the quote)'}"
@@ -143,7 +157,7 @@ class Bot:
         chat = cq["message"]["chat"]["id"]
         kind, cid, person = (cq.get("data", "||").split("|") + ["", ""])[:3]
         link = await self._link(chat)
-        p = self.pending.pop(cid, None)
+        p = await self._take(cid, chat)
         if not link or not p or kind != "ok":
             return self.api.send(chat, "Discarded." if kind == "no" else "That request expired.")
         mem = self.gm.open(link["agent"], link["circle"])
