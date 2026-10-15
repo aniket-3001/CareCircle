@@ -69,6 +69,8 @@ class Bot:
             return self.api.send(chat, "Please link this chat first: /link <key> <circle>")
         mem = self.gm.open(link["agent"], link["circle"])
         arg = (text.split() + ["", ""])[1]
+        if not arg and text.startswith(("/regimen", "/check", "/ack")):
+            arg = await self._patient(mem)                          # "/regimen" alone means the circle's person
         try:
             if text.startswith("/who"):
                 p = await mem.care_people()
@@ -84,7 +86,7 @@ class Bot:
             if text.startswith("/gave"):
                 parts = text.split(maxsplit=3)
                 if len(parts) < 4:
-                    return self.api.send(chat, "Usage: /gave <person> <medicine> <slot>, e.g. /gave mum metformin 2026-10-16 08:00")
+                    return self.api.send(chat, "Usage: /gave <person> <medicine> <slot>, e.g. /gave asha metformin 2026-10-16 08:00")
                 r = await mem.care_give(parts[1], parts[2], parts[3])
                 return self.api.send(chat, "Recorded." if r["given"] else f"Already recorded by {r['already_given_by']}. {r['note']}")
             if "photo" in m or "voice" in m or "audio" in m or "document" in m:
@@ -94,6 +96,11 @@ class Bot:
         except KeyError:
             return self.api.send(chat, "I could not find that.")
         self.api.send(chat, HELP)
+
+    @staticmethod
+    async def _patient(mem) -> str:
+        patients = (await mem.care_people())["patients"]
+        return patients[0] if patients else "mum"
 
     async def _cmd_link(self, chat, parts):
         if len(parts) < 3:
@@ -119,6 +126,8 @@ class Bot:
         if not props:
             return self.api.send(chat, "I did not find a medicine name. Please type it.")
         kinds = {"image": "photo", "voice": "voice", "document": "document"}
+        link = await self._link(chat)
+        who = await self._patient(self.gm.open(link["agent"], link["circle"])) if link else "mum"   # the circle's person
         for p in props[:4]:
             cid = os.urandom(4).hex()
             top = p["drug_candidates"][0]["name"]
@@ -128,7 +137,7 @@ class Bot:
             self.api.send(chat, f"I read: {top} {p.get('dose_text', '')} {p.get('freq_text', '')}\nFrom: \"{p['quote'][:120]}\""
                                 f"{' (quote verified)' if p.get('verified') else ' (could not verify the quote)'}"
                                 f"{chr(10) + 'Other matches: ' + alt if alt else ''}\nIs this right? It is saved only when you confirm.",
-                          [[{"text": "Confirm for mum", "callback_data": f"ok|{cid}|mum"}, {"text": "Discard", "callback_data": f"no|{cid}|"}]])
+                          [[{"text": f"Confirm for {who}", "callback_data": f"ok|{cid}|{who}"}, {"text": "Discard", "callback_data": f"no|{cid}|"}]])
 
     async def _callback(self, cq):
         chat = cq["message"]["chat"]["id"]
@@ -138,14 +147,14 @@ class Bot:
         if not link or not p or kind != "ok":
             return self.api.send(chat, "Discarded." if kind == "no" else "That request expired.")
         mem = self.gm.open(link["agent"], link["circle"])
-        r = await mem.care_record(person or "mum", p["drug"], dose_text=p["dose_text"], freq_text=p["freq_text"],
+        r = await mem.care_record(person or await self._patient(mem), p["drug"], dose_text=p["dose_text"], freq_text=p["freq_text"],
                                   source_type=p["source_type"], quote=p["quote"], source_text=p["source_text"])
         if r["status"] == "pending":
             await mem.care_confirm(r["id"])                          # the person just confirmed by tapping
-        self.api.send(chat, f"Saved {p['drug']} for {person or 'mum'}. Other carers will be asked to acknowledge it.")
+        self.api.send(chat, f"Saved {p['drug']} for {person or 'the person'}. Other carers will be asked to acknowledge it.")
 
     async def _cmd_ack(self, chat, mem, person):
-        div = await mem.care_divergence(person or "mum")
+        div = await mem.care_divergence(person or await self._patient(mem))
         me = (await self._link(chat))["agent"].lower()
         todo = div["carers"].get(me, {}).get("unacknowledged", [])
         for u in todo:

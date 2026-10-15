@@ -221,3 +221,19 @@ async def test_demo_circle_and_label(gm):
     src = intake.read_source(demo.label_png(), "l.png", "image/png")
     props = intake.propose(src["text"], Checker())
     assert props and props[0]["drug_candidates"][0]["name"] == "clarithromycin"
+
+
+async def test_bot_uses_the_circles_own_patient_by_default(gm, monkeypatch):
+    monkeypatch.setenv("CC_LLM", "0")
+    t, c = await circle(gm, "ravi")
+    await c["ravi"].care_record("asha", "metformin", dose_text="500 mg")
+    key = await gm.issue_key("ravi")
+    api = FakeApi(); bot = Bot(gm, api, Checker())
+    await bot.handle({"message": {"chat": {"id": 7}, "text": f"/link {key} {t}"}})
+    await bot.handle({"message": {"chat": {"id": 7}, "text": "/regimen"}})
+    assert "metformin" in api.out[-1][1]
+    await bot.handle({"message": {"chat": {"id": 7}, "text": "Please start warfarin 5 mg once daily"}})
+    btn = api.out[-1][2]
+    assert "asha" in btn[0][0]["text"] and btn[0][0]["callback_data"].endswith("|asha")
+    await bot.handle({"callback_query": {"message": {"chat": {"id": 7}}, "data": btn[0][0]["callback_data"]}})
+    assert {r["drug"] for r in await c["ravi"].care_regimen("asha")} == {"metformin", "warfarin"}
