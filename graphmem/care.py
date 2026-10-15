@@ -175,7 +175,7 @@ class CareMixin:
                                       "WITH n, n.fresh AS fresh SET n.fresh=false RETURN fresh", {"k": key, "t": t}, checked=True)
                     if r[0][0]:
                         facts = {"drug": u["drug"], "hours": u["age_hours"], "carer": carer}
-                        tpl = (f"{carer} has not yet seen the change to {u['drug']} made {u['age_hours']} hours ago. "
+                        tpl = (f"{carer.split(chr(45))[0].capitalize()} has not yet seen the change to {u['drug']} made {u['age_hours']} hours ago. "
                                "Please check with them.") if kind == "escalate" else (
                                f"The change to {u['drug']} made {u['age_hours']} hours ago is not yet acknowledged. Please open it and confirm.")
                         sent.append({"kind": kind, "about_carer": carer, "notify": to, "drug": u["drug"], "age_hours": u["age_hours"],
@@ -197,7 +197,7 @@ class CareMixin:
                     key = f"{kind}|{carer}|{u['dose']}|{to}"
                     sent = (await self._q("MATCH (n:Nudge {key:$k}) RETURN count(n)", {"k": key}, scope="read"))[0][0] > 0
                     facts = {"drug": u["drug"], "hours": u["age_hours"], "carer": carer}
-                    tpl = (f"{carer} has not yet seen the change to {u['drug']} made {u['age_hours']} hours ago. Please check with them.") if kind == "escalate" else (
+                    tpl = (f"{carer.split(chr(45))[0].capitalize()} has not yet seen the change to {u['drug']} made {u['age_hours']} hours ago. Please check with them.") if kind == "escalate" else (
                           f"The change to {u['drug']} made {u['age_hours']} hours ago is not yet acknowledged. Please open it and confirm.")
                     out.append({"kind": kind, "about_carer": carer, "notify": to, "drug": u["drug"], "age_hours": u["age_hours"],
                                 "message": reword(tpl, facts), "delivered": sent})
