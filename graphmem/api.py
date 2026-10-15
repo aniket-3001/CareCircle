@@ -21,7 +21,7 @@ from typing import Optional
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from pathlib import Path
 
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 from . import accounts_api, branch, ops, spaces
@@ -143,6 +143,14 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
         if not index.exists():
             return HTMLResponse("<h1>Care Circle API</h1><p>The web app is not built: run <code>npm ci && npm run build</code> in <code>web/</code>.</p>", status_code=503)
         return HTMLResponse(index.read_text(encoding="utf-8"), headers={"cache-control": "no-cache"})
+
+    @app.get("/sw.js")
+    async def service_worker():
+        """The notification service worker must be served from the site root (its scope), and must never be cached by the browser."""
+        sw = dist / "sw.js"
+        if not sw.exists():
+            raise HTTPException(404, "no service worker")
+        return Response(sw.read_text(encoding="utf-8"), media_type="text/javascript", headers={"cache-control": "no-cache", "service-worker-allowed": "/"})
 
     if (dist / "assets").exists():
         from fastapi.staticfiles import StaticFiles

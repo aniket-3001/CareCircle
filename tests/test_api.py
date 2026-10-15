@@ -166,3 +166,10 @@ async def test_branching_over_http(client, gm):
         assert (await client.post(f"/v1/tenants/{t}/forks", json={}, headers=other)).status_code == 403
     finally:
         await (await gm._ctl()).query("MATCH (f:Fork) WHERE f.tenant STARTS WITH 'tt-' DETACH DELETE f")
+
+
+async def test_service_worker_is_served_from_the_root(client, tmp_path, monkeypatch):
+    r = await client.get("/sw.js")
+    assert r.status_code in (200, 404)
+    if r.status_code == 200:
+        assert r.headers["content-type"].startswith("text/javascript") and r.headers["cache-control"] == "no-cache" and "showNotification" in r.text
