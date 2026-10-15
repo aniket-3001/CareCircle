@@ -110,6 +110,7 @@ export interface IntakeResult {
 }
 
 export interface Counts {
+  reading: { saved: number; unchanged: number; statement: string };
   load: { medicines: number; times_of_day: number; special_directions: number; statement: string };
   anticholinergic: { total: number; medicines: { drug: string; score: number }[]; source: string; statement: string };
   coverage: { statement: string; rated: number; unrated: number; not_listed: number; pairs_possible: number };

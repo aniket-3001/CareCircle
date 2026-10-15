@@ -152,7 +152,8 @@ export function ProposalCard({ p, kind, sourceText, onDone }: { p: Proposal; kin
   async function confirm(): Promise<void> {
     setBusy(true);
     try {
-      const r = await app.api.record({ drug, dose_text: dose, freq_text: freq, source_type: kind, quote: p.quote, source_text: sourceText || p.quote });
+      const edited = [drug !== (p.drug_candidates[0]?.name ?? '') && 'drug', dose !== p.dose_text && 'dose', freq !== p.freq_text && 'freq'].filter(Boolean).join(',');
+      const r = await app.api.record({ edited, drug, dose_text: dose, freq_text: freq, source_type: kind, quote: p.quote, source_text: sourceText || p.quote });
       await app.api.confirm(r.id);
       toast(`Saved ${title(drug)}. ${r.warning ? `${r.warning} ` : ''}The other carers will be asked to acknowledge it.`);
       app.bump();

@@ -18,6 +18,7 @@ export function Counts(): React.JSX.Element {
             <li><span>{c.load.statement}</span></li>
             <li><span>{c.anticholinergic.statement}{c.anticholinergic.medicines.length > 0 && ` (${c.anticholinergic.medicines.map((m) => `${title(m.drug)} ${m.score}`).join(', ')})`} <span className="muted">· {c.anticholinergic.source}</span></span></li>
             <li><span>{c.coverage.statement}</span></li>
+            <li><span>{c.reading.statement}</span></li>
           </ul>
         )}
       </Async>
