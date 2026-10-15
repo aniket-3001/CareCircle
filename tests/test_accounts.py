@@ -229,3 +229,35 @@ async def test_only_an_owner_can_erase_everything_about_the_person(client):
     erase = {"person": "mum", "confirm": "mum"}
     assert (await client.post(f"/v1/tenants/{cid}/care_forget_person", json=erase, headers=auth(b))).status_code == 403
     assert (await client.post(f"/v1/tenants/{cid}/care_forget_person", json=erase, headers=auth(a))).status_code == 200
+
+
+async def test_telegram_links_with_an_account_code_and_switches_circles(client, gm):
+    from carecircle.checks import Checker
+    from carecircle.telegram import Bot
+
+    class Api:
+        def __init__(self): self.out = []
+        def send(self, chat, text, buttons=None): self.out.append(text)
+
+    token, acct = await account(client)
+    c1 = (await client.post("/v1/account/circles", json={"name": "Asha", "person": "Asha"}, headers=auth(token))).json()["id"]
+    c2 = (await client.post("/v1/account/circles", json={"name": "Dad", "person": "Dad"}, headers=auth(token))).json()["id"]
+    api = Api()
+    bot = Bot(gm, api, Checker())
+    await bot.handle({"message": {"chat": {"id": 31}, "text": "/link NOPE12"}})
+    assert "not valid" in api.out[-1]
+    code = (await client.post("/v1/account/telegram-code", headers=auth(token))).json()["code"]
+    await bot.handle({"message": {"chat": {"id": 31}, "text": f"/link {code}"}})
+    assert "Linked to Asha" in api.out[-1]
+    await bot.handle({"message": {"chat": {"id": 31}, "text": f"/link {code}"}})
+    assert "not valid" in api.out[-1]                                                      # one use
+    assert (await client.get("/v1/account", headers=auth(token))).json()["telegram"] == [{"chat": 31, "circle": c1}]
+    await bot.handle({"message": {"chat": {"id": 31}, "text": "/circles"}})
+    assert "1. Asha (here)" in api.out[-1] and "2. Dad" in api.out[-1]
+    await bot.handle({"message": {"chat": {"id": 31}, "text": "/circles 2"}})
+    assert "Now using Dad" in api.out[-1]
+    await bot.handle({"message": {"chat": {"id": 31}, "text": "Please start warfarin 5 mg once daily"}})
+    cb = [x for x in api.out if "I read: warfarin" in x]
+    assert cb                                                                              # the proposal is for the circle now in use
+    assert (await client.request("DELETE", "/v1/account/telegram", headers=auth(token))).status_code == 200
+    assert (await client.get("/v1/account", headers=auth(token))).json()["telegram"] == []
