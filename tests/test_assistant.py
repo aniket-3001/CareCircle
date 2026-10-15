@@ -57,6 +57,7 @@ async def test_rule_answers_come_from_the_record_and_never_advise(gm):
     "Should she stop taking the metformin?", "Can I give both tablets together?", "is it safe to take clarithromycin with atorvastatin",
     "How much metformin should she take", "what dose is right", "can mum skip tonight's dose", "Is this combination dangerous?",
     "what are the side effects", "which is better, metformin or something else", "what should I do about this interaction",
+    "Is it alright if mum has ibuprofen with it", "Would it hurt to skip tonight's tablet", "I forgot a pill, what now", "can mum drink alcohol on this", "Tell me whether to stop it", "Any harm in doubling up",
 ])
 async def test_advice_seeking_questions_are_refused_with_a_pointer_to_a_professional(gm, q):
     t, c, now = await seeded(gm)

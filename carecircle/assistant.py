@@ -33,7 +33,9 @@ ADVICE_Q = re.compile(
     r"\b(should|can|could|may|must|ought)\s+(i|we|she|he|they|mum|mom|dad|amma|papa|\w+)\s+(\w+\s+){0,3}(take|give|stop|skip|miss|double|increase|decrease|mix|combine|have|use|start|continue|reduce)\b"
     r"|\bhow (much|many|often|long)\b[^?]{0,40}\b(take|give|dose|tablets?|pills?)\b|\bwhat (dose|dosage)\b|\bdosage\b|\boverdose\b"
     r"|\b(is|are|would|will)\s+(it|this|that|they|these|those)\b[^?]{0,30}\b(safe|ok|okay|fine|dangerous|harmful|ok to)\b|\bsafe (to|with|together)\b|\bok(ay)? to\b"
-    r"|\bside effects?\b|\bdiagnos\w*|\bsymptoms?\b|\bwhat should i do\b|\bwhich is better\b|\balternative\b|\bsubstitute\b|\binstead of\b", re.I)
+    r"|\bside effects?\b|\bdiagnos\w*|\bsymptoms?\b|\bwhat should i do\b|\bwhich is better\b|\balternative\b|\bsubstitute\b|\binstead of\b"
+    r"|\b(ok|okay|fine|alright|all right|allowed|acceptable)\s+(with|if|to)\b|\bwhether to\b|\b(worry|worried|harm|hurt|risky|dangerous|too much|too many)\b|\bmax(imum)? (dose|amount|i can)\b"
+    r"|\b(forgot|forgotten|missed)\b[^?]{0,30}\b(dose|pill|tablet|medicine)s?\b|\bwhat (now|happens if|if)\b|\b(carry on|stopping|doubling|skipping|halving)\b|\brecommend\w*|\b(alcohol|wine|beer|grapefruit)\b|\b(problem|issue) to\b|\bwould you say\b", re.I)
 
 UNSEEN = re.compile(r"\b(not (yet )?seen|haven'?t seen|hasn'?t seen|unseen|unacknowledged|acknowledg\w*|out of date|behind|who (has|hasn'?t|have|knows)|kept in the loop|know about)\b", re.I)
 FLAGS = re.compile(r"\b(interact\w*|flag\w*|conflict\w*|clash\w*|major|moderate|enzyme|cyp\w*|why .*(flag|warn|red)|warning|combin\w*|together)\b", re.I)
