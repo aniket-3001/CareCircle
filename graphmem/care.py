@@ -273,6 +273,14 @@ class CareMixin:
         keystone = max(load, key=lambda k: load[k]) if load else None
         return {"carers": carers, "sole": out, "keystone": keystone, "keystone_count": load.get(keystone, 0) if keystone else 0}
 
+    async def care_summary_counts(self, person: str) -> dict:
+        """Plain counts over the record for a talk with a pharmacist: how complicated the regimen reads, a short anticholinergic list total (a subset), and
+        how much of the regimen the interaction sources actually cover."""
+        from carecircle import burden
+        c = await self.care_check(person)
+        return {"load": burden.regimen_load(c["regimen"]), "anticholinergic": burden.anticholinergic_count(c["regimen"]), "coverage": c["coverage"],
+                "note": "Counts of what is written and listed. They describe the record, not the person, and are not advice."}
+
     async def care_people(self) -> dict:
         """Patients and carers known in this circle."""
         rows = await self._q("MATCH (p:Person) RETURN p.id, p.role ORDER BY p.role, p.id", scope="read")
