@@ -59,12 +59,12 @@ export function CircleScreen(): React.JSX.Element {
                       {v.unacknowledged.length > 0 ? (
                         <div className="person-unseen">
                           {v.unacknowledged.map((u) => (
-                            <div key={u.dose} className="item">
+                            <div key={u.dose} className="item" style={{ alignItems: 'center', gap: 12 }}>
                               <div>
                                 <div className="item__title">{title(u.drug)} {u.action === 'stop' ? 'stopped' : 'changed'}</div>
                                 <div className="item__sub">{ago(t - u.age_hours * 3_600_000, t)}</div>
                               </div>
-                              {c === app.me && <button type="button" className="btn btn--sm" onClick={() => void ack(u.dose)}>I have seen this</button>}
+                              {c === app.me && <button type="button" className="btn btn--sm" style={{ whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => void ack(u.dose)}>I have seen this</button>}
                             </div>
                           ))}
                         </div>
