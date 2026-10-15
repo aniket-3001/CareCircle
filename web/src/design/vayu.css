@@ -293,7 +293,7 @@ code, .code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: 
 }
 
 /* ---------------------------------------------------------------- account bits and the assistant */
-.circle-pick select { max-width: 18rem; min-height: 40px; padding: 0 36px 0 16px; text-overflow: ellipsis; line-height: 40px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--text); font-weight: 600; font-size: 14px; }
+.circle-pick select { max-width: 18rem; min-height: 40px; padding: 0 34px 0 16px; text-overflow: ellipsis; line-height: 40px; appearance: none; -webkit-appearance: none; field-sizing: content; background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235b6b7f' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center; cursor: pointer; border: 1px solid var(--line); border-radius: 999px; color: var(--text); font-weight: 600; font-size: 14px; }
 .avatar-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--c-carer); color: var(--ink); font-weight: 800; font-size: 16px; cursor: pointer; }
 .icon-btn--rec { background: #f8dcdc; border-color: #e6a5a5; color: #b0413e; }
 @media (max-width: 520px) { .circle-pick select { max-width: 8.5rem; padding: 0 30px 0 12px; } .topline-actions { gap: 6px; } }
@@ -322,3 +322,4 @@ code, .code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: 
 @media (max-width: 520px) { .wide-only { display: none; } }
 @media (min-width: 521px) { .narrow-only { display: none; } }
 .topline-actions .btn--sm { gap: 0; }
+.lang-btn { min-width: 44px; padding: 0 10px; font-weight: 700; }
