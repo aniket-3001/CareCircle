@@ -4,6 +4,7 @@
     moderate/major pairs between the same drug sets does the rule recover? (A cross-check of two independent public sources.)
  B2 carer-staleness query vs an independent Python oracle on generated circles; baseline = "only the most recent change per carer".
  B3 double-dose guard: N rounds of concurrent claims on one slot; exactly one winner each time.
+ B5 latency of the interaction check for a 10-medicine regimen.
 
   PYTHONPATH=. python bench/care_bench.py [--circles 40] [--rounds 100]
 """
@@ -98,9 +99,22 @@ async def b3(rounds, width=10):
     return dict(rounds=rounds, concurrent_claims_per_round=width, rounds_with_exactly_one_winner=sum(1 for w in wins if w == 1))
 
 
+def b5(runs=200):
+    """B5 latency of the interaction check on a 10-medicine regimen (direct pairs + enzyme paths + combined weight), warm, one process."""
+    from carecircle.checks import Checker
+    c = Checker("localhost", 6379)
+    drugs = ["metformin", "amlodipine", "atorvastatin", "lisinopril", "levothyroxine", "omeprazole", "warfarin", "vitamin d", "clarithromycin", "ibuprofen"]
+    c.check(drugs)
+    ts = []
+    for _ in range(runs):
+        t = time.perf_counter(); c.check(drugs); ts.append((time.perf_counter() - t) * 1000)
+    ts.sort()
+    return {"regimen_size": len(drugs), "runs": runs, "p50_ms": round(ts[len(ts) // 2], 1), "p95_ms": round(ts[int(len(ts) * 0.95)], 1), "max_ms": round(ts[-1], 1)}
+
+
 async def main(circles, rounds):
     import json
-    print(json.dumps({"B1_enzyme_vs_ddinter": b1(), "B2_staleness": await b2(circles, 7), "B3_double_dose": await b3(rounds)}, indent=1))
+    print(json.dumps({"B1_enzyme_vs_ddinter": b1(), "B2_staleness": await b2(circles, 7), "B3_double_dose": await b3(rounds), "B5_check_latency": b5()}, indent=1))
 
 
 if __name__ == "__main__":

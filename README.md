@@ -146,7 +146,20 @@ indexes, unique constraints, variable-length paths, `FOREACH`, `UNWIND` bulk loa
 - **Carer staleness (graph query vs independent oracle):** exact in 40/40 generated circles; "last change only" baseline 0/40.
 - **Double-dose guard:** one winner in 100/100 rounds of 10 concurrent claims.
 
+- **Interaction check latency:** 7 ms median, 10 ms at the 95th percentile, for a 10-medicine regimen (direct pairs, enzyme paths and combined weight in three reads), warm, one process (`bench/care_bench.py`, B5).
 - **Intake on real input:** 5 real bottle photos and 1 spoken note (browser microphone to Whisper): drug found in 6/6, with one wrong extra candidate; see `docs/BENCHMARKS.md` (B4).
+
+## What runs, and how it is checked
+| Feature | Where it is answered | Checked by |
+|---|---|---|
+| Interaction flags and enzyme paths | `cc_ref` graph (DDInter, FDA table) | unit tests, B1, B5 |
+| Who has seen what, and who alone knows | circle graph (`ACKED` edges) | tests, B2 oracle, browser walk-through |
+| Dose given once per slot | one conditional `MERGE` | tests, B3 |
+| Readings next to medicine changes | circle graph (`Measurement`, `Dose`) | tests, browser walk-through |
+| Appointments, conditions, allergy cross-check | circle graph | tests, browser walk-through |
+| Recalls, label text, name lookup | RxNorm and openFDA, name only, cached in `cc_ref` | tests with the network faked; **live calls are not covered by CI** |
+| Helper (English and Hindi) | rules over the circle's facts; guarded model fallback (English only) | tests incl. advice refusals |
+| Schema upgrades | versioned migrations per circle graph | tests |
 
 **Not measured:** OCR/voice accuracy at scale or on home-quality photos and accents, severity accuracy against clinical truth, any patient outcome.
 
