@@ -127,14 +127,12 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
     async def _bad(_: Request, e: Exception):
         return JSONResponse({"error": str(e)}, status_code=422)
 
-    ui_file = Path(__file__).parent / "ui.html"
-
     web = Path(__file__).resolve().parent.parent / "web"
 
     @app.get("/", response_class=HTMLResponse)
     async def ui():
         index = web / "index.html"
-        return HTMLResponse((index if index.exists() else ui_file).read_text(encoding="utf-8"))
+        return HTMLResponse(index.read_text(encoding="utf-8"))
 
     if web.exists():
         from fastapi.staticfiles import StaticFiles
