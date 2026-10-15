@@ -17,16 +17,16 @@ CARERS = ("ravi", "meena")
 
 def label_png(drug: str = "Clarithromycin 500 mg tablets", sig: str = "Take ONE tablet twice daily for 7 days") -> bytes:
     """A synthetic pharmacy label (all fictional)."""
-    img = Image.new("RGB", (720, 330), "white")
+    img = Image.new("RGB", (900, 420), "white")
     d = ImageDraw.Draw(img)
     try:
-        f, fb = ImageFont.truetype("arial.ttf", 24), ImageFont.truetype("arialbd.ttf", 28)
+        f, fb = ImageFont.truetype("arial.ttf", 32), ImageFont.truetype("arialbd.ttf", 38)
     except OSError:
         f = fb = None
-    d.rectangle([8, 8, 712, 322], outline="#888", width=3)
+    d.rectangle([8, 8, 892, 412], outline="#888", width=3)
     for i, (t, b) in enumerate([("DEMO PHARMACY   Rx 00481", False), ("Patient: Asha (synthetic)", False), (drug, True), (sig, False),
                                 ("Qty 14   Refills 0   Dr. Example", False)]):
-        d.text((28, 24 + i * 56), t, fill="black", font=fb if b else f)
+        d.text((32, 28 + i * 74), t, fill="black", font=fb if b else f)
     buf = io.BytesIO(); img.save(buf, "PNG")
     return buf.getvalue()
 

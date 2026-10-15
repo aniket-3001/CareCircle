@@ -391,3 +391,9 @@ def test_label_frequency_two_lines_below_the_drug_is_read():
     assert p["dose_text"] == "500 mg" and p["freq_text"] == "twice daily"
     assert intake.quote_in_source(p["quote"], text)
     assert intake.rule_proposals("Warfarin 5 mg\nQty 30\nTake once daily", ch)[0]["freq_text"] == "once daily"
+
+
+def test_ocr_letter_o_inside_numbers_is_read_as_zero_only_there():
+    assert intake.fix_digits("Clarithromycin 5o0 mg") == "Clarithromycin 500 mg"
+    assert intake.fix_digits("take 1OO mg; 2O mg") == "take 100 mg; 20 mg"
+    assert intake.fix_digits("Oral dose; Omeprazole; TOP 10; Rx 00481") == "Oral dose; Omeprazole; TOP 10; Rx 00481"

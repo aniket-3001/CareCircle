@@ -56,6 +56,14 @@ def _done(kind: str, text: str, method: str) -> dict:
             "note": None if text else "nothing readable found: type it in or retake the photo"}
 
 
+_O_FOR_ZERO = re.compile(r"(?<=\d)([Oo]+)(?=\d|\s?(?:mg|mcg|ml|g)\b)", re.I)
+
+
+def fix_digits(text: str) -> str:
+    """OCR reads a zero as the letter O inside numbers ("5o0 mg", "1OO mg"). Only touches O's that follow a digit and precede a digit or a unit."""
+    return _O_FOR_ZERO.sub(lambda m: "0" * len(m.group(1)), text)
+
+
 def _ocr_text(data: bytes) -> str:
     global _ocr
     from PIL import Image
