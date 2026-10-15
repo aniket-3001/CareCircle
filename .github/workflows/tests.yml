@@ -29,6 +29,7 @@ jobs:
           CC_LLM=0 python -m graphmem.api > api.log 2>&1 &
           for i in $(seq 1 30); do curl -sf localhost:8000/healthz && break; sleep 1; done
           PORT=8000 CC_SHOTS="$RUNNER_TEMP" python scripts/ui_e2e.py || { tail -30 api.log; exit 1; }
+          PORT=8000 CC_SHOTS="$RUNNER_TEMP" python scripts/ui_e2e_accounts.py || { tail -30 api.log; exit 1; }
 
   # Every push to main that passes the tests is deployed to the live site. AWS access is by short-lived OIDC credentials
   # (no keys stored in GitHub): the role can only be assumed from this repo's main branch and can only run a command on one instance.
