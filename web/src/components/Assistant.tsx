@@ -27,6 +27,12 @@ function utter(text: string): SpeechSynthesisUtterance {
   return u;
 }
 
+interface SpeechRec {
+  continuous: boolean; interimResults: boolean; lang: string;
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onerror: (() => void) | null;
+  start: () => void; stop: () => void;
+}
+
 const voiceOn = (): boolean => { try { return window.localStorage.getItem('cc-voice') === 'on'; } catch { return false; } };
 
 /** The helper. It answers from the circle's own record (the server decides what it may say), prepares entries for you to confirm, and refuses to advise.
@@ -42,6 +48,8 @@ export function Assistant({ open, onClose, initial }: { open: boolean; onClose: 
   const [speak, setSpeak] = useState(voiceOn);
   const [left, setLeft] = useState<number | null>(null);
   const end = useRef<HTMLDivElement>(null);
+  const live = useRef('');
+  const recog = useRef<{ stop: () => void } | null>(null);
   const sent = useRef('');
 
   useEffect(() => { if (open) app.api.chat().then(setMsgs, () => setMsgs([])); }, [open, app.api, app.rev]);
@@ -76,10 +84,31 @@ export function Assistant({ open, onClose, initial }: { open: boolean; onClose: 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const r = new MediaRecorder(stream);
       const chunks: Blob[] = [];
+      // live captions while speaking (the browser's own recogniser, where it has one); the recording is the fallback
+      live.current = '';
+      const SR = (window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec }).SpeechRecognition
+        ?? (window as unknown as { webkitSpeechRecognition?: new () => SpeechRec }).webkitSpeechRecognition;
+      if (SR) {
+        const sr = new SR();
+        sr.continuous = true;
+        sr.interimResults = true;
+        sr.lang = getLang() === 'hi' ? 'hi-IN' : 'en-IN';
+        sr.onresult = (e) => {
+          let text = '';
+          for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript + ' ';
+          live.current = text.trim();
+          setDraft(live.current);
+        };
+        sr.onerror = () => undefined;
+        try { sr.start(); recog.current = sr; } catch { recog.current = null; }
+      }
       r.ondataavailable = (e) => chunks.push(e.data);
       r.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
+        recog.current?.stop();
+        recog.current = null;
         setRec(null);
+        if (live.current) { const said = live.current; live.current = ''; void say(said); return; }
         setBusy(true);
         try {
           const fd = new FormData();
