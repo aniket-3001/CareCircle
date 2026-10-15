@@ -1,0 +1,18 @@
+falkordb
+fastapi
+uvicorn[standard]
+python-multipart
+mcp
+httpx
+boto3
+pillow
+numpy
+rapidocr-onnxruntime
+faster-whisper
+pypdf
+python-docx
+# tests
+pytest
+pytest-asyncio
+# optional: semantic recall (GRAPHMEM_EMBEDDINGS=1)
+# fastembed
