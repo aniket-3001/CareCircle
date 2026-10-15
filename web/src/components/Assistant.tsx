@@ -54,6 +54,8 @@ export function Assistant({ open, onClose, initial }: { open: boolean; onClose: 
   const sent = useRef('');
 
   useEffect(() => { if (open) app.api.chat().then(setMsgs, () => setMsgs([])); }, [open, app.api, app.rev]);
+  useEffect(() => { if (!open) { window.speechSynthesis?.cancel(); recog.current?.stop(); } }, [open]);
+  useEffect(() => () => { window.speechSynthesis?.cancel(); }, []);
   useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [msgs, busy]);
 
   const say = useCallback(async (text: string) => {
