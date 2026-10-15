@@ -156,3 +156,40 @@ async def test_no_output_gives_advice_and_judgement_states(gm):
     assert (await r.care_check("mum"))["judgement"]["state"] == "flags"
     for o in outputs:
         assert safety.scan_advice(o) == [], safety.scan_advice(o)
+
+
+# ---- telegram shell (fake API, no network) ----
+from carecircle.telegram import Bot
+
+
+class FakeApi:
+    def __init__(self): self.out = []
+    def send(self, chat, text, buttons=None): self.out.append((chat, text, buttons))
+    def download(self, fid): return open(reference.DATA.parent.parent.parent / "data" / "checks" / "label.png", "rb").read(), "p.png"
+
+
+async def test_bot_link_photo_confirm_check_and_nudge(gm, monkeypatch):
+    monkeypatch.setenv("CC_LLM", "0")
+    t, c = await circle(gm, "ravi", "meena")
+    key = await gm.issue_key("ravi"); key2 = await gm.issue_key("meena")
+    api = FakeApi(); bot = Bot(gm, api, Checker())
+    await bot.handle({"message": {"chat": {"id": 1}, "text": "/regimen mum"}})
+    assert "link this chat first" in api.out[-1][1]
+    await bot.handle({"message": {"chat": {"id": 1}, "text": f"/link {key} {t}"}})
+    await bot.handle({"message": {"chat": {"id": 2}, "text": f"/link {key2} {t}"}})
+    assert "Linked as ravi" in api.out[-2][1]
+    await bot.handle({"message": {"chat": {"id": 1}, "photo": [{"file_id": "x"}]}})
+    chat, msg, btn = api.out[-1]
+    assert "warfarin" in msg and btn and "quote verified" in msg
+    await bot.handle({"callback_query": {"message": {"chat": {"id": 1}}, "data": btn[0][0]["callback_data"]}})
+    await bot.handle({"message": {"chat": {"id": 1}, "text": "/regimen mum"}})
+    assert "warfarin" in api.out[-1][1].lower()
+    await bot.handle({"message": {"chat": {"id": 1}, "text": "/check mum"}})
+    assert "not a statement of safety" in api.out[-1][1] or "Possible interactions" in api.out[-1][1]
+    later = int(__import__("time").time() * 1000) + 6 * H
+    await bot.handle({"message": {"chat": {"id": 2}, "text": "/who"}})        # meena appears as a carer only after acting; ack makes her one
+    await c["meena"].care_ack((await c["meena"].care_record("mum", "vitamin d"))["id"])
+    await c["ravi"].care_record("mum", "metformin")
+    assert await bot.deliver_nudges(now=later) >= 1 and await bot.deliver_nudges(now=later) == 0
+    await bot.handle({"message": {"chat": {"id": 2}, "text": "/ack"}})
+    assert "Acknowledged" in api.out[-1][1]

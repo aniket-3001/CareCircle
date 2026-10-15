@@ -27,7 +27,7 @@ OPS = {
     # traceability
     # care circle
     "care_record": "write", "care_confirm": "write", "care_regimen": "read", "care_check": "read", "care_resolve": "read",
-    "care_ack": "write", "care_divergence": "read", "care_nudges": "write", "care_give": "write", "care_gives": "read",
+    "care_ack": "write", "care_divergence": "read", "care_nudges": "write", "care_give": "write", "care_gives": "read", "care_people": "read", "care_hubs": "read",
     # code graph + algorithms
     "code_load": "write", "code_stats": "read", "blast_radius": "read", "dependencies_of": "read",
     "criticality": "read", "single_points_of_failure": "read", "failure_domains": "read", "communities": "read",

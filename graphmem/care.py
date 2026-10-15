@@ -15,6 +15,7 @@ import os
 from typing import Optional
 
 from carecircle import risk
+from carecircle.algos import Algos
 from carecircle.checks import Checker
 from carecircle.safety import judgement, reword
 from carecircle.verify import quote_in_source
@@ -22,6 +23,7 @@ from carecircle.verify import quote_in_source
 from .db import new_id, norm, now_ms
 
 _checker: Optional[Checker] = None
+_algos: Optional[Algos] = None
 SOURCES = ("typed", "photo", "voice", "document")
 H = 3_600_000
 
@@ -191,3 +193,18 @@ class CareMixin:
         rows = await self._q("MATCH (g:Give {person:$p}) RETURN g.drug, g.slot, g.by, g.at ORDER BY g.at DESC LIMIT $n",
                              {"p": norm(person), "n": limit}, scope="read")
         return [dict(drug=r[0], slot=r[1], by=r[2], at=r[3]) for r in rows]
+
+    async def care_people(self) -> dict:
+        """Patients and carers known in this circle."""
+        rows = await self._q("MATCH (p:Person) RETURN p.id, p.role ORDER BY p.role, p.id", scope="read")
+        return {"patients": [r[0] for r in rows if r[1] == "patient"], "carers": [r[0] for r in rows if r[1] == "carer"]}
+
+    async def care_hubs(self, person: str) -> dict:
+        """Graph-algorithm views: which medicines sit in most hazards within this regimen, and the PageRank hubs of the reference graph
+        (each with the Cypher that ran)."""
+        global _algos
+        if _algos is None:
+            _algos = Algos(os.getenv("FALKORDB_HOST", "localhost"), int(os.getenv("FALKORDB_PORT", "6379")))
+        reg = await self.care_regimen(person)
+        return {"regimen_hubs": await asyncio.to_thread(_algos.regimen_hubs, [r["drug"] for r in reg]),
+                "global_hubs": await asyncio.to_thread(_algos.hub_drugs, 10)}
