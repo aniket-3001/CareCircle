@@ -38,8 +38,13 @@ export function App(): React.JSX.Element {
   const [assistant, setAssistant] = useState<{ open: boolean; q?: string }>({ open: false });
   const [sev, setSev] = useState<SeverityKey>('none');
 
-  const go = useCallback((t: TabId) => { setTab(t); window.history.replaceState(null, '', `#/${t}`); window.scrollTo({ top: 0 }); }, []);
-  useEffect(() => { const f = () => setTab(fromHash()); window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f); }, []);
+  // each tab is a history entry, so Back walks through the tabs you visited before it leaves the app
+  const go = useCallback((t: TabId) => {
+    setTab(t);
+    if (window.location.hash !== `#/${t}`) window.history.pushState(null, '', `#/${t}`);
+    window.scrollTo({ top: 0 });
+  }, []);
+  useEffect(() => { const f = () => setTab(fromHash()); window.addEventListener('popstate', f); window.addEventListener('hashchange', f); return () => { window.removeEventListener('popstate', f); window.removeEventListener('hashchange', f); }; }, []);
 
   const token = session?.account ? session.keys.me ?? null : null;
   const acct = useMemo(() => (token ? makeAccountApi(token) : null), [token]);
