@@ -23,5 +23,21 @@ This shows correctness of the graph query against an independently written oracl
 ## B3 Double-dose guard
 100 rounds of 10 concurrent claims on one dose slot from two carers: exactly one winner in **100/100** rounds (single MERGE claim).
 
+## B4 Intake on real photos and speech (small, hand-checked, rules path with no model)
+5 real photographs of medicine bottles from Wikimedia Commons (CC licences, used for testing only, not stored in the repo) and 1 synthetic-speech recording
+(Windows speech synthesizer, played into Chrome's microphone and transcribed by Whisper `base`).
+
+| Input | What OCR/ASR read | Result |
+|---|---|---|
+| Generic Truvada bottle | "Emtricitabine and / Tenofovir / Disoproxil Fumarate ... 200 mg/300 mg" | emtricitabine found; the strength was attached to a wrong second candidate ("diroximel fumarate"): a person must pick |
+| AcipHex sample bottle | "AcipHex / rabeprazolesodium / 20mg" | rabeprazole 20mg, quote verified |
+| Anastrozole bottle | "ANASTROZOLE ... TABLETS" | anastrozole (no strength legible) |
+| Advil bottle | "Advil LIQUI-GELS" | ibuprofen via the brand list (no strength legible) |
+| Aspirin bottle | "GENUINE ASPIRIN ..." | acetylsalicylic acid via the brand list |
+| Voice, "chlorythromycin 500 mg twice daily" | Whisper spelled the drug "chlorythromycin" | clarithromycin 500 mg after single-word fuzzy matching |
+
+Drug named correctly as a candidate in 5/5 photos and the voice note; strength captured correctly in 2 of the 3 inputs that show one. One wrong candidate
+shown beside a right one. n is tiny and these are clean product shots, not curved, creased or blurry home photos, so this shows the pipeline works on real pixels and real speech, not its accuracy in a kitchen.
+
 ## Not measured
-OCR/ASR accuracy on real photos and voices, interaction-severity accuracy against clinical truth, any patient outcome.
+OCR/ASR accuracy at scale or on home-quality photos and varied accents, interaction-severity accuracy against clinical truth, any patient outcome.
