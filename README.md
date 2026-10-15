@@ -116,7 +116,7 @@ indexes, unique constraints, variable-length paths, `FOREACH`, `UNWIND` bulk loa
 ## Limits, stated plainly
 - Interaction severity weights (minor .1, moderate .3, major .7; enzyme strong .7, moderate .3; staleness half-life 72 h) are **assumptions**, not clinical values.
 - The FDA CYP table is an index list, not exhaustive. Sources may disagree. Flags are for discussion with a prescriber or pharmacist.
-- The Telegram bot is tested against a fake Telegram API and, by hand, live (`/link`, `/regimen`, a typed medicine, Confirm, `/check`, a photo of a label, a reminder arriving after a back-dated unseen change, `/ack`); a voice note through Telegram was not yet exercised live. A photo reading shows the strength but not a frequency written two lines below the drug name. Voice uses a local Whisper `base` model; accuracy varies with accent and noise.
+- The Telegram bot is tested against a fake Telegram API and, by hand, live (`/link`, `/regimen`, a typed medicine, Confirm, `/check`, a photo of a label, a reminder arriving after a back-dated unseen change, `/ack`); a spoken note, where Whisper heard "Arferin" and the matcher still offered warfarin first, with the heard text shown for a person to confirm. A photo reading shows the strength but not a frequency written two lines below the drug name. Voice uses a local Whisper `base` model; accuracy varies with accent and noise.
 - Anthropic models on Bedrock were unavailable on the account used (verification pending), so the default structuring model is Amazon Nova; rules work without any model.
 - Per-process rate limiting; no TLS in the compose file (put a proxy in front); one shared database credential across circles.
 
