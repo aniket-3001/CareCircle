@@ -29,7 +29,7 @@ function utter(text: string): SpeechSynthesisUtterance {
 
 interface SpeechRec {
   continuous: boolean; interimResults: boolean; lang: string;
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onerror: (() => void) | null;
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onerror: ((e: unknown) => void) | null;
   start: () => void; stop: () => void;
 }
 
@@ -48,6 +48,7 @@ export function Assistant({ open, onClose, initial }: { open: boolean; onClose: 
   const [speak, setSpeak] = useState(voiceOn);
   const [left, setLeft] = useState<number | null>(null);
   const end = useRef<HTMLDivElement>(null);
+  const [captionNote, setCaptionNote] = useState('');
   const live = useRef('');
   const recog = useRef<{ stop: () => void } | null>(null);
   const sent = useRef('');
@@ -86,6 +87,7 @@ export function Assistant({ open, onClose, initial }: { open: boolean; onClose: 
       const chunks: Blob[] = [];
       // live captions while speaking (the browser's own recogniser, where it has one); the recording is the fallback
       live.current = '';
+      setCaptionNote('');
       const SR = (window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec }).SpeechRecognition
         ?? (window as unknown as { webkitSpeechRecognition?: new () => SpeechRec }).webkitSpeechRecognition;
       if (SR) {
@@ -99,7 +101,7 @@ export function Assistant({ open, onClose, initial }: { open: boolean; onClose: 
           live.current = text.trim();
           setDraft(live.current);
         };
-        sr.onerror = () => undefined;
+        sr.onerror = (e) => { const code = (e as unknown as { error?: string })?.error; if (code && code !== 'no-speech' && code !== 'aborted') setCaptionNote(code === 'not-allowed' ? 'Live captions are blocked here; the text will appear when you stop.' : 'Live captions are not available in this browser; the text will appear when you stop.'); };
         try { sr.start(); recog.current = sr; } catch { recog.current = null; }
       }
       r.ondataavailable = (e) => chunks.push(e.data);
@@ -108,15 +110,16 @@ export function Assistant({ open, onClose, initial }: { open: boolean; onClose: 
         recog.current?.stop();
         recog.current = null;
         setRec(null);
-        if (live.current) { const said = live.current; live.current = ''; void say(said); return; }
+        if (live.current) { setDraft(live.current); live.current = ''; document.getElementById('ask')?.focus(); return; }
         setBusy(true);
         try {
           const fd = new FormData();
           fd.append('file', new File([new Blob(chunks)], 'q.webm', { type: 'audio/webm' }));
           if (getLang() === 'hi') fd.append('language', 'hi');
+          else fd.append('language', 'en');
           const heard = await app.api.intake(fd);
           setBusy(false);
-          if (heard.text) void say(heard.text); else toast(t('I could not hear anything in that.'));
+          if (heard.text) { setDraft(heard.text); document.getElementById('ask')?.focus(); } else toast(t('I could not hear anything in that.'));
         } catch { setBusy(false); toast(t('Could not transcribe that.')); }
       };
       r.start();
@@ -151,6 +154,7 @@ export function Assistant({ open, onClose, initial }: { open: boolean; onClose: 
           {busy && <div className="bubble bubble--assistant"><Spinner /></div>}
           <div ref={end} />
         </div>
+        {captionNote && <p className="muted small" role="status">{captionNote}</p>}
         <form className="chat-input" onSubmit={(e) => { e.preventDefault(); void say(draft); }}>
           <label className="sr-only" htmlFor="ask">{t('Your question')}</label>
           <input id="ask" type="text" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={t('Ask about the record…')} maxLength={300} autoComplete="off" />
