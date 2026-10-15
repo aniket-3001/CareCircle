@@ -44,6 +44,7 @@ async def gm():
         if new:
             await ctl.query("MATCH (n) WHERE (n:Agent OR n:Tenant OR n:Space) AND n.id IN $ids DETACH DELETE n", {"ids": new})
         await ctl.query("MATCH (k:ApiKey) WHERE NOT ()-[:HAS_KEY]->(k) DELETE k")
+        await ctl.query("MATCH (c:TgChat) WHERE c.circle STARTS WITH 'tt-' DELETE c")
     except Exception:
         pass
 
