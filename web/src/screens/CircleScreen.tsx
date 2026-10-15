@@ -119,6 +119,7 @@ function Doses(): React.JSX.Element {
   const toast = useToast();
   const reg = useLoad((a) => a.api.regimen());
   const log = useLoad((a) => a.api.gives());
+  const [showAll, setShowAll] = useState(false);
   const [drug, setDrug] = useState('');
   const [slot, setSlot] = useState(`${new Date().toISOString().slice(0, 10)} 08:00`);
   const [msg, setMsg] = useState<string | null>(null);
@@ -156,7 +157,7 @@ function Doses(): React.JSX.Element {
       </Async>
       {msg && <div className="banner banner--bad" role="alert" data-testid="duplicate">{msg}</div>}
       <Async state={log}>
-        {(l) => (l.length ? <div className="rows">{l.map((g) => <div key={g.drug + g.slot} className="item"><div><div className="item__title">{title(g.drug)} <span className="muted">{g.slot}</span></div><div className="item__sub">recorded by {nameOf(g.by)}</div></div></div>)}</div> : <p className="muted">Nothing recorded yet.</p>)}
+        {(l) => (l.length ? <><div className="rows">{l.slice(0, showAll ? undefined : 10).map((g) => <div key={g.drug + g.slot} className="item"><div><div className="item__title">{title(g.drug)} <span className="muted">{g.slot}</span></div><div className="item__sub">recorded by {nameOf(g.by)}</div></div></div>)}</div>{l.length > 10 && <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowAll((v) => !v)}>{showAll ? 'Show fewer' : `Show all ${l.length}`}</button>}</> : <p className="muted">Nothing recorded yet.</p>)}
       </Async>
     </section>
   );
