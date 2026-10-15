@@ -57,6 +57,11 @@ class CareMixin:
         verified = quote_in_source(quote, source_text) if quote else source_type == "typed"
         status = "confirmed" if (confirm and verified) else "pending"
         d, ts, did = norm(drug), (now_ms() if at is None else at), new_id("dose")
+        warning = None
+        if action == "set" and dose_text:
+            from carecircle import dose as dosemod
+            prev = await self._q("MATCH (o:Dose {cur:true, drug:$d})-[:FOR]->(:Person {id:$p}) RETURN o.dose_text LIMIT 1", {"d": d, "p": norm(person)}, scope="read")
+            warning = dosemod.slip(prev[0][0], dose_text) if prev and prev[0][0] else None
         rows = await self._q(
             """
             MERGE (p:Person {id:$p}) ON CREATE SET p.role='patient'
@@ -70,8 +75,11 @@ class CareMixin:
              "src": source_type, "q": quote[:200], "v": verified, "by": norm(self.agent)})
         if status == "confirmed":
             await self._care_activate(did)
-        return {"id": rows[0][0], "status": status, "verified": verified,
-                "note": None if verified else "quote not found in the source text: confirm manually before it counts"}
+        out = {"id": rows[0][0], "status": status, "verified": verified,
+               "note": None if verified else "quote not found in the source text: confirm manually before it counts"}
+        if warning:
+            out["warning"] = warning
+        return out
 
     async def _care_activate(self, did: str) -> None:
         """Make a confirmed entry current and close the previous one for the same person+drug."""
