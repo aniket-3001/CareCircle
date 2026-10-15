@@ -53,8 +53,8 @@ Optional: `CC_MODEL` / `AWS_REGION` + AWS credentials let Amazon Bedrock (defaul
 `CC_LLM=0` or no credentials falls back to rules. Set `TELEGRAM_BOT_TOKEN` to also run the Telegram bot in the server process (`/link <key> <circle>`, then send a photo, voice note or text).
 
 ## What is in the app
-The web app is React + TypeScript + Vite, built on the design system of [Vayu Labs](https://github.com/hrsh-kr/vayu-labs) (its tokens, shell, tab bar, sheets and
-segmented controls are reused), light and dark, phone to desktop.
+The web app is React + TypeScript + Vite, in the visual language of [The Vayu Project](https://github.com/hrsh-kr/the-vayu-project) (Hanken Grotesk, a soft wash in the colour of the most serious flag, a status
+card with a big number and a face, white hairline cards, dashed add tiles, a floating pill tab bar and round buttons; the AQI level colours become flag severity), phone to desktop.
 - **Today:** one verdict tile (never "safe"), the regimen, and every flag with its source and the Cypher or enzyme path behind it.
 - **Add:** a photo, voice note (recorded in the browser), PDF, Word file or typed text becomes proposals that show the exact quoted line, a verified badge and the top three drug matches. Nothing is saved until a person confirms.
 - **Circle:** who has not seen which change (graph query), reminders with a time-warp control, and a once-per-slot dose log.
