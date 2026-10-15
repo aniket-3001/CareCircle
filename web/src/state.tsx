@@ -15,6 +15,8 @@ export interface AppState {
   go: (tab: 'today' | 'add' | 'circle' | 'graph' | 'history') => void;
   /** Forget this browser's session and return to the welcome screen. */
   leave: () => void;
+  /** Switch which carer is acting. */
+  actAs: (agent: string) => void;
 }
 
 export const AppCtx = createContext<AppState | null>(null);

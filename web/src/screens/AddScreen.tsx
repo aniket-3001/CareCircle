@@ -1,6 +1,9 @@
+import { Camera, FileText, Mic, ScanLine, Square } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useRef, useState } from 'react';
 import { sampleLabel } from '../api/client';
 import type { IntakeResult, Proposal } from '../api/types';
+import { PageHead } from '../components/PageHead';
 import { Pill, Spinner } from '../components/Pill';
 import { useToast } from '../components/Toast';
 import { title } from '../lib/format';
@@ -13,12 +16,13 @@ export function AddScreen(): React.JSX.Element {
   const app = useApp();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
-  const [over, setOver] = useState(false);
+  const [over, setOver] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [recording, setRecording] = useState<MediaRecorder | null>(null);
   const [result, setResult] = useState<IntakeResult | null>(null);
   const [props, setProps] = useState<Proposal[]>([]);
-  const file = useRef<HTMLInputElement>(null);
+  const photo = useRef<HTMLInputElement>(null);
+  const doc = useRef<HTMLInputElement>(null);
 
   async function run(body: FormData): Promise<void> {
     setBusy(true);
@@ -38,6 +42,11 @@ export function AddScreen(): React.JSX.Element {
     fd.append('file', f);
     return run(fd);
   };
+  const drop = (kind: string) => ({
+    onDragOver: (e: React.DragEvent) => { e.preventDefault(); setOver(kind); },
+    onDragLeave: () => setOver(null),
+    onDrop: (e: React.DragEvent) => { e.preventDefault(); setOver(null); const f = e.dataTransfer.files[0]; if (f) void send(f); },
+  });
 
   async function toggleRecord(): Promise<void> {
     if (recording) { recording.stop(); return; }
@@ -58,62 +67,75 @@ export function AddScreen(): React.JSX.Element {
     }
   }
 
+  const pick = (ref: React.RefObject<HTMLInputElement>, accept: string, label: string) => (
+    <input ref={ref} type="file" hidden accept={accept} aria-label={label} onChange={(e) => { const f = e.target.files?.[0]; if (f) void send(f); e.target.value = ''; }} />
+  );
+
   return (
     <div className="screen">
-      <h1 className="headline">Add a medicine</h1>
-      <section className="card" aria-labelledby="add-title">
-        <h2 className="card__title" id="add-title">From a photo, voice note, document or text</h2>
-        <label
-          className={`drop${over ? ' drop--over' : ''}`}
-          onDragOver={(e) => { e.preventDefault(); setOver(true); }}
-          onDragLeave={() => setOver(false)}
-          onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; if (f) void send(f); }}
-        >
-          <input ref={file} type="file" hidden accept="image/*,audio/*,.pdf,.docx,.txt" aria-label="Choose a photo, audio file or document" onChange={(e) => { const f = e.target.files?.[0]; if (f) void send(f); e.target.value = ''; }} />
-          <b>Drop a file here or tap to choose</b>
-          <span className="muted">Photo of a label · voice note · PDF · Word</span>
-        </label>
-        <div className="row row--wrap">
-          <button type="button" className="button button--secondary button--small" disabled={busy} onClick={async () => send(await sampleLabel())}>
-            Use a sample label
-          </button>
-          <button type="button" className={`button button--small ${recording ? 'button--danger' : 'button--secondary'}`} onClick={() => void toggleRecord()} aria-pressed={!!recording}>
-            {recording ? 'Stop recording' : 'Record a voice note'}
-          </button>
-          {busy && <Spinner />}
-        </div>
-        <label className="field">
-          Or type it
-          <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Clarithromycin 500 mg twice daily for 7 days" />
-        </label>
-        <div className="row">
-          <button type="button" className="button" disabled={busy || !text.trim()} onClick={() => { const fd = new FormData(); fd.append('text', text); void run(fd); }}>
-            Read it
-          </button>
-        </div>
-        <p className="muted">Nothing is saved until you confirm each item, and every reading shows the exact line it came from.</p>
-      </section>
-
-      {result && (
-        <>
-          <section className="card">
-            <div className="row row--wrap row--between">
-              <h2 className="card__title">What was read</h2>
-              <Pill tone="mute">{METHOD[result.source.method] ?? result.source.method}</Pill>
+      <PageHead crumb="Add to the record" title="Add a medicine" lede="From a photo, a voice note, a document or text. Nothing is saved until you confirm, and every reading shows the exact line it came from." />
+      <div className="layout">
+        <div className="col">
+          <section className="card" aria-labelledby="add-title">
+            <div className="card-head">
+              <h2 id="add-title">Choose how</h2>
+              {busy && <Spinner />}
             </div>
-            <pre className="quote" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{result.text || result.source.note || 'Nothing readable.'}</pre>
+            <div className="tiles">
+              <button type="button" className={`tile${over === 'photo' ? ' tile--over' : ''}`} onClick={() => photo.current?.click()} {...drop('photo')}>
+                <span className="ico"><Camera size={26} strokeWidth={1.75} aria-hidden="true" /></span>
+                <b>Photo</b>
+                <span>of a label or box</span>
+              </button>
+              {pick(photo, 'image/*', 'Choose a photo of a label')}
+              <button type="button" className={`tile${recording ? ' tile--rec' : ''}`} onClick={() => void toggleRecord()} aria-pressed={!!recording} aria-label={recording ? 'Stop recording' : 'Record a voice note'}>
+                <span className="ico">{recording ? <Square size={22} strokeWidth={1.75} aria-hidden="true" /> : <Mic size={26} strokeWidth={1.75} aria-hidden="true" />}</span>
+                <b>{recording ? 'Stop' : 'Voice note'}</b>
+                <span>{recording ? 'Recording…' : 'say it out loud'}</span>
+              </button>
+              <button type="button" className={`tile${over === 'doc' ? ' tile--over' : ''}`} onClick={() => doc.current?.click()} {...drop('doc')}>
+                <span className="ico"><FileText size={26} strokeWidth={1.75} aria-hidden="true" /></span>
+                <b>Document</b>
+                <span>PDF or Word</span>
+              </button>
+              {pick(doc, 'audio/*,.pdf,.docx,.txt', 'Choose a document or audio file')}
+              <button type="button" className="tile" disabled={busy} onClick={async () => send(await sampleLabel())}>
+                <span className="ico"><ScanLine size={26} strokeWidth={1.75} aria-hidden="true" /></span>
+                <b>Sample label</b>
+                <span>try it without a photo</span>
+              </button>
+            </div>
           </section>
+          <section className="card" aria-labelledby="type-title">
+            <h2 id="type-title">Or type it</h2>
+            <label className="field">
+              <span className="sr-only">Medicine, dose and how often</span>
+              <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Clarithromycin 500 mg twice daily for 7 days" />
+            </label>
+            <div className="row">
+              <button type="button" className="btn" disabled={busy || !text.trim()} onClick={() => { const fd = new FormData(); fd.append('text', text); void run(fd); }}>
+                Read it
+              </button>
+            </div>
+          </section>
+        </div>
+        <div className="col">
+          {result && (
+            <section className="card">
+              <div className="card-head">
+                <h2>What was read</h2>
+                <Pill tone="mute">{METHOD[result.source.method] ?? result.source.method}</Pill>
+              </div>
+              <pre className="quote" style={{ whiteSpace: 'pre-wrap', margin: 0, font: 'inherit' }}>{result.text || result.source.note || 'Nothing readable.'}</pre>
+            </section>
+          )}
           {props.map((p, i) => (
-            <ProposalCard
-              key={`${p.quote}-${i}`}
-              p={p}
-              kind={KINDS[result.source.kind] ?? 'typed'}
-              sourceText={result.text}
-              onDone={() => setProps((cur) => cur.filter((_, j) => j !== i))}
-            />
+            <motion.div key={`${p.quote}-${i}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+              <ProposalCard p={p} kind={KINDS[result?.source.kind ?? 'typed'] ?? 'typed'} sourceText={result?.text ?? ''} onDone={() => setProps((cur) => cur.filter((_, j) => j !== i))} />
+            </motion.div>
           ))}
-        </>
-      )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -169,8 +191,8 @@ function ProposalCard({ p, kind, sourceText, onDone }: { p: Proposal; kind: 'pho
         </label>
       </div>
       <div className="row">
-        <button type="button" className="button" disabled={busy || !drug} onClick={() => void confirm()}>Confirm and save</button>
-        <button type="button" className="button button--secondary" onClick={onDone}>Discard</button>
+        <button type="button" className="btn" disabled={busy || !drug} onClick={() => void confirm()}>Confirm and save</button>
+        <button type="button" className="btn btn--soft" onClick={onDone}>Discard</button>
         {busy && <Spinner />}
       </div>
     </section>
