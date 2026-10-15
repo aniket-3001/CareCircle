@@ -11,6 +11,8 @@ knows what is on record, **who has seen each change**, which entries **interact*
 **It records and cross-checks. It never advises.** It never says what to take, stop or change. Every flag shows its source and the graph
 path behind it, and "no flag" is never reported as "safe". All data in the demo is synthetic; no real person's data is used.
 
+**Live demo: https://52-200-189-188.sslip.io** (press "Start a demo circle"; synthetic data only).
+
 ![Today](docs/img/flags.png)
 
 ## Why the graph is the product
@@ -28,6 +30,8 @@ carer-acknowledgement state, the dose-slot guard and the access grants all live 
 | Privacy | one graph per circle (`mem__<circle>`), grants on every query | rows in a shared table |
 
 ## Run it
+Deployed on one AWS EC2 instance (t3.large, Docker Compose, Caddy for HTTPS, Bedrock through the instance role, only ports 80/443 open): `deploy/docker-compose.prod.yml`.
+
 ```bash
 # everything: FalkorDB (append-only volume) + app. First start downloads the public reference data and loads it (a few minutes).
 GRAPHMEM_ADMIN_KEY=change-me docker compose up -d --build
