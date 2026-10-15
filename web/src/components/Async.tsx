@@ -1,3 +1,4 @@
+import { TriangleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useApp, type Loaded } from '../state';
 import { Skeleton } from './Pill';
@@ -10,9 +11,16 @@ export function Async<T>({ state, children }: { state: Loaded<T>; children: (dat
     const gone = /invalid api key|not found|no access|not granted|forbidden/i.test(state.error);
     return (
       <div className="card" role="alert">
-        <h2 className="card__title">{gone ? 'This circle is not available any more' : 'Something went wrong'}</h2>
+        <div className="row">
+          <TriangleAlert size={22} strokeWidth={1.75} aria-hidden="true" />
+          <h2>{gone ? 'This circle is not available any more' : 'Something went wrong'}</h2>
+        </div>
         <p className="muted">{gone ? 'Demo circles are cleaned up after a while, or the key was changed. Nothing here can be recovered, but you can start a fresh demo.' : state.error}</p>
-        {gone && <button type="button" className="button" style={{ justifySelf: 'start' }} onClick={app.leave}>Start over</button>}
+        {gone && (
+          <button type="button" className="btn" style={{ justifySelf: 'start' }} onClick={app.leave}>
+            Start over
+          </button>
+        )}
       </div>
     );
   }
