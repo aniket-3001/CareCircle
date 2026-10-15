@@ -48,7 +48,7 @@ H = 3_600_000
 async def circle(gm, *carers):
     t = tid(gm, "cc")
     for c in ("amma", *carers):
-        await gm.grant(c, t, ("read", "write"))
+        await gm.grant(c, t, ("read", "write", "admin"))
     return t, {c: gm.open(c, t) for c in carers}
 
 

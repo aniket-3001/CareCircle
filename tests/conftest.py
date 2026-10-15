@@ -39,6 +39,21 @@ async def gm():
         await ctl.query("MATCH (f:Fork) WHERE f.tenant STARTS WITH 'tt-' OR f.tenant IN $ts DETACH DELETE f", {"ts": created})
     except Exception:
         pass
+    try:                                    # accounts made by a test (email @tt.test): their circles, sessions, agents and keys
+        rows = (await ctl.query("MATCH (a:Account) WHERE a.email ENDS WITH '@tt.test' OPTIONAL MATCH (a)-[:MEMBER]->(t:Tenant) RETURN a.agent, t.id")).result_set
+        for _, circle in rows:
+            if circle:
+                await db.drop_tenant(circle)
+        agents = sorted({r[0] for r in rows})
+        circles = sorted({r[1] for r in rows if r[1]})
+        if agents:
+            await ctl.query("MATCH (t:Tenant) WHERE t.id IN $c DETACH DELETE t", {"c": circles})
+            await ctl.query("MATCH (a:Account) WHERE a.agent IN $a OPTIONAL MATCH (a)<-[:OF]-(s:Session) DETACH DELETE s, a", {"a": agents})
+            await ctl.query("MATCH (g:Agent) WHERE g.id IN $a OPTIONAL MATCH (g)-[:HAS_KEY]->(k) DETACH DELETE k, g", {"a": agents})
+        await ctl.query("MATCH (n:Throttle) DETACH DELETE n")
+        await ctl.query("MATCH (i:Invite) DETACH DELETE i")
+    except Exception:
+        pass
     new = sorted(await _ctl_ids(db) - before)
     try:
         if new:

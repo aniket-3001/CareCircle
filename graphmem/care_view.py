@@ -247,7 +247,7 @@ class CareViewMixin:
         p = norm(person)
         if norm(confirm) != p:
             raise ValueError("type the person's name as `confirm` to remove all records of them")
-        doses = await self._q("MATCH (x:Dose)-[:FOR]->(:Person {id:$p}) RETURN x.id", {"p": p}, scope="write")
+        doses = await self._q("MATCH (x:Dose)-[:FOR]->(:Person {id:$p}) RETURN x.id", {"p": p}, scope="admin")      # owners only
         ids = [r[0] for r in doses]
         gives = (await self._q("MATCH (g:Give {person:$p}) RETURN count(g)", {"p": p}))[0][0]
         digest = hashlib.sha256(json.dumps([p, sorted(ids)]).encode()).hexdigest()
