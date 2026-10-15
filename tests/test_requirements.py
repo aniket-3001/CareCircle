@@ -1,6 +1,6 @@
-import uuid
 """One test group per Track 02 requirement. Run against a live FalkorDB (docker run -p 6379:6379 falkordb/falkordb)."""
 import asyncio
+import uuid
 
 import pytest
 
@@ -289,13 +289,13 @@ async def test_read_scope_runs_as_read_only_database_user():
     try:
         await gm2.grant("tt-roagent", t)
         m = gm2.open("tt-roagent", t)
-        await m.assert_fact("x", "is", "y")
-        assert (await m.recall("x"))[0]["object"] == "y"                      # reads work as gm_reader
+        await m.assert_fact("xray", "is", "yes")
+        assert (await m.recall("xray"))[0]["object"] == "yes"                      # reads work as gm_reader
         ro = (await db.ro_graph(db.graph_name(t))).ro_query
         assert (await ro("MATCH (n) RETURN count(n)")).result_set[0][0] > 0
         with pytest.raises(Exception, match="no permissions"):
             await db.ro_client.select_graph(db.graph_name(t)).query("CREATE (:Hack)")
     finally:
         await db.drop_tenant(t)
-        await (await gm2._ctl()).query("MATCH (n) WHERE n.id IN ["tt-roagent", $t] DETACH DELETE n", {"t": t})
+        await (await gm2._ctl()).query("MATCH (n) WHERE n.id IN ['tt-roagent', $t] DETACH DELETE n", {"t": t})
         await db.client.execute_command("ACL", "DELUSER", "gm_reader")
