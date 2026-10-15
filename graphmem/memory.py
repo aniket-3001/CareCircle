@@ -19,6 +19,7 @@ import re
 from typing import Awaitable, Callable, Iterable, Optional
 
 from .db import Db, new_id, norm, now_ms
+from .care import CareMixin
 from .codegraph import CodeGraphMixin
 from .embed import get_embedder
 from .extract import RuleExtractor
@@ -41,7 +42,7 @@ def _props(node) -> dict:
     return dict(node.properties) if hasattr(node, "properties") else node
 
 
-class TenantMemory(CodeGraphMixin):
+class TenantMemory(CodeGraphMixin, CareMixin):
     def __init__(self, db: Db, tenant: str, agent: str, guard: Optional[Guard] = None, graph: Optional[str] = None,
                  extractor=None):
         self.db, self.tenant, self.agent, self._guard, self._graph = db, tenant, agent, guard, graph

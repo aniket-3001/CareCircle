@@ -30,6 +30,7 @@ TENANT_INDEXES = [
     ("Session", "id"), ("Episode", "id"), ("Entity", "key"), ("Fact", "id"), ("Fact", "skey"),
     ("Skill", "key"), ("Run", "id"), ("Task", "id"), ("Plan", "id"), ("Decision", "id"), ("Agent", "id"),
     ("Code", "id"), ("Commit", "sha"), ("Person", "id"),
+    ("Dose", "id"), ("Give", "key"), ("Nudge", "key"), ("Drug", "name"),
 ]
 CTL_INDEXES = [("Tenant", "id"), ("Agent", "id"), ("ApiKey", "hash"), ("Fork", "id")]
 # UNIQUE constraints enforced by FalkorDB itself (need the matching exact-match index above): even a buggy writer cannot

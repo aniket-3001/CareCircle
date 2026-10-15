@@ -1,6 +1,8 @@
 """Interaction checks over the shared reference graph. Reads only (GRAPH.RO_QUERY). Never says 'safe' and never advises."""
 from __future__ import annotations
 
+import difflib
+
 from falkordb import FalkorDB
 
 from .reference import REF_GRAPH, norm
@@ -45,3 +47,24 @@ class Checker:
             weights.append(w) if key not in pairs else None
         return {"checked": d, "not_in_reference": sorted(set(d) - known), "direct": direct, "unrated": unrated,
                 "enzyme_paths": mech, "regimen_risk": regimen_risk(weights), "notice": NOTICE}
+
+
+    _names = None
+
+    def candidates(self, text: str, n: int = 3) -> list[dict]:
+        """Top-n drug names for a noisy string (OCR output). The human picks one; nothing is auto-accepted."""
+        if self._names is None:
+            self._names = [r[0] for r in self.g.ro_query("MATCH (d:Drug) RETURN d.name").result_set]
+        t = norm(text)
+        if not t:
+            return []
+        squashed = t.replace(" ", "")
+        scored = {}
+        for name in self._names:
+            nn = name.replace(" ", "")
+            if len(nn) >= 4 and nn in squashed:
+                scored[name] = 0.9 + min(len(nn), 12) / 200
+        for name in difflib.get_close_matches(t, self._names, n=n, cutoff=0.6):
+            scored.setdefault(name, difflib.SequenceMatcher(None, t, name).ratio())
+        top = sorted(scored.items(), key=lambda kv: -kv[1])[:n]
+        return [{"name": k, "score": round(v, 3)} for k, v in top]
