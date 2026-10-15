@@ -161,7 +161,8 @@ async def test_hindi_answers_come_from_the_record_and_never_advise(gm):
     assert "रिकॉर्ड में" in r["answer"]
 
 
-@pytest.mark.parametrize("q", ["क्या मम्मी मेटफॉर्मिन बंद कर दें?", "क्या यह दवा सुरक्षित है", "कितनी गोली लेनी चाहिए", "इसके साइड इफेक्ट क्या हैं", "kya main dawa chhod du, chahiye kya"])
+@pytest.mark.parametrize("q", ["क्या मम्मी मेटफॉर्मिन बंद कर दें?", "क्या यह दवा सुरक्षित है", "कितनी गोली लेनी चाहिए", "इसके साइड इफेक्ट क्या हैं", "kya main dawa chhod du, chahiye kya",
+                               "खुराक छूट गई अब क्या", "क्या शराब पी सकते हैं", "dawai bhul gayi ab kya", "kya iska koi khatra hai"])
 async def test_hindi_advice_questions_get_the_fixed_refusal(gm, q):
     t, c, now = await seeded(gm)
     r = await say(c, q, now)

@@ -21,7 +21,9 @@ EMERGENCY = _re(r"आपात|इमरजेंसी|एम्बुलें
 ADVICE = _re(
     r"चाहिए|ले सकत|दे सकत|खा सकत|सकती हूँ|सकता हूँ|छोड़ दूँ|छोड़ दें|छोड़ दूं|बंद कर|रोक दूँ|रोक दें|बढ़ा|घटा|कम कर|खुराक कितनी|कितनी खुराक|कितनी (गोली|दवा).*(लें|लूँ|लूं|दें|दूँ|दूं)"
     r"|कितना (लें|लूँ|लूं|दें|दूँ|दूं)|सुरक्षित|ठीक रहेगा|ठीक है क्या|नुकसान|साइड इफ़?ेक्ट|दुष्प्रभाव|लक्षण|विकल्प|की जगह|क्या करूँ|क्या करूं|कौन सी बेहतर"
-    r"|\b(should|safe|dosage|side effect)\b|\bkitn[ai]\b.*\b(lu|du|le|de|len|den)\b|\bkhana chahiye\b|\bchahiye\b|\bsakt[aei]\b|\bsurakshit\b", re.I)
+    r"|सकते|सकती|सकता|भूल (गय|ग)|छूट (गय|ग)|अब क्या|क्या होगा|दिक्कत|परेशानी|खतरा|ख़तरा|जोखिम|शराब|दारू|जारी रख|रोकना|बंद करना|छोड़|दोगुना|दो गोली|खा लें|खा लूँ|खा लूं"
+    r"|\b(should|safe|dosage|side effect)\b|\bkitn[ai]\b.*\b(lu|du|le|de|len|den)\b|\bkhana chahiye\b|\bchahiye\b|\bsakt[aei]\b|\bsurakshit\b"
+    r"|\b(bhul|bhool|chhut|chut)\b|\bab kya\b|\bkya hoga\b|\bkhatra\b|\bdikkat\b|\bsharab\b|\b(band|chhod|chod|jaari|jari)\b|\bdo goli\b|\bdugna\b", re.I)
 UNSEEN = _re(r"नहीं देखा|नहीं देखी|नहीं देखे|नहीं पता|किसने नहीं|किसे नहीं|अनदेखा|पीछे|अपडेट|पुष्टि नहीं|जानकारी नहीं|किसे पता|नहीं जानता|नहीं जानती|\bnahi (dekha|pata)\b|\bkisne nahi\b", re.I)
 FLAGS = _re(r"इंटरैक्शन|इंटरेक्शन|इंटरएक्शन|चेतावनी|फ्लैग|चिह्नित|टकराव|एक साथ|साथ में|गंभीर|मध्यम|एंजाइम|एन्ज़ाइम|क्यों.*(लाल|फ्लैग|चेतावनी)|interaction|flag|warning", re.I)
 DOSES = _re(r"दी गई|दी गयी|दी है|दिया गया|किसने दी|किसने दिया|खुराक.*दर्ज|\bgiven\b|\bdi gayi\b|\bkisne di\b", re.I)
