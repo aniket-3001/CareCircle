@@ -116,7 +116,7 @@ class CareMixin:
         """Top-n drug name candidates for an OCR/voice string. Nothing is auto-accepted; a person chooses."""
         if self._guard:
             await self._guard("read")
-        return await asyncio.to_thread(checker().candidates, text, n)
+        return await asyncio.to_thread(checker().resolve, text, n)
 
     # ------------------------------------------------------------------ carers: acknowledgement and staleness
     async def care_ack(self, dose_id: str) -> dict:
@@ -222,6 +222,19 @@ class CareMixin:
         rows = await self._q("MATCH (g:Give {person:$p}) RETURN g.drug, g.slot, g.by, g.at ORDER BY g.at DESC LIMIT $n",
                              {"p": norm(person), "n": limit}, scope="read")
         return [dict(drug=r[0], slot=r[1], by=r[2], at=r[3]) for r in rows]
+
+    async def care_drug_info(self, drug: str) -> dict:
+        """What public sources say about one medicine on record: the official label's own words (openFDA / DailyMed), the RxNorm identifier, and
+        which reference sources cover it. Reading only: the medicine name is the only thing sent out, never a person or a circle."""
+        from carecircle import external
+        if self._guard:
+            await self._guard("read")
+        d = norm(drug)
+        label, rx = await asyncio.gather(asyncio.to_thread(external.openfda_label, d), asyncio.to_thread(external.rxnorm_ingredients, d))
+        ck = checker()
+        return {"drug": d, "in_interaction_reference": d in ck.known_names(), "rxnorm": next((r for r in rx if r["name"] == d), None),
+                "label": label, "available": external.enabled(),
+                "note": "Public reference text, shown as published. It is not advice for this person: ask the prescriber or pharmacist."}
 
     async def care_people(self) -> dict:
         """Patients and carers known in this circle."""

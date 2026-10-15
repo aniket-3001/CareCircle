@@ -56,6 +56,24 @@ class Checker:
 
     _names = None
 
+    def known_names(self) -> set[str]:
+        if self._names is None:
+            self._names = [r[0] for r in self.g.ro_query("MATCH (d:Drug) RETURN d.name").result_set]
+        return set(self._names)
+
+    def resolve(self, text: str, n: int = 3) -> list[dict]:
+        """candidates(), then, when none is a strong match, RxNorm (a public NLM service, name only). Only ingredients that exist in the reference
+        graph are kept, so every suggestion can be checked, and each carries where it came from. A person still picks."""
+        from . import external
+        out = self.candidates(text, n)
+        if out and out[0]["score"] >= 0.9:
+            return out
+        known = self.known_names()
+        for ing in external.rxnorm_ingredients(text):
+            if ing["name"] in known and ing["name"] not in {c["name"] for c in out}:
+                out.append({"name": ing["name"], "score": 0.9, "via": ing["source"], "rxcui": ing["rxcui"]})
+        return sorted(out, key=lambda c: -c["score"])[:n]
+
     def candidates(self, text: str, n: int = 3) -> list[dict]:
         """Top-n drug names for a noisy string (OCR output). The human picks one; nothing is auto-accepted."""
         if self._names is None:

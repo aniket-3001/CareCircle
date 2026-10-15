@@ -163,7 +163,7 @@ def propose(text: str, checker, image: Optional[bytes] = None, image_format: str
         named = p.pop("llm_drug")
         if not quote_in_source(named, p["quote"]):                # a quote that does not even contain the drug name proves nothing
             continue
-        p["drug_candidates"] = checker.candidates(named, 3)
+        p["drug_candidates"] = checker.resolve(named, 3)
         p["verified"] = bool(text) and quote_in_source(p["quote"], text)
         if p["drug_candidates"]:
             props.append(p)

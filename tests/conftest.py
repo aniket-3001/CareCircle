@@ -21,6 +21,7 @@ async def _ctl_ids(db):
 def _no_model_calls(monkeypatch):
     """Tests never reach Bedrock unless they inject a generator themselves."""
     monkeypatch.setenv("CC_LLM", "0")
+    monkeypatch.setenv("CC_EXTERNAL", "0")          # no network in tests; test_external.py fakes the services
 
 
 @pytest_asyncio.fixture
