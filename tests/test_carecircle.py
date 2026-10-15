@@ -193,3 +193,14 @@ async def test_bot_link_photo_confirm_check_and_nudge(gm, monkeypatch):
     assert await bot.deliver_nudges(now=later) >= 1 and await bot.deliver_nudges(now=later) == 0
     await bot.handle({"message": {"chat": {"id": 2}, "text": "/ack"}})
     assert "Acknowledged" in api.out[-1][1]
+
+
+async def test_demo_circle_and_label(gm):
+    from carecircle import demo
+    out = await demo.start(gm)
+    gm._created.append(out["circle"])
+    m = gm.open(out["agents"]["ravi"], out["circle"])
+    assert {r["drug"] for r in await m.care_regimen("asha")} == {"metformin", "amlodipine", "atorvastatin", "vitamin d"}
+    src = intake.read_source(demo.label_png(), "l.png", "image/png")
+    props = intake.propose(src["text"], Checker())
+    assert props and props[0]["drug_candidates"][0]["name"] == "clarithromycin"

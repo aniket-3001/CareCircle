@@ -129,9 +129,37 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
 
     ui_file = Path(__file__).parent / "ui.html"
 
+    web = Path(__file__).resolve().parent.parent / "web"
+
     @app.get("/", response_class=HTMLResponse)
     async def ui():
-        return HTMLResponse(ui_file.read_text(encoding="utf-8"))
+        index = web / "index.html"
+        return HTMLResponse((index if index.exists() else ui_file).read_text(encoding="utf-8"))
+
+    if web.exists():
+        from fastapi.staticfiles import StaticFiles
+        app.mount("/static", StaticFiles(directory=str(web)), name="static")
+
+    demo_on = os.getenv("CC_DEMO", "1") == "1"
+    demo_circles: list[str] = []
+
+    @app.post("/demo/start")
+    async def demo_start():
+        """Create a fresh synthetic demo circle (keys returned). Capped: the oldest demo circle is deleted beyond CC_DEMO_MAX."""
+        if not demo_on:
+            raise HTTPException(404, "demo disabled")
+        from carecircle import demo
+        out = await demo.start(gm)
+        demo_circles.append(out["circle"])
+        while len(demo_circles) > int(os.getenv("CC_DEMO_MAX", "40")):
+            await gm.db.drop_tenant(demo_circles.pop(0))
+        return out
+
+    @app.get("/demo/label.png")
+    async def demo_label(drug: str = "Clarithromycin 500 mg tablets", sig: str = "Take ONE tablet twice daily for 7 days"):
+        from fastapi.responses import Response
+        from carecircle import demo
+        return Response(demo.label_png(drug[:60], sig[:80]), media_type="image/png")
 
     @app.get("/healthz")
     async def healthz():

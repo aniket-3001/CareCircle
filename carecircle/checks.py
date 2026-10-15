@@ -36,11 +36,14 @@ class Checker:
             else:
                 item["weight"] = w
                 direct.append(item); weights.append(w)
-        mech = []
+        mech, seen_paths = [], set()
         for x, rel, strength, enz, y, src in self.g.ro_query(MECH, {"d": d}).result_set:
             w = ENZYME_WEIGHT[strength]
             kind = "raises exposure of" if rel == "INHIBITS" else "lowers exposure of"
             key = tuple(sorted((x, y)))
+            if (x, rel, enz, y) in seen_paths:
+                continue
+            seen_paths.add((x, rel, enz, y))
             mech.append({"kind": "enzyme_path", "path": f"{x} -{rel}({strength})-> {enz} <-SUBSTRATE_OF- {y}",
                          "meaning": f"{x} may {kind} {y} via {enz}", "weight": w, "also_in_ddinter": key in pairs,
                          "source": f"FDA CYP index table; substrate: {src}"})
