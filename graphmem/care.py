@@ -182,6 +182,27 @@ class CareMixin:
                                      "message": reword(tpl, facts)})
         return sent
 
+    async def care_reminders(self, person: str, now: Optional[int] = None, remind_after_h: float = 4, escalate_after_h: float = 12) -> list[dict]:
+        """Reminders that are due, as a read-only preview: nothing is claimed, so looking at them never uses them up (care_nudges claims and delivers).
+        `delivered` says whether the chat bot has already sent that one."""
+        t = now_ms() if now is None else now
+        div = await self.care_divergence(person, t)
+        out = []
+        for carer, d in div["carers"].items():
+            for u in d["unacknowledged"]:
+                todo = [("remind", carer)] if u["age_hours"] >= remind_after_h else []
+                if u["age_hours"] >= escalate_after_h:
+                    todo += [("escalate", o) for o in div["carers"] if o != carer]
+                for kind, to in todo:
+                    key = f"{kind}|{carer}|{u['dose']}|{to}"
+                    sent = (await self._q("MATCH (n:Nudge {key:$k}) RETURN count(n)", {"k": key}, scope="read"))[0][0] > 0
+                    facts = {"drug": u["drug"], "hours": u["age_hours"], "carer": carer}
+                    tpl = (f"{carer} has not yet seen the change to {u['drug']} made {u['age_hours']} hours ago. Please check with them.") if kind == "escalate" else (
+                          f"The change to {u['drug']} made {u['age_hours']} hours ago is not yet acknowledged. Please open it and confirm.")
+                    out.append({"kind": kind, "about_carer": carer, "notify": to, "drug": u["drug"], "age_hours": u["age_hours"],
+                                "message": reword(tpl, facts), "delivered": sent})
+        return out
+
     # ------------------------------------------------------------------ doses given: never twice for one slot
     async def care_give(self, person: str, drug: str, slot: str) -> dict:
         """Record that the calling carer gave `drug` for dose slot `slot` (e.g. '2026-10-16 08:00'). A slot can be claimed once:
