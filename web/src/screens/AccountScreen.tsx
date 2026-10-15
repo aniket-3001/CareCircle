@@ -167,7 +167,7 @@ function CircleRow({ c }: { c: CircleInfo }): React.JSX.Element {
             <>
               <div className="row row--wrap">
                 <button type="button" className="btn btn--soft btn--sm" onClick={() => void acct.invite(c.id).then(setInvite, (e) => toast(e.message))}>Invite a carer</button>
-                {invite && <span className="banner" data-testid="invite-code"><b className="tnum" style={{ fontSize: 18 }}>{invite.code}</b><button type="button" className="btn btn--ghost btn--sm" onClick={() => void navigator.clipboard?.writeText(invite.code).then(() => toast('Copied'))}><Copy size={14} aria-hidden="true" /> Copy</button><span className="small">one use · {invite.hours} h</span></span>}
+                {invite && <span className="banner" data-testid="invite-code"><b className="tnum" style={{ fontSize: 18 }}>{invite.code}</b><button type="button" className="btn btn--ghost btn--sm" onClick={() => void (navigator.clipboard?.writeText(invite.code).then(() => toast('Copied'), () => toast('Could not copy: select the code and copy it')) ?? toast('Select the code and copy it'))}><Copy size={14} aria-hidden="true" /> Copy</button><span className="small">one use · {invite.hours} h</span></span>}
               </div>
               <div className="row">
                 <label className="field grow"><span className="sr-only">Circle name</span><input type="text" value={name ?? c.name} onChange={(e) => setName(e.target.value)} maxLength={60} /></label>
