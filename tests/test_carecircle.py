@@ -408,3 +408,17 @@ async def test_graph_of_a_larger_regimen_with_heavy_drugs_is_fast_enough(gm):
     g = await c["ravi"].care_graph("asha")
     assert time.time() - t0 < 3.0                                   # FalkorDB's own query timeout is 1 s per query
     assert sum(n["kind"] == "drug" for n in g["nodes"]) == 9
+
+
+async def test_reminder_preview_never_uses_up_a_reminder(gm):
+    t, c = await circle(gm, "ravi", "meena")
+    await c["ravi"].care_record("asha", "metformin")
+    await c["meena"].care_record("asha", "vitamin d")
+    later = int(__import__("time").time() * 1000) + 6 * H
+    for _ in range(3):                                                               # looking any number of times claims nothing
+        due = await c["ravi"].care_reminders("asha", now=later)
+        assert {(d["kind"], d["notify"], d["drug"], d["delivered"]) for d in due} == {("remind", "ravi", "vitamin d", False), ("remind", "meena", "metformin", False)}
+    claimed = await c["ravi"].care_nudges("asha", now=later)                         # the bot's delivery still gets every one of them
+    assert len(claimed) == 2
+    assert all(d["delivered"] for d in await c["ravi"].care_reminders("asha", now=later))
+    assert await c["ravi"].care_nudges("asha", now=later) == []

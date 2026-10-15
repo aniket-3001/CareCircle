@@ -261,3 +261,19 @@ async def test_telegram_links_with_an_account_code_and_switches_circles(client, 
     assert cb                                                                              # the proposal is for the circle now in use
     assert (await client.request("DELETE", "/v1/account/telegram", headers=auth(token))).status_code == 200
     assert (await client.get("/v1/account", headers=auth(token))).json()["telegram"] == []
+
+
+async def test_members_count_as_carers_from_the_moment_they_join_and_stop_when_they_leave(client):
+    a, _ = await account(client, "a@tt.test", "Ana")
+    b, _ = await account(client, "b@tt.test", "Ben")
+    cid = (await client.post("/v1/account/circles", json={"name": "C", "person": "Mum"}, headers=auth(a))).json()["id"]
+    r = await client.post(f"/v1/tenants/{cid}/care_record", json={"person": "mum", "drug": "metformin"}, headers=auth(a))
+    await client.post("/v1/join", json={"code": (await client.post(f"/v1/circles/{cid}/invites", headers=auth(a))).json()["code"]}, headers=auth(b))
+    div = (await client.post(f"/v1/tenants/{cid}/care_divergence", json={"person": "mum"}, headers=auth(a))).json()["result"]
+    assert sorted(k.split("-")[0] for k in div["carers"]) == ["ana", "ben"]
+    ben = next(k for k in div["carers"] if k.startswith("ben"))
+    assert [u["drug"] for u in div["carers"][ben]["unacknowledged"]] == ["metformin"]            # Ben has not seen Ana's entry
+    await client.post(f"/v1/tenants/{cid}/care_ack", json={"dose_id": r.json()["result"]["id"]}, headers=auth(b))
+    await client.post(f"/v1/circles/{cid}/leave", headers=auth(b))
+    div = (await client.post(f"/v1/tenants/{cid}/care_divergence", json={"person": "mum"}, headers=auth(a))).json()["result"]
+    assert [k.split("-")[0] for k in div["carers"]] == ["ana"]
