@@ -18,6 +18,7 @@ services:
     environment:
       GRAPHMEM_ADMIN_KEY: ${GRAPHMEM_ADMIN_KEY:?set GRAPHMEM_ADMIN_KEY}
       FALKORDB_HOST: falkordb
+      GRAPHMEM_RO_PASSWORD: ${GRAPHMEM_RO_PASSWORD:-}   # set to run read operations as a GRAPH.RO_QUERY-only database user
     ports: ["${API_PORT:-8000}:8000"]
     depends_on:
       falkordb: {condition: service_healthy}

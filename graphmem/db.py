@@ -10,16 +10,20 @@ Design notes
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 import re
 import time
 import uuid
+
+from typing import Optional
 
 from falkordb.asyncio import FalkorDB
 from redis.asyncio import BlockingConnectionPool
 
 TENANT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,47}$")
 CTL_GRAPH = "ctl"
+RO_USER = "gm_reader"
 
 # (label, property) pairs indexed in every tenant graph.
 TENANT_INDEXES = [
@@ -67,10 +71,16 @@ class RetryingGraph:
         self._g = graph
 
     async def query(self, q, params=None, **kw):
+        return await self._retry(self._g.query, q, params, **kw)
+
+    async def ro_query(self, q, params=None, **kw):
+        return await self._retry(self._g.ro_query, q, params, **kw)
+
+    async def _retry(self, call, q, params, **kw):
         delay = 0.02
         for attempt in range(self.ATTEMPTS):
             try:
-                return await self._g.query(q, params, **kw)
+                return await call(q, params, **kw)
             except Exception as e:
                 if "max pending queries" not in str(e).lower():
                     raise
@@ -84,16 +94,44 @@ class RetryingGraph:
 
 
 class Db:
-    def __init__(self, host: str = "localhost", port: int = 6379, max_connections: int = 64):
+    def __init__(self, host: str = "localhost", port: int = 6379, max_connections: int = 64,
+                 ro_password: Optional[str] = None):
         pool = BlockingConnectionPool(host=host, port=port, max_connections=max_connections,
                                       timeout=30, decode_responses=True)
         self.client = FalkorDB(connection_pool=pool)
+        # Optional database-level ACL: read-scope operations run as a Redis user that may only call GRAPH.RO_QUERY, so even a
+        # bug in a read path cannot write. Enabled by GRAPHMEM_RO_PASSWORD; the user is created on first use (needs the default user).
+        ro_password = ro_password if ro_password is not None else os.getenv("GRAPHMEM_RO_PASSWORD")
+        self.ro_client = None            # built lazily: the client authenticates on construction, so the user must exist first
+        self._ro_password, self._conn = ro_password, dict(host=host, port=port, max_connections=max_connections)
+        self._ro_ready = False
         self._ready: dict[str, asyncio.Future] = {}
         self._lock = asyncio.Lock()
 
     @staticmethod
     def graph_name(tenant: str) -> str:
         return f"mem__{validate_tenant(tenant)}"
+
+    async def ensure_ro_user(self) -> None:
+        if not self._ro_password or self._ro_ready:
+            return
+        async with self._lock:
+            if self._ro_ready:
+                return
+            await self.client.execute_command("ACL", "SETUSER", RO_USER, "reset", "on", f">{self._ro_password}", "~*", "&*",
+                                              "+ping", "+auth", "+hello", "+info", "+client", "+graph.ro_query", "+graph.list")
+            pool = BlockingConnectionPool(timeout=30, decode_responses=True, username=RO_USER, password=self._ro_password,
+                                          **self._conn)
+            self.ro_client = await asyncio.get_running_loop().run_in_executor(None, lambda: FalkorDB(connection_pool=pool))
+            self._ro_ready = True
+
+    async def ro_graph(self, name: str):
+        """Graph handle bound to the read-only database user (falls back to the normal handle when ACL is not enabled)."""
+        g = await self.graph(name)
+        if not self._ro_password:
+            return g
+        await self.ensure_ro_user()
+        return RetryingGraph(self.ro_client.select_graph(name))
 
     async def graph(self, name: str):
         """Return a graph handle, creating indexes exactly once per process."""

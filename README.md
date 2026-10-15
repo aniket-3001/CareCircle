@@ -120,11 +120,11 @@ recall@10 for "what changes with this file" falls to random or file-name similar
 is nothing for the isolation suite to test (B3). A dict-backed reimplementation of the whole product was not built.
 
 ## Security notes (what is and is not protected)
-Protected: tenant isolation (separate graphs plus a grant check on every query; revocation is immediate), hashed API keys, parameterised
+Protected: database-level read-only user (set `GRAPHMEM_RO_PASSWORD`: every read-scope operation then runs as a Redis ACL user that may only call `GRAPH.RO_QUERY`, so a bug in a read path cannot write), tenant isolation (separate graphs plus a grant check on every query; revocation is immediate), hashed API keys, parameterised
 Cypher everywhere (no string-built queries from user input), only whitelisted operations are callable, rate limits, size caps on forks.
 Not protected: stored content can contain prompt-injection text that a downstream LLM may obey (graphmem returns it as data, it never
 executes it); rate limiting is per API process; no TLS (put a proxy in front); the admin key is a single shared secret; FalkorDB
-itself has no per-tenant ACL configured here (all tenants share one database credential).
+ACLs are not per tenant (writes of all tenants share one database credential; the optional read-only user only splits read from write).
 
 ## Honest limits
 - Extraction: rules (narrow) or an optional OpenAI-compatible LLM (`GRAPHMEM_LLM_URL/MODEL/KEY`); the LLM path is tested only against a fake server.

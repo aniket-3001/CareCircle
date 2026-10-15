@@ -52,7 +52,11 @@ class TenantMemory(CodeGraphMixin):
         checked=True to the rest, so a policy lookup is not repeated per query."""
         if self._guard and not checked:
             await self._guard(scope)
-        g = await (self.db.graph(self._graph) if self._graph else self.db.tenant_graph(self.tenant))
+        name = self._graph or self.db.graph_name(self.tenant)
+        if scope == "read":      # read scope never needs write access; with GRAPHMEM_RO_PASSWORD it runs as the RO database user
+            g = await self.db.ro_graph(name)
+            return (await g.ro_query(cypher, params or {})).result_set
+        g = await self.db.graph(name)
         return (await g.query(cypher, params or {})).result_set
 
     # ---------------------------------------------------------------- episodic
