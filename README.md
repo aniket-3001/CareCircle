@@ -105,7 +105,9 @@ indexes, unique constraints, variable-length paths, `FOREACH`, `UNWIND` bulk loa
 - **Carer staleness (graph query vs independent oracle):** exact in 40/40 generated circles; "last change only" baseline 0/40.
 - **Double-dose guard:** one winner in 100/100 rounds of 10 concurrent claims.
 
-**Not measured:** OCR/voice accuracy on real photos and voices (only synthetic labels tried), severity accuracy against clinical truth, any patient outcome.
+- **Intake on real input:** 5 real bottle photos and 1 spoken note (browser microphone to Whisper): drug found in 6/6, with one wrong extra candidate; see `docs/BENCHMARKS.md` (B4).
+
+**Not measured:** OCR/voice accuracy at scale or on home-quality photos and accents, severity accuracy against clinical truth, any patient outcome.
 
 ## Limits, stated plainly
 - Interaction severity weights (minor .1, moderate .3, major .7; enzyme strong .7, moderate .3; staleness half-life 72 h) are **assumptions**, not clinical values.
