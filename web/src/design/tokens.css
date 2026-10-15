@@ -1,0 +1,78 @@
+/*
+ * Design tokens, after Apple's Human Interface Guidelines: system fonts, an 8-point grid,
+ * semantic colours with light and dark values, large radii, brief spring-like motion.
+ */
+:root {
+  color-scheme: light dark;
+
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* 8-point grid */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+
+  --radius-card: 1.25rem;
+  --radius-control: 0.75rem;
+  --radius-pill: 999px;
+  --tap-target: 2.75rem; /* 44 pt */
+
+  /* Type scale (rem, so it follows the reader's text-size setting) */
+  --text-large-title: 2.125rem;
+  --text-title: 1.5rem;
+  --text-headline: 1.0625rem;
+  --text-body: 1rem;
+  --text-footnote: 0.8125rem;
+  --text-caption: 0.75rem;
+
+  /* Semantic colours, light */
+  --surface-grouped: #f2f2f7;
+  --surface-card: #ffffff;
+  --label: #000000;
+  --label-secondary: rgb(60 60 67 / 0.62);
+  --separator: rgb(60 60 67 / 0.2);
+  --accent: #0060df;
+  --accent-label: #ffffff;
+  --material: rgb(242 242 247 / 0.78);
+  --focus-ring: #0a84ff;
+
+  --ease-spring: cubic-bezier(0.2, 0.9, 0.25, 1);
+  --duration-short: 200ms;
+  --duration-medium: 320ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-grouped: #000000;
+    --surface-card: #1c1c1e;
+    --label: #ffffff;
+    --label-secondary: rgb(235 235 245 / 0.62);
+    --separator: rgb(84 84 88 / 0.65);
+    --accent: #4da3ff;
+    --accent-label: #000000;
+    --material: rgb(28 28 30 / 0.78);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --label-secondary: var(--label);
+    --separator: var(--label);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
