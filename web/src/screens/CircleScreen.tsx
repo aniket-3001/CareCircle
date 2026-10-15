@@ -1,6 +1,7 @@
 import { BellRing, Check, Clock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState } from 'react';
+import { Appointments } from '../components/Appointments';
 import { Async } from '../components/Async';
 import { FaceIcon } from '../components/Face';
 import { PageHead } from '../components/PageHead';
@@ -88,6 +89,7 @@ export function CircleScreen(): React.JSX.Element {
               </div>
             )}
           </Async>
+          <Appointments />
           <Doses />
         </div>
         <div className="col">

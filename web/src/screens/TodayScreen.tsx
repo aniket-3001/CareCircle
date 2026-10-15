@@ -7,6 +7,7 @@ import { DrugInfo } from '../components/DrugInfo';
 import { MedActions } from '../components/MedActions';
 import { PageHead } from '../components/PageHead';
 import { Pill } from '../components/Pill';
+import { ProfileCard } from '../components/ProfileCard';
 import { Readings } from '../components/Readings';
 import { Recalls } from '../components/Recalls';
 import { Scale } from '../components/Scale';
@@ -91,6 +92,7 @@ export function TodayScreen(): React.JSX.Element {
             </div>
             <div className="col">
               <Scale check={c} />
+              <ProfileCard />
               <Readings />
               <Recalls />
               <section className="card" aria-labelledby="sources-title">

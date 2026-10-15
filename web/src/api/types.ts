@@ -284,3 +284,16 @@ export interface Trend {
   kind: string; label: string; units: string[]; series: Reading[]; drug: string; window_days: number; note: string;
   changes: { dose: string; at: number; action: string; text: string; before: { n: number; mean: number | null }; after: { n: number; mean: number | null } }[];
 }
+
+export interface Appointment { id: string; title: string; at: number; place: string; who: string; bring: string; by: string; status: 'upcoming' | 'done' | 'cancelled' }
+export interface CareProfile { conditions: { id: string; name: string; by: string }[]; allergies: { id: string; text: string; drug: string; by: string }[] }
+export interface AllergyCheck { hits: { allergy: string; drug: string; entry: string; why: string }[]; allergies: number; note: string }
+export interface Visit {
+  appointment: Appointment | null; since: number; note: string;
+  changes: { drug: string; action: string; dose_text: string; freq_text: string; at: number; by: string; source: string }[];
+  readings: { kind: string; value: number; unit: string; at: number }[];
+  flags: { drugs?: string[]; level?: string; path?: string; source: string }[];
+  unseen: Record<string, { drug: string; age_hours: number }[]>;
+  allergy_hits: AllergyCheck['hits'];
+  regimen: RegimenEntry[];
+}
