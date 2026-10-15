@@ -7,4 +7,14 @@ ALIASES = {
     "zoloft": "sertraline", "lasix": "furosemide", "plavix": "clopidogrel", "synthroid": "levothyroxine", "biaxin": "clarithromycin",
     "diflucan": "fluconazole", "zithromax": "azithromycin", "xarelto": "rivaroxaban", "eliquis": "apixaban", "viagra": "sildenafil",
     "prozac": "fluoxetine", "lexapro": "escitalopram", "xanax": "alprazolam", "valium": "diazepam", "zestril": "lisinopril",
+    # common brands in India and elsewhere (single-ingredient products only; combinations are left out on purpose)
+    "crocin": "acetaminophen", "dolo": "acetaminophen", "calpol": "acetaminophen", "ecosprin": "acetylsalicylic acid", "disprin": "acetylsalicylic acid",
+    "eltroxin": "levothyroxine", "thyronorm": "levothyroxine", "euthyrox": "levothyroxine", "glycomet": "metformin", "telma": "telmisartan",
+    "amlokind": "amlodipine", "stamlo": "amlodipine", "storvas": "atorvastatin", "atorva": "atorvastatin", "rosuvas": "rosuvastatin",
+    "crestor": "rosuvastatin", "pantocid": "pantoprazole", "protonix": "pantoprazole", "omez": "omeprazole", "ciplox": "ciprofloxacin",
+    "cipro": "ciprofloxacin", "azithral": "azithromycin", "brufen": "ibuprofen", "clopilet": "clopidogrel", "uniwarfin": "warfarin",
+    "cozaar": "losartan", "diovan": "valsartan", "tenormin": "atenolol", "lopressor": "metoprolol", "toprol": "metoprolol",
+    "januvia": "sitagliptin", "glucotrol": "glipizide", "zofran": "ondansetron", "flagyl": "metronidazole", "amoxil": "amoxicillin",
+    "keflex": "cephalexin", "pepcid": "famotidine", "ultram": "tramadol", "ativan": "lorazepam", "zyrtec": "cetirizine",
+    "claritin": "loratadine", "deltasone": "prednisone", "aldactone": "spironolactone", "zyloprim": "allopurinol", "neurontin": "gabapentin",
 }

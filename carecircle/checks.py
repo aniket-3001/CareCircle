@@ -69,7 +69,7 @@ class Checker:
             nn = name.replace(" ", "")
             if len(nn) >= 4 and nn in squashed:
                 scored[name] = 0.9 + min(len(nn), 12) / 200
-        for name in difflib.get_close_matches(t, self._names, n=n, cutoff=0.6):
+        for name in difflib.get_close_matches(t, self._names, n=n, cutoff=0.8):
             scored.setdefault(name, difflib.SequenceMatcher(None, t, name).ratio())
         known = set(self._names)
         for word in t.replace("-", " ").split():
