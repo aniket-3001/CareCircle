@@ -44,7 +44,7 @@ python scripts/fetch_reference.py                                           # DD
 python -c "from carecircle import reference as r; print(r.load())"          # build the shared cc_ref graph
 (cd web && npm ci && npm run build)                                         # the React app (served by the API from web/dist)
 python -m graphmem.api                                                      # http://127.0.0.1:8000
-python -m pytest -q tests                                                   # 80 tests against live FalkorDB
+python -m pytest -q tests                                                   # 79 tests against live FalkorDB
 (cd web && npm test)                                                        # UI unit tests; `npm run dev` for hot reload (proxies to :8000)
 PORT=8000 python scripts/ui_e2e.py                                          # browser walk-through (needs Chrome and `pip install playwright`)
 PYTHONPATH=. python bench/care_bench.py                                     # benchmarks below
