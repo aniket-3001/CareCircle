@@ -126,3 +126,33 @@ def test_image_roundtrip_ocr_and_llm_off(monkeypatch):
     assert src["status"] == "ok"
     props = intake.propose(src["text"], Checker())
     assert props and props[0]["drug_candidates"][0]["name"].startswith("warfarin") and props[0]["verified"]
+
+
+# ---- safety layer ----
+from carecircle import safety
+
+
+def test_advice_scanner_and_reword_guard():
+    assert safety.scan_advice({"a": "You should stop taking the tablet"}) and safety.scan_advice("it is safe to take")
+    assert not safety.scan_advice({"statement": "Possible interactions found: discuss with a prescriber.", "quote": "take ONE tablet daily"})
+    facts = {"drug": "warfarin", "hours": 14.0}
+    assert safety.numbers_match_facts("change to warfarin 14 hours ago", facts)
+    assert not safety.numbers_match_facts("change to warfarin 15 hours ago", facts)
+    assert safety.reword("tpl 14", facts, lambda t, f: "made up 99")["source"] == "template"
+    assert safety.reword("tpl 14", facts, lambda t, f: "warfarin changed 14 hours ago")["source"] == "model"
+
+
+async def test_no_output_gives_advice_and_judgement_states(gm):
+    t, c = await circle(gm, "ravi", "meena")
+    r, mn = c["ravi"], c["meena"]
+    assert (await r.care_check("mum"))["judgement"]["state"] == "no_data"
+    await mn.care_ack((await mn.care_record("mum", "amlodipine"))["id"])
+    assert (await r.care_check("mum"))["judgement"]["state"] == "no_known_conflict"
+    await r.care_record("mum", "notarealdrug")
+    assert (await r.care_check("mum"))["judgement"]["state"] == "partial"
+    await r.care_record("mum", "simvastatin"); await r.care_record("mum", "clarithromycin")
+    outputs = [await r.care_check("mum"), await r.care_divergence("mum"), await r.care_regimen("mum"),
+               await r.care_nudges("mum", now=int(__import__("time").time() * 1000) + 30 * H)]
+    assert (await r.care_check("mum"))["judgement"]["state"] == "flags"
+    for o in outputs:
+        assert safety.scan_advice(o) == [], safety.scan_advice(o)

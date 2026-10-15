@@ -16,6 +16,7 @@ from typing import Optional
 
 from carecircle import risk
 from carecircle.checks import Checker
+from carecircle.safety import judgement, reword
 from carecircle.verify import quote_in_source
 
 from .db import new_id, norm, now_ms
@@ -98,6 +99,7 @@ class CareMixin:
         reg = await self.care_regimen(person, as_of)
         res = await asyncio.to_thread(checker().check, [r["drug"] for r in reg])
         res["regimen"] = reg
+        res["judgement"] = judgement(res)
         return res
 
     async def care_resolve(self, text: str, n: int = 3) -> list[dict]:
@@ -162,7 +164,12 @@ class CareMixin:
                     r = await self._q("MERGE (n:Nudge {key:$k}) ON CREATE SET n.at=$t, n.fresh=true "
                                       "WITH n, n.fresh AS fresh SET n.fresh=false RETURN fresh", {"k": key, "t": t}, checked=True)
                     if r[0][0]:
-                        sent.append({"kind": kind, "about_carer": carer, "notify": to, "drug": u["drug"], "age_hours": u["age_hours"]})
+                        facts = {"drug": u["drug"], "hours": u["age_hours"], "carer": carer}
+                        tpl = (f"{carer} has not yet seen the change to {u['drug']} made {u['age_hours']} hours ago. "
+                               "Please check with them.") if kind == "escalate" else (
+                               f"The change to {u['drug']} made {u['age_hours']} hours ago is not yet acknowledged. Please open it and confirm.")
+                        sent.append({"kind": kind, "about_carer": carer, "notify": to, "drug": u["drug"], "age_hours": u["age_hours"],
+                                     "message": reword(tpl, facts)})
         return sent
 
     # ------------------------------------------------------------------ doses given: never twice for one slot
