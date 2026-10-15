@@ -135,16 +135,18 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
     async def _bad(_: Request, e: Exception):
         return JSONResponse({"error": str(e)}, status_code=422)
 
-    web = Path(__file__).resolve().parent.parent / "web"
+    dist = Path(os.getenv("CC_WEB_DIST") or Path(__file__).resolve().parent.parent / "web" / "dist")
 
     @app.get("/", response_class=HTMLResponse)
     async def ui():
-        index = web / "index.html"
-        return HTMLResponse(index.read_text(encoding="utf-8"))
+        index = dist / "index.html"
+        if not index.exists():
+            return HTMLResponse("<h1>Care Circle API</h1><p>The web app is not built: run <code>npm ci && npm run build</code> in <code>web/</code>.</p>", status_code=503)
+        return HTMLResponse(index.read_text(encoding="utf-8"), headers={"cache-control": "no-cache"})
 
-    if web.exists():
+    if (dist / "assets").exists():
         from fastapi.staticfiles import StaticFiles
-        app.mount("/static", StaticFiles(directory=str(web)), name="static")
+        app.mount("/assets", StaticFiles(directory=str(dist / "assets")), name="assets")     # hashed file names: cacheable
 
     demo_on = os.getenv("CC_DEMO", "1") == "1"
     demo_circles: list[str] = []
