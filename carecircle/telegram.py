@@ -193,15 +193,35 @@ class Bot:
         return sent
 
 
-async def poll(gm, token: str) -> None:                       # pragma: no cover - needs a real bot token
+async def poll(gm, token: str, nudge_every: float = 20.0) -> None:                       # pragma: no cover - needs a real bot token
+    """Long-poll Telegram and deliver due reminders. Neither loop may die: every failure is logged and retried after a pause."""
     from graphmem.care import checker
     api = TgApi(token)
-    bot, offset = Bot(gm, api, checker()), 0
-    while True:
-        for u in await asyncio.to_thread(api.call, "getUpdates", offset=offset, timeout=30):
-            offset = u["update_id"] + 1
+    bot = Bot(gm, api, checker())
+
+    async def updates():
+        offset = 0
+        while True:
             try:
-                await bot.handle(u)
+                for u in await asyncio.to_thread(api.call, "getUpdates", offset=offset, timeout=25):
+                    offset = u["update_id"] + 1
+                    try:
+                        await bot.handle(u)
+                    except Exception as e:
+                        print("handler error", type(e).__name__, e, flush=True)
             except Exception as e:
-                print("handler error", type(e).__name__, e)
-        await bot.deliver_nudges()
+                print("poll error", type(e).__name__, e, flush=True)
+                await asyncio.sleep(3)
+
+    async def reminders():
+        while True:
+            try:
+                n = await bot.deliver_nudges()
+                if n:
+                    print("reminders sent", n, flush=True)
+            except Exception as e:
+                print("reminder error", type(e).__name__, e, flush=True)
+            await asyncio.sleep(nudge_every)
+
+    print("telegram bot polling", flush=True)
+    await asyncio.gather(updates(), reminders())
