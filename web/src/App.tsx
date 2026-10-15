@@ -26,8 +26,8 @@ export function App(): React.JSX.Element {
 
   const state = useMemo<AppState | null>(() => session && {
     session, api: makeApi(session), rev, bump: () => setRev((r) => r + 1), warp, setWarp,
-    now: () => Date.now() + warp * 3_600_000, go: setTab,
-  }, [session, rev, warp]);
+    now: () => Date.now() + warp * 3_600_000, go: setTab, leave: reset,
+  }, [session, rev, warp, reset]);
 
   return (
     <ToastProvider>

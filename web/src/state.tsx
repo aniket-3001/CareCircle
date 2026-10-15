@@ -13,6 +13,8 @@ export interface AppState {
   setWarp: (h: number) => void;
   now: () => number;
   go: (tab: 'today' | 'add' | 'circle' | 'graph' | 'history') => void;
+  /** Forget this browser's session and return to the welcome screen. */
+  leave: () => void;
 }
 
 export const AppCtx = createContext<AppState | null>(null);
