@@ -118,14 +118,14 @@ class CareViewMixin:
                     ["Status", status], ["Recorded by", f"{who(by)}, {iso(at)} ({ago(at, t)})"],
                     ["Source", SOURCE_WORDS.get(src, src)],
                     ["Line it was read from", f"“{quote}”" if quote else "typed directly"],
-                    ["Quote checked against the source text", "yes" if verified else "no: a person confirmed it by hand"],
+                    ["Quote checked against the source text", ("yes" if verified else "no: a person confirmed it by hand") if quote else "not applicable (typed directly)"],
                     ["Acknowledged by", ", ".join(ackers) or "nobody yet"]]
             if vt:
                 meta.insert(4, ["Ended", iso(vt)])
             node(f"dose:{did}", "dose" if cur else "dose_old", label,
                  f"{who(by)} {'stopped' if action == 'stop' else 'recorded'} {_title(drug)}{' ' + dt if dt else ''}{' ' + ft if ft else ''}, "
                  f"{SOURCE_WORDS.get(src, src)}, {ago(at, t)}.", meta,
-                 "(:Dose)-[:FOR]->(:Person), (:Dose)-[:OF]->(:Drug)", current=bool(cur), at=at, short=dt or ft or "entry")
+                 "(:Dose)-[:FOR]->(:Person), (:Dose)-[:OF]->(:Drug)", current=bool(cur), at=at, short="stopped" if action == "stop" else (dt or ft or "entry"))
             edge(f"dose:{did}", f"person:{p}", "for", "is for", f"{label} is on record for {_title(p)}.")
             edge(f"dose:{did}", f"drug:{drug}", "of", "is", "", [], weak=True)
             if norm(by) in {x for x in people["carers"]}:
