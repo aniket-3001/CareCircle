@@ -28,7 +28,7 @@ const HI: Record<string, string> = {
   // header, tabs, dock
   'Care Circle': 'केयर सर्कल', 'Sign in': 'साइन इन', 'Sign up': 'साइन अप', 'Create account': 'खाता बनाएँ', 'Sign out': 'साइन आउट',
   'About and safety': 'परिचय और सुरक्षा', 'Close': 'बंद करें', 'Circle': 'सर्कल', 'Today': 'आज', 'Add': 'जोड़ें', 'Graph': 'ग्राफ़', 'History': 'इतिहास',
-  'Main': 'मुख्य', 'Ask the helper': 'सहायक से पूछें', 'Add a medicine': 'दवा जोड़ें', 'Language': 'भाषा',
+  'Main': 'मुख्य', 'Ask the helper': 'सहायक से पूछें', 'Add a medicine': 'दवा जोड़ें', 'Language': 'भाषा', 'Switch to dark theme': 'डार्क थीम चालू करें', 'Switch to light theme': 'लाइट थीम चालू करें', 'Dark theme': 'डार्क थीम', 'Light theme': 'लाइट थीम',
   // about
   'What this is': 'यह क्या है', 'What it will not do': 'यह क्या नहीं करेगा', 'Your data': 'आपका डेटा', 'Where the data comes from': 'डेटा कहाँ से आता है', 'AI use': 'AI का उपयोग',
   "A shared record of a person's medicines for the people who look after them. It records what carers add, cross-checks it against public data, and shows who has not seen a change.":

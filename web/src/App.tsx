@@ -1,4 +1,4 @@
-import { Info, LogOut, ShieldCheck } from 'lucide-react';
+import { Info, LogOut, Moon, ShieldCheck, Sun } from 'lucide-react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Profile, Session } from './api/types';
@@ -12,6 +12,7 @@ import { levelVars, worstSeverity, type SeverityKey } from './design/levels';
 import { nameOf } from './lib/format';
 import { setLang, useLang, useT } from './lib/i18n';
 import { loadSession, saveSession } from './lib/session';
+import { setTheme, useTheme } from './lib/theme';
 import { AccountScreen } from './screens/AccountScreen';
 import { AddScreen } from './screens/AddScreen';
 import { CircleScreen } from './screens/CircleScreen';
@@ -31,6 +32,7 @@ const fromHash = (): TabId => {
 export function App(): React.JSX.Element {
   const t = useT();
   const lang = useLang();
+  const theme = useTheme();
   const [session, setSession] = useState<Session | null>(loadSession);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -142,7 +144,7 @@ export function App(): React.JSX.Element {
             <div className="topline">
               <span className="wordmark">
                 <span className="logo" aria-hidden="true"><ShieldCheck size={18} strokeWidth={2} /></span>
-                {t('Care Circle')}
+                <span className="wide-only">{t('Care Circle')}</span>
               </span>
               <div className="topline-actions">
                 {profile && profile.circles.length > 0 && (
@@ -169,13 +171,16 @@ export function App(): React.JSX.Element {
                     <button type="button" className="btn btn--sm" onClick={() => openAuth('signup')} data-testid="top-signup" aria-label="Create account"><span className="wide-only">{t('Create account')}</span><span className="narrow-only">{t('Sign up')}</span></button>
                   </>
                 )}
-                {session && <button type="button" className="btn btn--ghost btn--sm" onClick={() => void signOut()} data-testid="top-signout"><LogOut size={16} aria-hidden="true" /> {t('Sign out')}</button>}
+                {session && <button type="button" className="btn btn--ghost btn--sm" onClick={() => void signOut()} data-testid="top-signout" aria-label={t('Sign out')}><LogOut size={16} aria-hidden="true" /><span className="wide-only"> {t('Sign out')}</span></button>}
                 {profile && (
                   <button type="button" className="avatar-btn" onClick={() => go('account')} aria-label={`Account: ${profile.name}`} data-testid="open-account">
                     {profile.name.charAt(0).toUpperCase()}
                   </button>
                 )}
                 <button type="button" className="btn btn--ghost btn--sm lang-btn" onClick={() => setLang(lang === 'hi' ? 'en' : 'hi')} aria-label={t('Language')} title="English / हिन्दी" data-testid="lang-toggle">{lang === 'hi' ? 'EN' : 'हिं'}</button>
+                <button type="button" className="icon-btn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label={theme === 'dark' ? t('Switch to light theme') : t('Switch to dark theme')} title={theme === 'dark' ? t('Light theme') : t('Dark theme')} data-testid="theme-toggle">
+                  {theme === 'dark' ? <Sun size={20} strokeWidth={1.75} aria-hidden="true" /> : <Moon size={20} strokeWidth={1.75} aria-hidden="true" />}
+                </button>
                 <button type="button" className="icon-btn" onClick={() => setAbout(true)} aria-label={t('About and safety')}>
                   <Info size={20} strokeWidth={1.75} aria-hidden="true" />
                 </button>
