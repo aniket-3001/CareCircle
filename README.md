@@ -72,6 +72,23 @@ Optional: `CC_COGNITO_POOL_ID` / `CC_COGNITO_CLIENT_ID` (email sign-up through A
   (`carecircle/assistant.py`, 20 tests including a prompt-injection attempt). The conversation is stored on the server per carer (60 questions a day), can be cleared, and can be asked by voice and read aloud.
 - **More:** change a recorded dose or record a medicine as stopped (a new entry, the old one stays in the history), a printable one-page summary for a pharmacist, FHIR export, forget with a receipt.
 
+## More than medicines
+Around the medicine record, a circle also keeps what a family needs at the doctor's door. Everything below is stored in the circle's graph, is typed or confirmed by a carer, and never advises.
+- **Readings over time** (blood pressure, sugar, INR, weight, pulse, temperature, oxygen, TSH): kept as typed, drawn as a line with the dates a medicine's entry changed marked on it, with the plain mean before and after each change. Only typing slips are refused (a pressure of 1200); a value is never called good or bad.
+- **Appointments** with who goes and what to bring; a past one reads as done and stays in the history. **"What to bring"** assembles, from the record alone, what changed since the previous visit, the flags and their sources, anything not yet seen by every carer, readings in that time and any allergy hit.
+- **Conditions and allergies.** An allergy is cross-checked against the medicines on record: an exact generic name or a medicine in a short, hand-written group list (penicillins, NSAIDs, statins ...). A hit says "ask the prescriber"; no hit is never shown as safe.
+- **Recalls and label text.** Public sources, queried by medicine name only, cached in the reference graph: RxNorm (name to ingredient, used when the local match is weak and kept only if the reference graph has that medicine), openFDA drug labels (the official boxed warning and "used for" text, quoted with its source and date) and openFDA recall reports. Live calls are not covered by CI.
+- **Only one carer knows.** A graph query over the acknowledgement edges lists current entries known to a single carer (a single point of failure) and the carer holding most of them.
+- **Reminders** reach people through the Telegram bot and, where the server has VAPID keys, as browser notifications (Web Push, no chat app needed); one claim per reminder, so it is never produced twice however many channels it goes to.
+- **Hindi** across the screens, the helper (Devanagari and Hinglish), Hindi voice input and read-aloud.
+
+## Three graphs, on purpose
+| Graph | Holds | Why separate |
+|---|---|---|
+| `cc_ref` | public knowledge only: DDInter, the FDA enzyme table, cached public lookups | shared by everyone; only the system writes; no personal data |
+| `mem__<circle>` | everything about one person: doses, acknowledgements, readings, appointments, conditions, allergies, notes | one graph so one query can cross types ("readings in the two weeks after the warfarin change") and so erasing a person is one drop with one receipt; each graph carries a schema version and is migrated forward when opened (`graphmem/schema.py`) |
+| `ctl` | accounts, sessions, invitations, keys, push subscriptions | never holds health data |
+
 ## What is in the app
 The web app is React + TypeScript + Vite, in the visual language of [The Vayu Project](https://github.com/hrsh-kr/the-vayu-project) (Hanken Grotesk, a soft wash in the colour of the most serious flag, a status
 card with a big number and a face, white hairline cards, dashed add tiles, a floating pill tab bar and round buttons; the AQI level colours become flag severity), phone to desktop.
@@ -113,6 +130,9 @@ ctl     (agents, grants, hashed API keys, Telegram chat links, and accounts)
   (:Account)-[:MEMBER {role: owner|carer}]->(:Tenant {id, name, person, owner})        a circle;  (:Agent)-[:GRANTED {scopes}]->(:Tenant) is the engine's access check
   (:Invite {hash, circle, exp})   (:Throttle {key, n, exp})
 mem__<circle> also has  (:ChatMsg {by, role, text, at})  the helper conversation, per carer
+  (:Measurement {kind, value, unit, at, by})-[:FOR]->(Person)    (:Appointment {title, at, place, who, bring, status})-[:FOR]->(Person)
+  (:Condition {name})-[:FOR]->(Person)   (:Allergy {text, drug})-[:FOR]->(Person)   (:Schema {v})  the graph's version
+cc_ref also has  (:Cached {url, at, body})  public lookups, by medicine name only
 ```
 
 ## Queries and algorithms
