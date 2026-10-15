@@ -11,7 +11,7 @@ knows what is on record, **who has seen each change**, which entries **interact*
 **It records and cross-checks. It never advises.** It never says what to take, stop or change. Every flag shows its source and the graph
 path behind it, and "no flag" is never reported as "safe". All data in the demo is synthetic; no real person's data is used.
 
-**Live demo: https://52-200-189-188.sslip.io** (press "Start a demo circle"; synthetic data only).
+**Live demo: https://3-228-70-117.sslip.io** (press "Start a demo circle"; synthetic data only).
 
 ![Today](docs/img/flags.png)
 
