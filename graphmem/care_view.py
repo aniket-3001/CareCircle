@@ -254,6 +254,8 @@ class CareViewMixin:
         gives = (await self._q("MATCH (g:Give {person:$p}) RETURN count(g)", {"p": p}))[0][0]
         digest = hashlib.sha256(json.dumps([p, sorted(ids)]).encode()).hexdigest()
         await self._q("MATCH (g:Give {person:$p}) DELETE g", {"p": p})
+        await self._q("MATCH (h:Handover {person:$p}) DELETE h", {"p": p})
+        await self._q("MATCH (w:Watch) WHERE w.key STARTS WITH $k DELETE w", {"k": p + "|"})
         for lab in ("Measurement", "Appointment", "Condition", "Allergy"):
             await self._q(f"MATCH (m:{lab})-[:FOR]->(:Person {{id:$p}}) DETACH DELETE m", {"p": p})
         if ids:

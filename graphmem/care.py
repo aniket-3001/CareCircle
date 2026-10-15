@@ -222,14 +222,16 @@ class CareMixin:
             {"k": key, "me": norm(self.agent), "t": now_ms(), "p": norm(person), "d": norm(drug), "s": norm(slot)})
         fresh, by, at = rows[0]
         if fresh:
-            return {"given": True, "slot": slot}
+            watched = (await self._q("MATCH (w:Watch {key:$k}) RETURN count(w)", {"k": f"{norm(person)}|{norm(drug)}"}, scope="read"))[0][0] > 0
+            return {"given": True, "slot": slot, **({"needs_second_carer": True} if watched else {})}
         return {"given": False, "duplicate": True, "already_given_by": by, "at": at,
                 "note": "this slot was already recorded; check with them before giving another dose"}
 
     async def care_gives(self, person: str, limit: int = 50) -> list[dict]:
-        rows = await self._q("MATCH (g:Give {person:$p}) RETURN g.drug, g.slot, g.by, g.at ORDER BY g.at DESC LIMIT $n",
+        rows = await self._q("MATCH (g:Give {person:$p}) OPTIONAL MATCH (w:Watch {key: g.person + '|' + g.drug}) "
+                             "RETURN g.drug, g.slot, g.by, g.at, g.witness, w IS NOT NULL ORDER BY g.at DESC LIMIT $n",
                              {"p": norm(person), "n": limit}, scope="read")
-        return [dict(drug=r[0], slot=r[1], by=r[2], at=r[3]) for r in rows]
+        return [dict(drug=r[0], slot=r[1], by=r[2], at=r[3], witness=r[4], needs_second_carer=bool(r[5]) and not r[4]) for r in rows]
 
     async def care_drug_info(self, drug: str) -> dict:
         """What public sources say about one medicine on record: the official label's own words (openFDA / DailyMed), the RxNorm identifier, and
