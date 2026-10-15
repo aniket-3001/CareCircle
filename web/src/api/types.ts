@@ -1,10 +1,13 @@
 // Shapes returned by the Care Circle API (graphmem/care.py, care_view.py, carecircle/checks.py, intake.py).
 
+/** What this browser holds. For a signed-in account `keys` is just `{ me: <session token> }` and everything else is read from the server. */
 export interface Session {
-  circle: string;
+  circle: string; // '' when an account has no circle yet
   person: string;
-  keys: Record<string, string>; // agent name -> API key
+  keys: Record<string, string>; // agent name -> bearer token (API key for the anonymous demo, session token for an account)
   as: string; // which agent is acting
+  account?: { provider: 'local' | 'cognito'; tokens?: import('../lib/cognito').Tokens };
+  demoCircle?: boolean; // the throw-away anonymous demo: unlocks demo-only tools
 }
 
 export interface RegimenEntry {
@@ -79,6 +82,10 @@ export interface Nudge {
   drug: string;
   age_hours: number;
   message: { text: string };
+}
+
+export interface Reminder extends Nudge {
+  delivered: boolean;
 }
 
 export interface Candidate {
@@ -200,4 +207,61 @@ export interface FhirBundle {
 export interface People {
   patients: string[];
   carers: string[];
+}
+
+// ---- accounts, circles, assistant
+export interface AuthConfig {
+  provider: 'local' | 'cognito';
+  cognito: { region: string; userPoolId: string; clientId: string } | null;
+  demo_accounts: { email: string; name: string; password: string }[];
+  password_rule: string;
+}
+
+export interface Account {
+  id: string;
+  email: string;
+  name: string;
+  provider: 'local' | 'cognito';
+  demo: boolean;
+  created_at: number;
+}
+
+export interface CircleInfo {
+  id: string;
+  name: string;
+  person: string;
+  role: 'owner' | 'carer';
+  members: number;
+  demo: boolean;
+}
+
+export interface Profile extends Account {
+  circles: CircleInfo[];
+  telegram: { chat: number; circle: string }[];
+}
+
+export interface Member {
+  id: string;
+  name: string;
+  role: 'owner' | 'carer';
+  since: number;
+  you: boolean;
+}
+
+export interface Invite {
+  code: string;
+  expires_at: number;
+  hours: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  at: number;
+  source: string;
+  links: { tab: string; label: string }[];
+  proposals: Proposal[];
+  proposal_text?: string;
+  left_today?: number;
 }
