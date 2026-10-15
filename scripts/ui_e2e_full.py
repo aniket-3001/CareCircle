@@ -191,6 +191,12 @@ with sync_playwright() as p:
     pg.locator(".chat-input button[type=submit]").click()
     expect(pg.get_by_test_id("msg-assistant").last).to_contain_text("can't advise", timeout=20000)
     pg.locator("dialog[open] .icon-btn[aria-label=Close]").click()
+    pg.get_by_test_id("theme-toggle").click()                                   # dark theme: the choice sticks across a reload
+    assert pg.evaluate("document.documentElement.dataset.theme") == "dark"
+    pg.reload()
+    assert pg.evaluate("document.documentElement.dataset.theme") == "dark"
+    pg.get_by_test_id("theme-toggle").click()
+    assert pg.evaluate("document.documentElement.dataset.theme") == "light"
     pg.get_by_test_id("lang-toggle").click()
     expect(pg.get_by_role("button", name="साइन आउट")).to_be_visible()
     pg.get_by_test_id("open-assistant").click()
