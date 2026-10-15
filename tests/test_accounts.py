@@ -157,12 +157,12 @@ async def test_demo_accounts_are_seeded_once_and_work_like_any_other(client, gm,
         circles = (await client.get("/v1/account/circles", headers=auth(tok))).json()
         assert circles[0]["id"] == accmod.SHARED_CIRCLE and circles[0]["demo"] and circles[0]["members"] == 2
         reg = (await client.post(f"/v1/tenants/{accmod.SHARED_CIRCLE}/care_regimen", json={"person": "asha"}, headers=auth(tok))).json()["result"]
-        assert {x["drug"] for x in reg} == {"metformin", "amlodipine", "atorvastatin", "vitamin d"}
+        assert {"metformin", "warfarin", "levothyroxine", "vitamin d"} <= {x["drug"] for x in reg} and len(reg) == 10          # ten weeks of history, not a stub
         assert (await client.request("DELETE", "/v1/account", json={"confirm": cfg["demo_accounts"][0]["email"]}, headers=auth(tok))).status_code == 403
-        await client.post(f"/v1/tenants/{accmod.SHARED_CIRCLE}/care_record", json={"person": "asha", "drug": "warfarin"}, headers=auth(tok))
+        await client.post(f"/v1/tenants/{accmod.SHARED_CIRCLE}/care_record", json={"person": "asha", "drug": "tramadol"}, headers=auth(tok))
         assert (await client.post("/v1/demo/reset", headers=auth(tok))).status_code == 200
         reg = (await client.post(f"/v1/tenants/{accmod.SHARED_CIRCLE}/care_regimen", json={"person": "asha"}, headers=auth(tok))).json()["result"]
-        assert "warfarin" not in {x["drug"] for x in reg}
+        assert "tramadol" not in {x["drug"] for x in reg} and len(reg) == 10
         other, _ = await account(client)
         assert (await client.post("/v1/demo/reset", headers=auth(other))).status_code == 403
     finally:

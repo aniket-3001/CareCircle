@@ -13,6 +13,7 @@ PERSON = "asha"
 BASELINE = [("metformin", "500 mg", "twice daily with food"), ("amlodipine", "5 mg", "once daily"),
             ("atorvastatin", "20 mg", "at bedtime")]
 CARERS = ("ravi", "meena")
+SEED_VERSION = 2          # raise it when the shared demo story changes: the next start rebuilds the circle
 
 
 def label_png(drug: str = "Clarithromycin 500 mg tablets", sig: str = "Take ONE tablet twice daily for 7 days") -> bytes:
@@ -58,19 +59,21 @@ async def seed_shared(gm, acc) -> None:
         row = await acc.by_email(email) or await acc.create(email, name, DEMO_PASSWORD, demo=True)
         agents.append(row["agent"])
     if await acc.role(agents[0], SHARED_CIRCLE):
-        return
+        rows = await acc._q("MATCH (t:Tenant {id:$c}) RETURN t.seed", {"c": SHARED_CIRCLE})
+        if rows and (rows[0][0] or 0) >= SEED_VERSION:
+            return
+        await gm.db.drop_tenant(SHARED_CIRCLE)                      # an older story: rebuild with the current one
+        await acc._q("MATCH (t:Tenant {id:$c}) DETACH DELETE t", {"c": SHARED_CIRCLE})
     from graphmem.db import now_ms
     await gm.create_tenant(SHARED_CIRCLE)
     for i, a in enumerate(agents):
         await gm.grant(a, SHARED_CIRCLE, ("read", "write", "admin") if i == 0 else ("read", "write"))
         await acc._q("MATCH (a:Account {agent:$ag}), (t:Tenant {id:$c}) CREATE (a)-[:MEMBER {role:$r, at:$t}]->(t)",
                      {"ag": a, "c": SHARED_CIRCLE, "r": "owner" if i == 0 else "carer", "t": now_ms()})
-    await acc._q("MATCH (t:Tenant {id:$c}) SET t.name=\"Asha's circle (demo)\", t.person=$p, t.owner=$o, t.demo=true", {"c": SHARED_CIRCLE, "p": PERSON, "o": agents[0]})
+    await acc._q("MATCH (t:Tenant {id:$c}) SET t.name=\"Asha's circle (demo)\", t.person=$p, t.owner=$o, t.demo=true, t.seed=$v", {"v": SEED_VERSION, "c": SHARED_CIRCLE, "p": PERSON, "o": agents[0]})
     ravi, meena = gm.open(agents[0], SHARED_CIRCLE), gm.open(agents[1], SHARED_CIRCLE)
-    ids = [(await ravi.care_record(PERSON, d, dose_text=dose, freq_text=freq, source_type="typed"))["id"] for d, dose, freq in BASELINE]
-    for i in ids:
-        await meena.care_ack(i)
-    await meena.care_record(PERSON, "vitamin d", dose_text="1000 iu", freq_text="once daily")
+    from .demo_history import build
+    await build(ravi, meena, PERSON, now_ms())
 
 
 async def reset_shared(gm, acc) -> None:
