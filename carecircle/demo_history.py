@@ -127,6 +127,18 @@ async def build(ravi, meena, person: str, now: int) -> None:
     await rec("ravi", 3, "levothyroxine", "75 mcg", "each morning, empty stomach", "document", "Levothyroxine 75 mcg tablets - one tablet each morning on an empty stomach", THYROID_LETTER)
     await rec("meena", 0.8, "cetirizine", "10 mg", "at night when needed", "photo", "CETIRIZINE 10 MG TABLETS", CETIRIZINE_LABEL)
 
+    # readings the carers took or were told (typed as given; the app never judges them). They line up with the warfarin and amlodipine changes above.
+    for days, who, v in ((66, "ravi", 154), (58, "ravi", 152), (50, "meena", 156), (44, "ravi", 151), (37, "meena", 150), (31, "ravi", 141), (24, "meena", 138),
+                         (17, "ravi", 136), (10, "meena", 137), (3, "ravi", 135)):
+        await handle[who].care_measure(person, "bp_systolic", v, "mmHg", at=ts(days))
+        await handle[who].care_measure(person, "bp_diastolic", round(v * 0.57), "mmHg", at=ts(days))
+    for days, v in ((46, 1.7), (40, 1.8), (35, 1.9), (28, 2.1), (21, 2.4), (14, 2.6), (7, 2.5), (1.5, 2.4)):
+        await handle["meena"].care_measure(person, "inr", v, at=ts(days))
+    for days, v in ((64, 8.9), (50, 8.4), (36, 8.1), (22, 7.8), (8, 7.6)):
+        await handle["ravi"].care_measure(person, "glucose", v, "mmol/L", at=ts(days))
+    for days, v in ((62, 61.2), (40, 60.8), (18, 60.1), (4, 59.9)):
+        await handle["meena"].care_measure(person, "weight", v, "kg", at=ts(days))
+
     # the last seven days of doses actually given (each slot can be claimed once; who gave it is kept)
     sched = [("levothyroxine", "07:00", "ravi"), ("omeprazole", "07:30", "ravi"), ("metformin", "08:00", "ravi"), ("amlodipine", "08:00", "ravi"),
              ("lisinopril", "08:00", "ravi"), ("vitamin d", "08:00", "meena"), ("warfarin", "18:00", "meena"), ("metformin", "19:30", "meena"),
