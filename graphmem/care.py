@@ -46,7 +46,7 @@ class CareMixin:
     # ------------------------------------------------------------------ record / confirm
     async def care_record(self, person: str, drug: str, action: str = "set", dose_text: str = "", freq_text: str = "",
                           source_type: str = "typed", quote: str = "", source_text: str = "", confirm: bool = True,
-                          at: Optional[int] = None) -> dict:
+                          at: Optional[int] = None, edited: str = "") -> dict:
         """A change to what `person` takes. action 'set' (start/change) or 'stop'. The previous current entry is closed and linked
         by SUPERSEDES. If `quote` is given it must occur in `source_text` (the OCR/transcript), else the entry stays UNVERIFIED and
         PENDING until someone confirms it with care_confirm; pending entries never reach the regimen or the checks."""
@@ -68,11 +68,11 @@ class CareMixin:
             MERGE (dr:Drug {name:$d})
             MERGE (au:Person {id:$by}) ON CREATE SET au.role='carer'
             CREATE (x:Dose {id:$id, drug:$d, dose_text:$dt, freq_text:$ft, valid_from:$ts, cur:false, action:$a, status:$st,
-                            source_type:$src, quote:$q, verified:$v, by:$by, at:$ts})
+                            source_type:$src, quote:$q, verified:$v, by:$by, at:$ts, edited:$ed})
             CREATE (x)-[:FOR]->(p) CREATE (x)-[:OF]->(dr)
             RETURN x.id""",
             {"p": norm(person), "d": d, "id": did, "dt": dose_text[:80], "ft": freq_text[:80], "ts": ts, "a": action, "st": status,
-             "src": source_type, "q": quote[:200], "v": verified, "by": norm(self.agent)})
+             "src": source_type, "q": quote[:200], "v": verified, "by": norm(self.agent), "ed": ",".join(sorted({x for x in edited.split(",") if x in ("drug", "dose", "freq")}))})
         if status == "confirmed":
             await self._care_activate(did)
         out = {"id": rows[0][0], "status": status, "verified": verified,
@@ -278,8 +278,21 @@ class CareMixin:
         how much of the regimen the interaction sources actually cover."""
         from carecircle import burden
         c = await self.care_check(person)
-        return {"load": burden.regimen_load(c["regimen"]), "anticholinergic": burden.anticholinergic_count(c["regimen"]), "coverage": c["coverage"],
+        stats = await self.care_reading_stats(person)
+        return {"reading": stats, "load": burden.regimen_load(c["regimen"]), "anticholinergic": burden.anticholinergic_count(c["regimen"]), "coverage": c["coverage"],
                 "note": "Counts of what is written and listed. They describe the record, not the person, and are not advice."}
+
+    async def care_reading_stats(self, person: str) -> dict:
+        """How often what was read from a photo, voice note or document was saved without a change by the carer who checked it. No text is kept, only
+        counts, so it measures the reading on real use without storing anything personal."""
+        rows = await self._q("MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p}) WHERE x.source_type <> 'typed' "
+                             "RETURN x.source_type, count(x), sum(CASE WHEN x.edited = '' THEN 1 ELSE 0 END)", {"p": norm(person)}, scope="read")
+        by = {r[0]: {"saved": int(r[1]), "unchanged": int(r[2])} for r in rows}
+        saved = sum(v["saved"] for v in by.values())
+        unchanged = sum(v["unchanged"] for v in by.values())
+        return {"saved": saved, "unchanged": unchanged, "by_source": by,
+                "statement": (f"Of {saved} entries read from photos, voice notes or documents, {unchanged} were saved exactly as read; the rest were corrected by the carer first."
+                              if saved else "No entry has been read from a photo, voice note or document yet.")}
 
     async def care_people(self) -> dict:
         """Patients and carers known in this circle."""
