@@ -55,7 +55,7 @@ export function App(): React.JSX.Element {
   const acct = useMemo(() => (token ? makeAccountApi(token) : null), [token]);
 
   const persist = useCallback((s: Session | null) => { saveSession(s); setSession(s); }, []);
-  const reset = useCallback(() => { persist(null); setProfile(null); setProfileError(null); setAbout(false); setAssistant({ open: false }); setSev('none'); setWarp(0); }, [persist]);
+  const reset = useCallback(() => { persist(null); setProfile(null); setProfileError(null); setAbout(false); setAssistant({ open: false }); setSev('none'); setWarp(0); setWelcomeReq(undefined); }, [persist]);
 
   const signOut = useCallback(async () => {
     if (session?.account) {
