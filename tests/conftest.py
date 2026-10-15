@@ -1,5 +1,6 @@
 import uuid
 
+import pytest
 import pytest_asyncio
 
 from graphmem import Db, GraphMem
@@ -14,6 +15,12 @@ async def _ctl_ids(db):
         except Exception:
             pass
     return out
+
+
+@pytest.fixture(autouse=True)
+def _no_model_calls(monkeypatch):
+    """Tests never reach Bedrock unless they inject a generator themselves."""
+    monkeypatch.setenv("CC_LLM", "0")
 
 
 @pytest_asyncio.fixture
