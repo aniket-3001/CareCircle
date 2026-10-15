@@ -141,14 +141,18 @@ def propose(text: str, checker, image: Optional[bytes] = None, image_format: str
     are kept but flagged, never trusted. Drug names are always resolved to reference-graph candidates for a human to choose."""
     props = []
     for p in llm_proposals(text, image, image_format):
-        p["drug_candidates"] = checker.candidates(p.pop("llm_drug"), 3)
+        named = p.pop("llm_drug")
+        if not quote_in_source(named, p["quote"]):                # a quote that does not even contain the drug name proves nothing
+            continue
+        p["drug_candidates"] = checker.candidates(named, 3)
         p["verified"] = bool(text) and quote_in_source(p["quote"], text)
         if p["drug_candidates"]:
             props.append(p)
-    have = {(p["drug_candidates"][0]["name"]) for p in props if p["verified"]}
+    have = {(p["drug_candidates"][0]["name"]) for p in props if p["verified"] and p["dose_text"]}   # a model item with no dose yields to the rule reading
     for p in rule_proposals(text, checker):
         if p["drug_candidates"][0]["name"] not in have:
             p["verified"] = quote_in_source(p["quote"], text)
+            props = [q for q in props if not (q["drug_candidates"][0]["name"] == p["drug_candidates"][0]["name"] and not q["dose_text"])]
             props.append(p)
     for p in props:
         p["needs_human"] = True                                  # always: nothing is written without a person confirming
