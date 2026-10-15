@@ -144,8 +144,8 @@ async def build(ravi, meena, person: str, now: int) -> None:
         await handle["ravi"].care_condition_add(person, c)
     await handle["ravi"].care_allergy_add(person, "Penicillin")
     for days, who, name, place, bring in ((-3, "meena", "Anticoagulant clinic: INR check", "Riverside Medical Practice", "INR diary, warfarin box, list of every medicine"),
-                                           (-12, "ravi", "GP review: blood pressure and thyroid", "Riverside Medical Practice", "BP diary, recent blood test results"),
-                                           (21, "ravi", "Eye check", "City Eye Clinic", "Glasses, medicine list")):
+                                           (12, "ravi", "GP review: blood pressure and thyroid", "Riverside Medical Practice", "BP diary, recent blood test results"),
+                                           (-21, "ravi", "Eye check", "City Eye Clinic", "Glasses, medicine list")):
         await handle[who].care_appoint(person, name, now - int(days * D), place, who, bring)
     await handle["meena"].care_appoint(person, "Diabetes review (done)", ts(30), "City General", "meena", "")
 
