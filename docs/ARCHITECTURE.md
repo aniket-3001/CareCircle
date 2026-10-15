@@ -2,46 +2,51 @@
 
 ```mermaid
 flowchart LR
-  subgraph Agents
-    A1[Claude Code / Cursor / custom agent]
+  subgraph Front doors
+    WEB[Web app /]:::f
+    TG[Telegram bot]:::f
+    MCPC[MCP client / agent]:::f
   end
-  A1 -- MCP stdio --> MCP[mcp_server.py]
-  A1 -- HTTP bearer key --> API[api.py FastAPI]
-  UI[Web UI /] --> API
-  MCP --> OPS[ops.py whitelisted operations]
-  API --> OPS
+  WEB -- HTTP bearer key --> API[graphmem/api.py FastAPI]
+  TG --> CC
+  MCPC -- stdio --> MCP[mcp_server.py] --> OPS
+  API -- /intake --> INT[carecircle/intake.py<br/>OCR, ASR, PDF, DOCX, Bedrock]
+  INT --> VER[quote verified against source text]
+  API --> OPS[ops.py whitelisted operations]
   OPS --> POL[policy.py grants checked on every query]
-  POL --> MEM[memory.py TenantMemory + codegraph.py tools]
-  OPS --> SP[spaces.py shared spaces]
-  API --> BR[branch.py fork / dry-run / merge]
-  MEM & SP & BR --> DB[(FalkorDB)]
+  POL --> CARE[care.py record / confirm / regimen / check / ack / divergence / nudges / give]
+  CARE --> CHK[checks.py + risk.py + safety.py]
+  CARE --> DB[(FalkorDB)]
+  CHK --> DB
+  CC[carecircle/telegram.py] --> CARE
   subgraph FalkorDB graphs
-    CTL[ctl: agents, grants, keys, forks]
-    T1[mem__tenant: memory + code graph]
-    F1[fork__tenant__id: GRAPH.COPY branch]
-    S1[shared__space: published facts]
+    REF[cc_ref: Drug, INTERACTS, HAZARD, Enzyme, INHIBITS, SUBSTRATE_OF]
+    CIRCLE[mem__circle: Person, Dose, ACKED, Give, Nudge]
+    CTL[ctl: agents, grants, keys, Telegram links]
   end
-  DB --- CTL & T1 & F1 & S1
+  DB --- REF & CIRCLE & CTL
 ```
 
 Request path: key -> `ctl` lookup (agent) -> op whitelist -> grant check (`read`/`write`/`admin`) -> parameterised Cypher on the
-tenant's graph (retried only on FalkorDB's "queue full" error, 503 if it persists).
+circle's graph (retried only on FalkorDB's "queue full" error, 503 if it persists). Interaction checks read the shared `cc_ref` graph, which no request can write.
 
-## Merge flow
+## Intake path
 ```mermaid
 sequenceDiagram
-  participant P as agent
-  participant T as mem__t (tenant graph)
-  participant F as fork__t__id
-  P->>T: fork: GRAPH.COPY (snapshot_ts)
-  T-->>F: copy of nodes, edges, indexes
-  P->>F: assert_fact / create_plan / ... (same API)
-  P->>T: merge dry-run: conflicts (exclusive facts changed since snapshot), plans with outdated inputs
-  P->>T: merge apply: replay fork-new items (skip or overwrite conflicts), then check new plans for staleness
-  P->>F: delete graph
+  participant C as carer
+  participant A as API
+  participant S as source reader
+  participant M as Bedrock model (optional)
+  participant G as circle graph
+  C->>A: photo / voice / PDF / text
+  A->>S: OCR / Whisper / pypdf -> source text
+  A->>M: structure it (JSON only)
+  A->>A: keep a proposal only if its quote occurs in the source text
+  A-->>C: proposals with quote + top-3 drug candidates (nothing saved)
+  C->>G: confirm -> care_record (supersedes the previous entry)
+  G-->>C: other carers show as "not seen" until they acknowledge
 ```
 
-## Why one graph per tenant
-Hard isolation (no tenant filter to forget in a query) and FalkorDB serializes writes per graph, so tenants write in parallel
-(2.36x on heavy writes in our spike, see `docs/DECISION.md`). One hot tenant with many writers is bounded by single-graph write
-speed; batch writes (`UNWIND`) for that case.
+## Why one graph per circle
+Hard isolation (no tenant filter to forget in a query) and FalkorDB serializes writes per graph, so circles write in parallel.
+Reference knowledge is shared once in `cc_ref` instead of copied into every circle.
