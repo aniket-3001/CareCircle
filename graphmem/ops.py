@@ -27,7 +27,7 @@ OPS = {
     # traceability
     # care circle
     "care_record": "write", "care_confirm": "write", "care_regimen": "read", "care_check": "read", "care_resolve": "read",
-    "care_ack": "write", "care_divergence": "read", "care_nudges": "write", "care_reminders": "read", "care_give": "write", "care_gives": "read", "care_people": "read", "care_drug_info": "read", "care_hubs": "read",
+    "care_ack": "write", "care_divergence": "read", "care_nudges": "write", "care_reminders": "read", "care_give": "write", "care_gives": "read", "care_people": "read", "care_drug_info": "read", "care_recalls": "read", "care_sole_knowers": "read", "care_hubs": "read",
     "care_graph": "read", "care_timeline": "read", "care_forget": "write", "care_forget_person": "write", "care_receipts": "read",
     "care_export_fhir": "read",
     "care_chat_ask": "write", "care_chat_history": "read", "care_chat_clear": "write",

@@ -91,3 +91,19 @@ def openfda_label(generic: str) -> Optional[dict]:
         "url": f"https://dailymed.nlm.nih.gov/dailymed/lookup.cfm?setid={sid[0]}" if sid and sid[0] else "https://open.fda.gov/",
         "source": "openFDA drug label (public data; not validated for medical decisions)",
     }
+
+
+def openfda_recalls(generic: str, limit: int = 2) -> list[dict]:
+    """Ongoing US drug recalls listed for products containing `generic` (openFDA enforcement reports), newest first. A recall is about specific
+    products and lots: it is shown as published, for a person to check against the pack at home, never as 'this applies to you'."""
+    generic = " ".join((generic or "").split())[:60].lower()
+    if not enabled() or len(generic) < 3 or '"' in generic:
+        return []
+    search = urllib.parse.quote(f'openfda.generic_name:"{generic}" AND status:"Ongoing"')
+    d = _get(f"https://api.fda.gov/drug/enforcement.json?search={search}&sort=report_date:desc&limit={int(limit)}")
+    out = []
+    for r in (d or {}).get("results") or []:
+        out.append({"drug": generic, "number": r.get("recall_number", ""), "class": r.get("classification", ""), "firm": r.get("recalling_firm", ""),
+                    "reason": _clean(r.get("reason_for_recall", ""), 240), "product": _clean(r.get("product_description", ""), 160),
+                    "reported": r.get("report_date", ""), "source": "openFDA enforcement report (public data; US recalls)"})
+    return out

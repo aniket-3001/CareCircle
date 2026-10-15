@@ -236,6 +236,33 @@ class CareMixin:
                 "label": label, "available": external.enabled(),
                 "note": "Public reference text, shown as published. It is not advice for this person: ask the prescriber or pharmacist."}
 
+    async def care_recalls(self, person: str) -> dict:
+        """Ongoing public recalls listed for the medicines on record. Only medicine names go out. Shown as published; whether one applies depends on the
+        pack at home, which only a person (or the pharmacist) can check."""
+        from carecircle import external
+        reg = await self.care_regimen(person)
+        drugs = sorted({r["drug"] for r in reg})
+        found = await asyncio.gather(*[asyncio.to_thread(external.openfda_recalls, d) for d in drugs])
+        return {"checked": drugs, "available": external.enabled(), "recalls": [x for f in found for x in f],
+                "note": "A recall is about particular products and lots. Check the pack, and ask the pharmacist if unsure. This is not a statement about this person."}
+
+    async def care_sole_knowers(self, person: str) -> dict:
+        """For each medicine on record, who knows about its current entry (the carer who recorded it plus everyone who acknowledged it). An entry known
+        to a single carer while others exist is a single point of failure: if that carer is away, nobody else has been told."""
+        rows = await self._q(
+            """MATCH (x:Dose {cur:true, status:'confirmed'})-[:FOR]->(:Person {id:$p})
+               OPTIONAL MATCH (c:Person)-[:ACKED]->(x)
+               RETURN x.id, x.drug, x.by, x.at, collect(DISTINCT c.id) ORDER BY x.drug""", {"p": norm(person)}, scope="read")
+        carers = [r[0] for r in await self._q("MATCH (c:Person {role:'carer'}) RETURN c.id ORDER BY c.id", scope="read")]
+        out, load = [], {}
+        for did, drug, by, at, ackers in rows:
+            knows = sorted({norm(by), *[norm(a) for a in ackers]} & set(carers))
+            if len(carers) > 1 and len(knows) == 1:
+                out.append({"dose": did, "drug": drug, "only": knows[0], "since": at})
+                load[knows[0]] = load.get(knows[0], 0) + 1
+        keystone = max(load, key=lambda k: load[k]) if load else None
+        return {"carers": carers, "sole": out, "keystone": keystone, "keystone_count": load.get(keystone, 0) if keystone else 0}
+
     async def care_people(self) -> dict:
         """Patients and carers known in this circle."""
         rows = await self._q("MATCH (p:Person) RETURN p.id, p.role ORDER BY p.role, p.id", scope="read")
