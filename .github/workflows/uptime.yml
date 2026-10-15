@@ -10,4 +10,4 @@ jobs:
     steps:
       - name: Site answers
         run: |
-          curl -sf --retry 3 --retry-delay 10 -m 20 https://52-200-189-188.sslip.io/healthz
+          curl -sf --retry 3 --retry-delay 10 -m 20 https://3-228-70-117.sslip.io/healthz

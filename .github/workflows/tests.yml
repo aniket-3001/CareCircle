@@ -44,12 +44,12 @@ jobs:
       contents: read
     env:
       AWS_REGION: us-east-1
-      INSTANCE_ID: i-0b7c2b82fab8b1768
-      SITE: https://52-200-189-188.sslip.io
+      INSTANCE_ID: i-050cbc58e87d6f98e
+      SITE: https://3-228-70-117.sslip.io
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::536697259243:role/carecircle-gh-deploy
+          role-to-assume: arn:aws:iam::534212416249:role/carecircle-gh-deploy
           aws-region: us-east-1
       - name: Pull and rebuild on the instance
         run: |

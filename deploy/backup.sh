@@ -2,7 +2,7 @@
 # Snapshot FalkorDB and copy it to S3 (private bucket, 14-day expiry). Runs from cron on the instance; uses the instance role, no keys.
 # Restore: see deploy/RESTORE.md
 set -euo pipefail
-BUCKET="${BACKUP_BUCKET:-carecircle-backups-536697259243}"
+BUCKET="${BACKUP_BUCKET:-carecircle-backups-534212416249}"
 DB="${DB_CONTAINER:-deploy-falkordb-1}"
 STAMP="$(date -u +%Y-%m-%d-%H%M)"
 TMP="$(mktemp -d)"
