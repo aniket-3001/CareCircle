@@ -22,7 +22,7 @@ from .safety import NUM, scan_advice
 
 MAX_Q = 300
 MAX_A = 700
-EMERGENCY_LINE = "If this is an emergency, call your local emergency number now (112 in India). I can only read back what is on record."
+EMERGENCY_LINE = "If this is an emergency, call your local emergency number now (112 in India and the EU, 911 in the US and Canada, 999 in the UK, 000 in Australia). I can only read back what is on record."
 REFUSAL = ("I can't advise on taking, stopping, skipping or changing any medicine, or say whether something is safe: that is for a prescriber or pharmacist who "
            "knows the person. I can show what is on record, what the sources list for these medicines, and who has not yet seen a change.")
 HELP = ("I can tell you what is on record, who has not seen a change, what the sources flag and why, what changed recently, and which doses were recorded as given. "
