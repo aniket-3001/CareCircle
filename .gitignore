@@ -6,3 +6,5 @@ __pycache__/
 *.log
 ui_shots/
 data/ref/
+web/node_modules/
+web/dist/
