@@ -139,6 +139,16 @@ async def build(ravi, meena, person: str, now: int) -> None:
     for days, v in ((62, 61.2), (40, 60.8), (18, 60.1), (4, 59.9)):
         await handle["meena"].care_measure(person, "weight", v, "kg", at=ts(days))
 
+    # the family's own notes about who she is and what is coming up
+    for c in ("Type 2 diabetes", "High blood pressure", "Atrial fibrillation", "Underactive thyroid", "Reflux"):
+        await handle["ravi"].care_condition_add(person, c)
+    await handle["ravi"].care_allergy_add(person, "Penicillin")
+    for days, who, name, place, bring in ((-3, "meena", "Anticoagulant clinic: INR check", "Riverside Medical Practice", "INR diary, warfarin box, list of every medicine"),
+                                           (-12, "ravi", "GP review: blood pressure and thyroid", "Riverside Medical Practice", "BP diary, recent blood test results"),
+                                           (21, "ravi", "Eye check", "City Eye Clinic", "Glasses, medicine list")):
+        await handle[who].care_appoint(person, name, now - int(days * D), place, who, bring)
+    await handle["meena"].care_appoint(person, "Diabetes review (done)", ts(30), "City General", "meena", "")
+
     # the last seven days of doses actually given (each slot can be claimed once; who gave it is kept)
     sched = [("levothyroxine", "07:00", "ravi"), ("omeprazole", "07:30", "ravi"), ("metformin", "08:00", "ravi"), ("amlodipine", "08:00", "ravi"),
              ("lisinopril", "08:00", "ravi"), ("vitamin d", "08:00", "meena"), ("warfarin", "18:00", "meena"), ("metformin", "19:30", "meena"),

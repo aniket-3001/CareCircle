@@ -13,7 +13,7 @@ PERSON = "asha"
 BASELINE = [("metformin", "500 mg", "twice daily with food"), ("amlodipine", "5 mg", "once daily"),
             ("atorvastatin", "20 mg", "at bedtime")]
 CARERS = ("ravi", "meena")
-SEED_VERSION = 3          # raise it when the shared demo story changes: the next start rebuilds the circle
+SEED_VERSION = 4          # raise it when the shared demo story changes: the next start rebuilds the circle
 
 
 def label_png(drug: str = "Clarithromycin 500 mg tablets", sig: str = "Take ONE tablet twice daily for 7 days") -> bytes:
