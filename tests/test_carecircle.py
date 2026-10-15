@@ -138,8 +138,8 @@ def test_unsupported_and_corrupt_files_do_not_crash():
 
 def test_image_roundtrip_ocr_and_llm_off(monkeypatch):
     monkeypatch.setenv("CC_LLM", "0")
-    data = open(reference.DATA.parent.parent.parent / "data" / "checks" / "label.png", "rb").read()
-    src = intake.read_source(data, "label.png", "image/png")
+    from carecircle import demo
+    src = intake.read_source(demo.label_png("Warfarin Sodium 5 mg tablets", "Take ONE tablet daily at bedtime"), "label.png", "image/png")
     assert src["status"] == "ok"
     props = intake.propose(src["text"], Checker())
     assert props and props[0]["drug_candidates"][0]["name"].startswith("warfarin") and props[0]["verified"]
@@ -182,7 +182,9 @@ from carecircle.telegram import Bot
 class FakeApi:
     def __init__(self): self.out = []
     def send(self, chat, text, buttons=None): self.out.append((chat, text, buttons))
-    def download(self, fid): return open(reference.DATA.parent.parent.parent / "data" / "checks" / "label.png", "rb").read(), "p.png"
+    def download(self, fid):
+        from carecircle import demo
+        return demo.label_png("Warfarin Sodium 5 mg tablets", "Take ONE tablet daily at bedtime"), "p.png"
 
 
 async def test_bot_link_photo_confirm_check_and_nudge(gm, monkeypatch):
@@ -237,3 +239,12 @@ async def test_bot_uses_the_circles_own_patient_by_default(gm, monkeypatch):
     assert "asha" in btn[0][0]["text"] and btn[0][0]["callback_data"].endswith("|asha")
     await bot.handle({"callback_query": {"message": {"chat": {"id": 7}}, "data": btn[0][0]["callback_data"]}})
     assert {r["drug"] for r in await c["ravi"].care_regimen("asha")} == {"metformin", "warfarin"}
+
+
+async def test_a_carer_who_only_records_still_gets_reminders(gm):
+    t, c = await circle(gm, "ravi", "meena")
+    await c["ravi"].care_record("asha", "metformin")                       # ravi never acknowledges anything
+    old = int(__import__("time").time() * 1000) - 5 * H
+    await c["meena"].care_record("asha", "fluconazole", at=old)
+    due = await c["ravi"].care_nudges("asha")
+    assert [(n["kind"], n["notify"]) for n in due if n["drug"] == "fluconazole"] == [("remind", "ravi")]
