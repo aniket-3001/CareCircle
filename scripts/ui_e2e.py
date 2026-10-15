@@ -1,12 +1,12 @@
 """End-to-end browser check of the web app (needs the server running and Chrome).
-Usage: PORT=8000 python scripts/ui_e2e.py      (set CC_SHOTS=<dir> to keep screenshots)"""
+Usage: PORT=8000 python scripts/ui_e2e.py   (or BASE=https://host/)     (set CC_SHOTS=<dir> to keep screenshots)"""
 import os
 import tempfile
 
 from playwright.sync_api import sync_playwright
 
 out = os.environ.get("CC_SHOTS", tempfile.gettempdir())
-base = f"http://127.0.0.1:{os.environ.get('PORT', '8000')}/"
+base = os.environ.get("BASE") or f"http://127.0.0.1:{os.environ.get('PORT', '8000')}/"
 
 
 def shot(pg, name, **kw):
