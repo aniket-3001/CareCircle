@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-arn: arn:aws:iam::536697259243:role/carecircle-gh-deploy
+          role-to-assume: arn:aws:iam::536697259243:role/carecircle-gh-deploy
           aws-region: us-east-1
       - name: Pull and rebuild on the instance
         run: |
