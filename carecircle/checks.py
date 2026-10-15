@@ -50,8 +50,15 @@ class Checker:
                          "x": x, "y": y, "enzyme": enz, "relation": rel, "strength": strength,
                          "source": f"FDA CYP index table; substrate: {src}"})
             weights.append(w) if key not in pairs else None
+        n_known = len(known)
+        total = n_known * (n_known - 1) // 2
+        covered = len(pairs)
+        coverage = {"medicines": len(d), "in_reference": n_known, "pairs_possible": total, "pairs_listed": covered, "rated": len(direct), "unrated": len(unrated),
+                    "not_listed": total - covered, "enzyme_paths": len(mech),
+                    "statement": (f"Of {total} possible pairs among the {n_known} medicines the reference data knows, the source lists {covered}: {len(direct)} with a severity, "
+                                  f"{len(unrated)} without one; {total - covered} are not listed. A pair that is not listed has not been rated as safe." if total else "Fewer than two medicines are known to the reference data.")}
         return {"checked": d, "not_in_reference": sorted(set(d) - known), "direct": direct, "unrated": unrated,
-                "enzyme_paths": mech, "regimen_risk": regimen_risk(weights), "notice": NOTICE}
+                "enzyme_paths": mech, "regimen_risk": regimen_risk(weights), "coverage": coverage, "notice": NOTICE}
 
 
     _names = None
