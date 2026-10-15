@@ -5,6 +5,7 @@ import difflib
 
 from falkordb import FalkorDB
 
+from .aliases import ALIASES
 from .reference import REF_GRAPH, norm
 from .risk import ENZYME_WEIGHT, regimen_risk, severity_weight
 
@@ -69,6 +70,10 @@ class Checker:
                 scored[name] = 0.9 + min(len(nn), 12) / 200
         for name in difflib.get_close_matches(t, self._names, n=n, cutoff=0.6):
             scored.setdefault(name, difflib.SequenceMatcher(None, t, name).ratio())
+        known = set(self._names)
+        for word in t.replace("-", " ").split():
+            if ALIASES.get(word) in known:
+                scored[ALIASES[word]] = max(scored.get(ALIASES[word], 0), 0.95)
         for word in {w for w in t.split() if len(w) >= 6 and w.isalpha()}:      # speech/OCR misspell single words: "chlorythromycin"
             for name in difflib.get_close_matches(word, self._names, n=n, cutoff=0.8):
                 scored[name] = max(scored.get(name, 0), difflib.SequenceMatcher(None, word, name).ratio())
