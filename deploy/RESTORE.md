@@ -17,4 +17,6 @@ docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d
 ```
 The reference graph (`cc_ref`) can always be rebuilt from public data: `python -c "from carecircle import reference as r; r.load()"`.
 
+**Tested:** a snapshot downloaded from the bucket and loaded into a fresh FalkorDB container came back with `cc_ref` (1,831 drugs, 219,723 interactions) and every demo circle (2026-10-15). Note: on Windows Docker Desktop use `docker cp` into the container, not a bind mount.
+
 **Demo circles are synthetic**, so losing them costs nothing; the backup matters most for any circle created with real use.
