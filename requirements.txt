@@ -18,3 +18,4 @@ pytest
 pytest-asyncio
 # optional: semantic recall (GRAPHMEM_EMBEDDINGS=1)
 # fastembed
+pywebpush            # browser notifications (Web Push + VAPID); off unless CC_VAPID_PUBLIC/PRIVATE are set

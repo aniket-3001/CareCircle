@@ -223,21 +223,32 @@ class Bot:
         return out
 
     async def deliver_nudges(self, now: Optional[int] = None) -> int:
-        """Send each due reminder once (care_nudges claims them) to the linked chat of the person to notify."""
+        """Send each due reminder once (care_nudges claims it) to every place its recipient asked for it: the linked chat and any browser that allowed
+        notifications. One claim, several channels, so a reminder is never produced twice however many ways it is delivered."""
+        from . import webpush
         g = await self.gm._ctl()
-        links = (await g.query("MATCH (c:TgChat) RETURN c.chat, c.agent, c.circle")).result_set
-        by_circle: dict[str, list] = {}
-        for chat, agent, circle in links:
-            by_circle.setdefault(circle, []).append((chat, agent))
+        chats: dict[str, list] = {}
+        circles: dict[str, set] = {}
+        for chat, agent, circle in (await g.query("MATCH (c:TgChat) RETURN c.chat, c.agent, c.circle")).result_set:
+            chats.setdefault(agent.lower(), []).append(chat)
+            circles.setdefault(circle, set()).add(agent)
+        if webpush.enabled():
+            subbed = {r[0] for r in (await g.query("MATCH (s:PushSub) RETURN DISTINCT s.agent")).result_set}
+            for agent, circle in (await g.query("MATCH (a:Account)-[:MEMBER]->(t:Tenant) RETURN a.agent, t.id")).result_set:
+                if agent in subbed:
+                    circles.setdefault(circle, set()).add(agent)
         sent = 0
-        for circle, members in by_circle.items():
-            mem = self.gm.open(members[0][1], circle)
+        for circle, members in circles.items():
+            mem = self.gm.open(sorted(members)[0], circle)
             for person in (await mem.care_people())["patients"]:
                 for n in await mem.care_nudges(person, now=now):
-                    for chat, agent in members:
+                    text = n["message"]["text"]
+                    for chat in chats.get(n["notify"], []):
+                        self.api.send(chat, text)
+                        sent += 1
+                    for agent in members:
                         if agent.lower() == n["notify"]:
-                            self.api.send(chat, n["message"]["text"])
-                            sent += 1
+                            sent += await webpush.push(self.gm, agent, text)
         return sent
 
 

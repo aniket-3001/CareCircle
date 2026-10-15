@@ -63,6 +63,12 @@ class Join(BaseModel):
     code: str = Field(max_length=40)
 
 
+class PushSub(BaseModel):
+    endpoint: str = Field(max_length=1000)
+    p256dh: str = Field(max_length=200)
+    auth: str = Field(max_length=100)
+
+
 class Delete(BaseModel):
     confirm: str = Field(max_length=254)
 
@@ -129,6 +135,32 @@ def mount(app: FastAPI, gm: GraphMem, agent_id, demo_on: bool) -> Accounts:
     async def signout(authorization: Optional[str] = Header(None)):
         await acc.end_session(_bearer(authorization))
         return {"ok": True}
+
+    # -------------------------------------------------------------- browser notifications (Web Push)
+    from carecircle import webpush
+
+    @app.get("/v1/push/config")
+    async def push_config():
+        return {"enabled": webpush.enabled(), "key": webpush.public_key() if webpush.enabled() else ""}
+
+    @app.post("/v1/push/subscribe")
+    async def push_subscribe(b: PushSub, agent: str = Depends(agent_id)):
+        if not webpush.enabled():
+            raise AuthProblem("Browser notifications are not switched on here.", 404)
+        try:
+            await webpush.subscribe(gm, agent, b.endpoint, b.p256dh, b.auth)
+        except ValueError as e:
+            raise AuthProblem(str(e), 400)
+        return {"ok": True}
+
+    @app.post("/v1/push/test")
+    async def push_test(agent: str = Depends(agent_id)):
+        n = await webpush.push(gm, agent, "Notifications are on. You will get reminders about changes you have not yet seen.")
+        return {"sent": n}
+
+    @app.delete("/v1/push/subscribe")
+    async def push_unsubscribe(agent: str = Depends(agent_id)):
+        return {"removed": await webpush.unsubscribe(gm, agent)}
 
     # -------------------------------------------------------------- the account
     async def profile(agent: str) -> dict:
