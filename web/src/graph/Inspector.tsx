@@ -1,3 +1,4 @@
+import { MousePointerClick } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { CareGraph, GraphEdge, GraphNode } from '../api/types';
 import { Pill, type Tone } from '../components/Pill';
@@ -47,7 +48,7 @@ function NodeBody({ graph, node, onSelect }: { graph: CareGraph; node: GraphNode
   const ns = neighbours(graph, node.id).filter((x) => !x.edge.weak || x.node.kind !== 'drug' || node.kind !== 'dose');
   return (
     <div className="stack">
-      <div className="inspector__head">
+      <div>
         <div style={{ ['--nc' as string]: KIND[node.kind].color }}>
           <div className="inspector__title" role="heading" aria-level={3}>{node.label}</div>
           <Pill tone={TONE[node.kind] ?? 'mute'}>{KIND[node.kind].word}</Pill>
@@ -57,7 +58,7 @@ function NodeBody({ graph, node, onSelect }: { graph: CareGraph; node: GraphNode
       <Rows meta={node.meta} />
       {ns.length > 0 && (
         <section>
-          <h4 className="section-title">Connected to</h4>
+          <h4 className="eyebrow">Connected to</h4>
           <ul className="neighbours">
             {ns.map((x) => (
               <li key={x.edge.id + x.node.id}>
@@ -73,7 +74,7 @@ function NodeBody({ graph, node, onSelect }: { graph: CareGraph; node: GraphNode
         </section>
       )}
       <section>
-        <h4 className="section-title">How it is stored in the graph</h4>
+        <h4 className="eyebrow">How it is stored in the graph</h4>
         <code className="code">{node.cypher}</code>
       </section>
     </div>
@@ -83,7 +84,7 @@ function NodeBody({ graph, node, onSelect }: { graph: CareGraph; node: GraphNode
 function EdgeBody({ graph, edge, onSelect }: { graph: CareGraph; edge: GraphEdge; onSelect: (s: Selection) => void }): React.JSX.Element {
   const a = graph.nodes.find((n) => n.id === edge.source);
   const b = graph.nodes.find((n) => n.id === edge.target);
-  const tone: Tone = edge.level === 'major' ? 'bad' : edge.level === 'moderate' ? 'warn' : edge.kind === 'acked' ? 'ok' : 'info';
+  const tone: Tone = edge.level === 'major' ? 'bad' : edge.level === 'moderate' ? 'warn' : edge.level === 'minor' ? 'minor' : edge.kind === 'acked' ? 'ok' : 'info';
   return (
     <div className="stack">
       <div>
@@ -95,7 +96,7 @@ function EdgeBody({ graph, edge, onSelect }: { graph: CareGraph; edge: GraphEdge
       <p>{edge.summary}</p>
       {edge.meta.length > 0 && <Rows meta={edge.meta} />}
       <section>
-        <h4 className="section-title">Ends of this line</h4>
+        <h4 className="eyebrow">Ends of this line</h4>
         <ul className="neighbours">
           {[a, b].map((n) =>
             n ? (
@@ -123,6 +124,7 @@ export function Inspector({ graph, selection, onSelect }: { graph: CareGraph; se
           <Body graph={graph} sel={selection} onSelect={onSelect} />
         ) : (
           <div className="empty">
+            <span className="ico"><MousePointerClick size={26} strokeWidth={1.75} aria-hidden="true" /></span>
             <b>Nothing selected</b>
             <span>Click a node or a line in the graph to see what it is, where it came from and how it is connected, in plain words.</span>
           </div>

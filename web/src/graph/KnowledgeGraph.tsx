@@ -1,4 +1,5 @@
 import { forceCollide, forceLink, forceManyBody, forceRadial, forceSimulation, type Simulation, type SimulationLinkDatum, type SimulationNodeDatum } from 'd3-force';
+import { Maximize2, Minus, Pause, Play, Plus } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { GraphEdge, GraphNode } from '../api/types';
 import { KIND, clip, edgeClass, glyphFor, isFlagged, isMajor, majorDrugs, type Visible } from './model';
@@ -294,10 +295,10 @@ export function KnowledgeGraph({ visible, selection, onSelect, replayKey }: Prop
       </svg>
       <div className="kg__hint" aria-hidden="true">Click a node or line · drag · scroll to zoom</div>
       <div className="kg__ctl">
-        <button type="button" aria-label="Zoom in" onClick={() => zoomBy(1.25)}>+</button>
-        <button type="button" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.25)}>−</button>
-        <button type="button" aria-label="Fit to view" onClick={() => fit(true)}>⤢</button>
-        <button type="button" aria-label="Pause motion" aria-pressed={still} onClick={() => setStill((s) => !s)}>❚❚</button>
+        <button type="button" aria-label="Zoom in" onClick={() => zoomBy(1.25)}><Plus size={18} aria-hidden="true" /></button>
+        <button type="button" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.25)}><Minus size={18} aria-hidden="true" /></button>
+        <button type="button" aria-label="Fit to view" onClick={() => fit(true)}><Maximize2 size={17} aria-hidden="true" /></button>
+        <button type="button" aria-label="Pause motion" aria-pressed={still} onClick={() => setStill((s) => !s)}>{still ? <Play size={17} aria-hidden="true" /> : <Pause size={17} aria-hidden="true" />}</button>
       </div>
       <div className="kg__legend" aria-hidden="true">
         {kinds.map((k) => (
