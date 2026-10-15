@@ -19,6 +19,7 @@ services:
       GRAPHMEM_ADMIN_KEY: ${GRAPHMEM_ADMIN_KEY:?set GRAPHMEM_ADMIN_KEY}
       FALKORDB_HOST: falkordb
       CC_DEMO: ${CC_DEMO:-1}
+      CC_DEMO_MAX: ${CC_DEMO_MAX:-300}                  # oldest demo circle is deleted beyond this many
       CC_MODEL: ${CC_MODEL:-us.amazon.nova-pro-v1:0}
       AWS_REGION: ${AWS_REGION:-us-east-1}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
