@@ -42,13 +42,25 @@ Without Docker (needs a FalkorDB on :6379, e.g. `docker run -p 6379:6379 falkord
 python -m venv .venv && .venv/bin/pip install -r requirements.txt          # Windows: .venv/Scripts
 python scripts/fetch_reference.py                                           # DDInter + FDA tables into data/ref (gitignored)
 python -c "from carecircle import reference as r; print(r.load())"          # build the shared cc_ref graph
+(cd web && npm ci && npm run build)                                         # the React app (served by the API from web/dist)
 python -m graphmem.api                                                      # http://127.0.0.1:8000
-python -m pytest -q tests                                                   # 65 tests against live FalkorDB
-PORT=8000 python scripts/ui_e2e.py                                          # browser check (needs Chrome)
+python -m pytest -q tests                                                   # 80 tests against live FalkorDB
+(cd web && npm test)                                                        # UI unit tests; `npm run dev` for hot reload (proxies to :8000)
+PORT=8000 python scripts/ui_e2e.py                                          # browser walk-through (needs Chrome and `pip install playwright`)
 PYTHONPATH=. python bench/care_bench.py                                     # benchmarks below
 ```
 Optional: `CC_MODEL` / `AWS_REGION` + AWS credentials let Amazon Bedrock (default `us.amazon.nova-pro-v1:0`) structure what the OCR read;
 `CC_LLM=0` or no credentials falls back to rules. Set `TELEGRAM_BOT_TOKEN` to also run the Telegram bot in the server process (`/link <key> <circle>`, then send a photo, voice note or text).
+
+## What is in the app
+The web app is React + TypeScript + Vite, built on the design system of [Vayu Labs](https://github.com/hrsh-kr/vayu-labs) (its tokens, shell, tab bar, sheets and
+segmented controls are reused), light and dark, phone to desktop.
+- **Today:** one verdict tile (never "safe"), the regimen, and every flag with its source and the Cypher or enzyme path behind it.
+- **Add:** a photo, voice note (recorded in the browser), PDF, Word file or typed text becomes proposals that show the exact quoted line, a verified badge and the top three drug matches. Nothing is saved until a person confirms.
+- **Circle:** who has not seen which change (graph query), reminders with a time-warp control, and a once-per-slot dose log.
+- **Graph:** the circle as an animated force-directed graph (people, entries, medicines, enzymes). Nodes pop in, edges draw themselves, flagged edges carry flowing dashes, major interactions pulse. **Click any node or line** and a panel explains it in plain words: what it is, who recorded it and when, the source and quoted line, who acknowledged it, interaction counts and PageRank hub rank for medicines, and the graph pattern it comes from. Layers can be toggled, nodes dragged, the view zoomed; it is keyboard-reachable.
+- **History:** a look-back slider (regimen and flags as they were), a timeline written as sentences, **FHIR R4 export** (free-text `MedicationStatement`s; no medicine codes are invented), and **forget with a receipt**: remove one entry or everything about the person for good, leaving only a SHA-256 hash, who and when.
+- **Telegram** does the same without an app: photo, voice, text, `/regimen`, `/check`, `/history`, `/ack`, `/gave`; proposals wait in the database, so a redeploy does not expire a Confirm button.
 
 ## The demo story (90 seconds)
 1. **Start a demo circle.** Asha takes metformin, amlodipine, atorvastatin; two carers, Ravi and Meena, have acknowledged them.
@@ -57,8 +69,9 @@ Optional: `CC_MODEL` / `AWS_REGION` + AWS credentials let Amazon Bedrock (defaul
 3. **Today** now flags clarithromycin + atorvastatin as *major* (DDInter), with the enzyme path `clarithromycin -INHIBITS(strong)-> CYP3A <-SUBSTRATE_OF- atorvastatin`.
    Pairs the source lists without a severity are shown as *unrated*, not safe.
 4. **Circle.** Meena has not acknowledged the change. Slide the time warp to 13 hours: a reminder is produced for Meena, and an escalation for Ravi. Each is produced exactly once.
-5. **Doses.** Record a dose as Ravi, then as Meena: the second is refused and names who already gave it.
-6. **History.** Slide back to see the regimen and flags as they were.
+5. **Doses** (in the Circle tab). Record a dose as Ravi, then as Meena: the second is refused and names who already gave it.
+6. **Graph.** Watch it assemble, click the clarithromycin node, then the red line: both explain themselves in words.
+7. **History.** Slide back to see the regimen and flags as they were; export FHIR; remove an entry and see the receipt.
 
 ## Graph data model
 ```
@@ -113,6 +126,10 @@ indexes, unique constraints, variable-length paths, `FOREACH`, `UNWIND` bulk loa
 
 **Not measured:** OCR/voice accuracy at scale or on home-quality photos and accents, severity accuracy against clinical truth, any patient outcome.
 
+## Operations
+Every push to `main` runs the tests, the web build and a headless-Chrome walk-through of the demo, and only then deploys to the instance (GitHub OIDC to AWS Systems Manager, no stored keys).
+FalkorDB is snapshotted to a private S3 bucket every 6 hours, CloudWatch alarms reboot or recover the instance, and a scheduled workflow checks `/healthz` (`deploy/RESTORE.md`).
+
 ## Limits, stated plainly
 - Interaction severity weights (minor .1, moderate .3, major .7; enzyme strong .7, moderate .3; staleness half-life 72 h) are **assumptions**, not clinical values.
 - The FDA CYP table is an index list, not exhaustive. Sources may disagree. Flags are for discussion with a prescriber or pharmacist.
@@ -131,5 +148,5 @@ proposed fields; it never decides interactions or doses.
 
 ## Layout
 `carecircle/` product logic (reference graph, checks, risk math, safety, intake, Telegram, algorithms, demo) · `graphmem/` the multi-tenant graph
-memory engine (tenants, grants, HTTP API, MCP server, forks, spaces) · `web/` the app · `tests/` · `bench/` · `scripts/` · `docs/ARCHITECTURE.md`.
+memory engine (tenants, grants, HTTP API, MCP server, forks, spaces) · `web/` the React app · `deploy/` production compose, S3 backup and restore guide · `tests/` · `bench/` · `scripts/` · `docs/ARCHITECTURE.md`.
 MCP: `claude mcp add carecircle -e GRAPHMEM_API_KEY=gm_... -- python -m graphmem.mcp_server` exposes every operation (`call(tenant, "care_check", ...)`).
