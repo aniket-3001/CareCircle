@@ -124,7 +124,7 @@ class CareViewMixin:
             node(f"dose:{did}", "dose" if cur else "dose_old", label,
                  f"{who(by)} {'stopped' if action == 'stop' else 'recorded'} {_title(drug)}{' ' + dt if dt else ''}{' ' + ft if ft else ''}, "
                  f"{SOURCE_WORDS.get(src, src)}, {ago(at, t)}.", meta,
-                 "(:Dose)-[:FOR]->(:Person), (:Dose)-[:OF]->(:Drug)", current=bool(cur), at=at)
+                 "(:Dose)-[:FOR]->(:Person), (:Dose)-[:OF]->(:Drug)", current=bool(cur), at=at, short=dt or ft or "entry")
             edge(f"dose:{did}", f"person:{p}", "for", "is for", f"{label} is on record for {_title(p)}.")
             edge(f"dose:{did}", f"drug:{drug}", "of", "is", "", [], weak=True)
             if norm(by) in {x for x in people["carers"]}:
