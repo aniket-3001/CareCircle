@@ -18,6 +18,8 @@ export const HI_MORE: Record<string, string> = {
   'Pretend it is later, to see reminders appear without waiting.': 'मान लें कि समय आगे बढ़ गया है, ताकि बिना इंतज़ार किए रिमाइंडर दिखें।', 'Showing': 'दिखा रहा है:', 'now': 'अभी', 'Real circles are always read as of now.': 'असली सर्कल हमेशा अभी के हिसाब से पढ़े जाते हैं।',
   'Notifications': 'सूचनाएँ', 'Get a reminder on this phone or computer when a change has not been seen, without any chat app.': 'किसी चैट ऐप के बिना, इस फ़ोन या कंप्यूटर पर रिमाइंडर पाएँ जब कोई बदलाव देखा न गया हो।', 'Turn notifications on': 'सूचनाएँ चालू करें', 'Turn notifications off': 'सूचनाएँ बंद करें',
   'Notifications are on for this browser.': 'इस ब्राउज़र के लिए सूचनाएँ चालू हैं।', 'Notifications are off for this browser.': 'इस ब्राउज़र के लिए सूचनाएँ बंद हैं।', 'Notifications are blocked in this browser. Allow them in the site settings.': 'इस ब्राउज़र में सूचनाएँ बंद हैं। साइट सेटिंग में उन्हें अनुमति दें।',
+  'A second carer confirms each dose of this medicine': 'इस दवा की हर खुराक की पुष्टि दूसरा देखभालकर्ता करता है', 'Handover notes': 'हैंडओवर नोट्स', 'Write a note for the next carer': 'अगले देखभालकर्ता के लिए नोट लिखें', 'Add note': 'नोट जोड़ें',
+  'A note cannot be edited or removed once saved: add another to correct it.': 'सहेजने के बाद नोट बदला या हटाया नहीं जा सकता: सुधारने के लिए नया नोट जोड़ें।', 'No notes yet.': 'अभी कोई नोट नहीं।',
   'Show fewer': 'कम दिखाएँ',
   // Graph
   'Replay animation': 'एनीमेशन दोबारा चलाएँ', 'Most hazard-connected in this regimen': 'इस सूची में सबसे ज़्यादा जोखिम-जुड़ी दवाएँ',

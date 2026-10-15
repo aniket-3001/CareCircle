@@ -1,6 +1,7 @@
 import { BellRing, Check, Clock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState } from 'react';
+import { Handover } from '../components/Handover';
 import { Appointments } from '../components/Appointments';
 import { Async } from '../components/Async';
 import { FaceIcon } from '../components/Face';
@@ -90,6 +91,7 @@ export function CircleScreen(): React.JSX.Element {
               </div>
             )}
           </Async>
+          <Handover />
           <Appointments />
           <Doses />
         </div>
@@ -132,7 +134,8 @@ function Doses(): React.JSX.Element {
   const app = useApp();
   const toast = useToast();
   const reg = useLoad((a) => a.api.regimen());
-  const log = useLoad((a) => a.api.gives());
+  const log = useLoad((a) => a.api.gives(), [app.rev]);
+  const watched = useLoad((a) => a.api.watched(), [app.rev]);
   const [showAll, setShowAll] = useState(false);
   const [drug, setDrug] = useState('');
   const [slot, setSlot] = useState(`${new Date().toISOString().slice(0, 10)} 08:00`);
@@ -163,15 +166,19 @@ function Doses(): React.JSX.Element {
             <label className="field">{tr('Slot')}
               <input type="text" value={slot} onChange={(e) => setSlot(e.target.value)} />
             </label>
-            <div className="row">
+            <div className="row row--wrap">
               <button type="button" className="btn" disabled={!r.length} onClick={() => void give(drug || r[0]?.drug || '')}>Record as {nameOf(app.me)}</button>
+              <label className="row" style={{ gap: 6 }}>
+                <input type="checkbox" checked={(watched.data ?? []).includes(drug || r[0]?.drug || '')} onChange={(e) => void app.api.watch(drug || r[0]?.drug || '', e.target.checked).then(() => app.bump())} />
+                <span className="muted small">{tr('A second carer confirms each dose of this medicine')}</span>
+              </label>
             </div>
           </div>
         )}
       </Async>
       {msg && <div className="banner banner--bad" role="alert" data-testid="duplicate">{msg}</div>}
       <Async state={log}>
-        {(l) => (l.length ? <><div className="rows">{l.slice(0, showAll ? undefined : 10).map((g) => <div key={g.drug + g.slot} className="item"><div><div className="item__title">{title(g.drug)} <span className="muted">{g.slot}</span></div><div className="item__sub">recorded by {nameOf(g.by)}</div></div></div>)}</div>{l.length > 10 && <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowAll((v) => !v)}>{showAll ? 'Show fewer' : `Show all ${l.length}`}</button>}</> : <p className="muted">{tr('Nothing recorded yet.')}</p>)}
+        {(l) => (l.length ? <><div className="rows">{l.slice(0, showAll ? undefined : 10).map((g) => <div key={g.drug + g.slot} className="item"><div><div className="item__title">{title(g.drug)} <span className="muted">{g.slot}</span></div><div className="item__sub">recorded by {nameOf(g.by)}{g.witness ? `, seen by ${nameOf(g.witness)}` : ''}</div></div>{g.needs_second_carer && (g.by === app.me ? <Pill tone="warn">waiting for a second carer</Pill> : <button type="button" className="btn btn--sm" onClick={() => void app.api.witness(g.drug, g.slot).then(() => { toast('Confirmed'); app.bump(); }, (e) => toast(e.message))}>I saw it given</button>)}</div>)}</div>{l.length > 10 && <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowAll((v) => !v)}>{showAll ? 'Show fewer' : `Show all ${l.length}`}</button>}</> : <p className="muted">{tr('Nothing recorded yet.')}</p>)}
       </Async>
     </section>
   );

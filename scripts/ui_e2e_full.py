@@ -105,6 +105,21 @@ with sync_playwright() as p:
     p2.get_by_role("button", name="Record as Dev").click()
     expect(p2.get_by_test_id("duplicate")).to_be_visible(timeout=15000)
     print("5 doses given once per slot ok")
+    # the family's second-carer rule: Kavya gives a watched dose, Dev confirms it
+    pg.locator("[aria-labelledby=dose-title] select").select_option(label="Metformin")
+    pg.locator("[aria-labelledby=dose-title] input[type=checkbox]").click()
+    expect(pg.locator("[aria-labelledby=dose-title] input[type=checkbox]")).to_be_checked(timeout=15000)
+    pg.locator("[aria-labelledby=dose-title] input[type=text]").fill("2030-01-01 08:00")
+    pg.get_by_role("button", name="Record as Kavya").click()
+    expect(pg.get_by_text("waiting for a second carer")).to_be_visible(timeout=15000)
+    p2.reload()
+    tab(p2, "Circle")
+    p2.get_by_role("button", name="I saw it given").click()
+    expect(p2.get_by_text("seen by Dev")).to_be_visible(timeout=15000)
+    p2.get_by_placeholder("Write a note for the next carer").fill("INR 2.4 on Tuesday; next check Monday.")
+    p2.get_by_role("button", name="Add note").click()
+    expect(p2.get_by_test_id("handover").get_by_text("INR 2.4 on Tuesday")).to_be_visible(timeout=15000)
+    print("5a second-carer confirmation and handover note ok")
 
     # ---- readings, conditions and allergies, appointments and the what-to-bring page
     tab(pg, "Today")

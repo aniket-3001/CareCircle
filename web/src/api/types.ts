@@ -109,7 +109,10 @@ export interface IntakeResult {
   proposals: Proposal[];
 }
 
+export interface Handover { id: string; text: string; by: string; at: number }
 export interface GiveRecord {
+  witness?: string | null;
+  needs_second_carer?: boolean;
   drug: string;
   slot: string;
   by: string;
