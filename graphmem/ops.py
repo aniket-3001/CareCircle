@@ -30,6 +30,7 @@ OPS = {
     "care_ack": "write", "care_divergence": "read", "care_nudges": "write", "care_give": "write", "care_gives": "read", "care_people": "read", "care_hubs": "read",
     "care_graph": "read", "care_timeline": "read", "care_forget": "write", "care_forget_person": "write", "care_receipts": "read",
     "care_export_fhir": "read",
+    "care_chat_ask": "write", "care_chat_history": "read", "care_chat_clear": "write",
     # memory
     "record_decision": "write", "explain": "read", "stats": "read", "graph_view": "read",
 }

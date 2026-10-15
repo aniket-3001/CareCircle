@@ -255,6 +255,11 @@ class Accounts:
         theirs = await self.role(who, circle)
         if not theirs:
             raise AuthProblem("They are not in this circle.", 404)
+        try:                                              # what they said to the assistant goes with them
+            g = await self.gm.db.tenant_graph(circle)
+            await g.query("MATCH (m:ChatMsg {by:$who}) DELETE m", {"who": who.lower()})
+        except Exception:
+            pass
         await self.gm.revoke(who, circle)
         await self._q("MATCH (:Account {agent:$ag})-[m:MEMBER]->(:Tenant {id:$c}) DELETE m", {"ag": who, "c": circle})
         await self._q("MATCH (c:TgChat {circle:$c, agent:$ag}) DELETE c", {"c": circle, "ag": who})

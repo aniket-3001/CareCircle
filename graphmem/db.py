@@ -30,7 +30,7 @@ TENANT_INDEXES = [
     ("Session", "id"), ("Episode", "id"), ("Entity", "key"), ("Fact", "id"), ("Fact", "skey"),
     ("Skill", "key"), ("Run", "id"), ("Task", "id"), ("Plan", "id"), ("Decision", "id"), ("Agent", "id"),
     ("Code", "id"), ("Commit", "sha"), ("Person", "id"),
-    ("Dose", "id"), ("Give", "key"), ("Nudge", "key"), ("Drug", "name"),
+    ("Dose", "id"), ("Give", "key"), ("Nudge", "key"), ("Drug", "name"), ("ChatMsg", "by"), ("Receipt", "id"),
 ]
 CTL_INDEXES = [("Tenant", "id"), ("Agent", "id"), ("ApiKey", "hash"), ("Fork", "id"), ("Account", "email"), ("Account", "agent"), ("Account", "sub"),
                ("Session", "hash"), ("Invite", "hash"), ("Throttle", "key"), ("TgChat", "chat")]

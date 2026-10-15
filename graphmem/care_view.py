@@ -267,6 +267,44 @@ class CareViewMixin:
         rows = await self._q("MATCH (r:Receipt) RETURN r.id, r.kind, r.hash, r.at, r.by, r.reason, r.removed ORDER BY r.at DESC", scope="read")
         return [dict(receipt=r[0], kind=r[1], sha256=r[2], at=r[3], when=iso(r[3]), by=who(r[4]), reason=r[5], removed=r[6]) for r in rows]
 
+    # ------------------------------------------------------------------ the helper assistant: the conversation is kept in the circle's graph
+    async def care_chat_ask(self, person: str, question: str, now: Optional[int] = None, daily_limit: int = 60) -> dict:
+        """Ask the helper assistant about this circle. Both sides of the exchange are stored for the asking carer, so the chat is there on any device.
+
+        Answers come from the circle's own record (rules first, then a guarded model); the assistant never changes anything and never advises."""
+        import os
+        from carecircle import assistant
+        from .care import checker
+        t = now_ms() if now is None else now
+        me = norm(self.agent)
+        day = t // 86_400_000
+        used = (await self._q("MATCH (m:ChatMsg {by:$me, day:$d, role:'user'}) RETURN count(m)", {"me": me, "d": day}, scope="read"))[0][0]
+        if used >= daily_limit:
+            raise ValueError(f"You have used today's {daily_limit} questions for the assistant. It resets tomorrow.")
+        facts = await assistant.gather(self, person, t)
+        out = await asyncio.to_thread(assistant.ask, question, facts, checker())
+        qid, aid = new_id("msg"), new_id("msg")
+        links = json.dumps(out.get("links", []))
+        props = json.dumps(out.get("proposals", []))
+        await self._q("""CREATE (:ChatMsg {id:$q, by:$me, day:$d, role:'user', text:$qt, at:$t, links:'[]', props:'[]', source:''}),
+                         (:ChatMsg {id:$a, by:$me, day:$d, role:'assistant', text:$at, at:$t2, links:$l, props:$p, source:$s, ptext:$pt})""",
+                      {"q": qid, "a": aid, "me": me, "d": day, "qt": " ".join(question.split())[:300], "at": out["answer"], "t": t, "t2": t + 1,
+                       "l": links, "p": props, "s": out["source"], "pt": out.get("text", "")})
+        return {"id": aid, "role": "assistant", "text": out["answer"], "source": out["source"], "at": t + 1, "links": out.get("links", []),
+                "proposals": out.get("proposals", []), "proposal_text": out.get("text", ""), "left_today": max(0, daily_limit - used - 1)}
+
+    async def care_chat_history(self, limit: int = 40) -> list[dict]:
+        """This carer's conversation with the helper assistant, oldest first."""
+        rows = await self._q("MATCH (m:ChatMsg {by:$me}) RETURN m.id, m.role, m.text, m.at, m.source, m.links, m.props, m.ptext ORDER BY m.at DESC LIMIT $n",
+                             {"me": norm(self.agent), "n": limit}, scope="read")
+        return [{"id": r[0], "role": r[1], "text": r[2], "at": r[3], "source": r[4], "links": json.loads(r[5] or "[]"), "proposals": json.loads(r[6] or "[]"),
+                 "proposal_text": r[7] or ""} for r in reversed(rows)]
+
+    async def care_chat_clear(self) -> dict:
+        """Delete this carer's conversation with the helper assistant."""
+        await self._q("MATCH (m:ChatMsg {by:$me}) DELETE m", {"me": norm(self.agent)})
+        return {"cleared": True}
+
     # ------------------------------------------------------------------ FHIR export
     async def care_export_fhir(self, person: str) -> dict:
         """The regimen as a FHIR R4 Bundle of MedicationStatement resources (free text only).
