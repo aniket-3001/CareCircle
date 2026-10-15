@@ -179,6 +179,16 @@ class Db:
             except Exception as e:
                 if "already" not in str(e).lower():
                     raise
+        if name != CTL_GRAPH:
+            from . import schema
+
+            async def mk(label: str, prop: str) -> None:
+                try:
+                    await g.query(f"CREATE INDEX FOR (n:{label}) ON (n.{prop})")
+                except Exception as e:
+                    if "already" not in str(e).lower():
+                        raise
+            await schema.migrate(g, mk)           # versioned: each circle graph is brought up to the current shape when first opened
         if name != CTL_GRAPH:   # full-text index for search_text (DDL form; the procedure form is rejected by FalkorDB 6.x)
             try:
                 await g.query("CREATE FULLTEXT INDEX FOR (e:Episode) ON (e.content)")
