@@ -47,13 +47,19 @@ export function KnowledgeGraph({ visible, selection, onSelect, replayKey }: Prop
   // ---- full screen (the browser's Fullscreen API on the graph card; Esc leaves)
   const [full, setFull] = useState(false);
   useEffect(() => {
-    const f = () => setFull(document.fullscreenElement === wrap.current);
+    const f = () => { if (!document.fullscreenElement) setFull(false); };
     document.addEventListener('fullscreenchange', f);
     return () => document.removeEventListener('fullscreenchange', f);
   }, []);
+  // If the browser refuses the Fullscreen API, the card still fills the window (the kg--full class), so the button always does what it says.
   const toggleFull = () => {
-    if (document.fullscreenElement) void document.exitFullscreen();
-    else void wrap.current?.requestFullscreen?.().catch(() => undefined);
+    if (full) {
+      setFull(false);
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+      return;
+    }
+    setFull(true);
+    void wrap.current?.requestFullscreen?.().catch(() => undefined);
   };
 
   // ---- size
@@ -234,7 +240,7 @@ export function KnowledgeGraph({ visible, selection, onSelect, replayKey }: Prop
   };
 
   return (
-    <div ref={wrap} className={`card kg${still ? ' kg--still' : ''}`} data-testid="knowledge-graph">
+    <div ref={wrap} className={`card kg${still ? ' kg--still' : ''}${full ? ' kg--full' : ''}`} data-testid="knowledge-graph">
       <svg
         ref={svg}
         className={`kg__svg${dim ? ' kg--dim' : ''}`}
@@ -310,7 +316,7 @@ export function KnowledgeGraph({ visible, selection, onSelect, replayKey }: Prop
         <button type="button" aria-label="Zoom in" onClick={() => zoomBy(1.25)}><Plus size={18} aria-hidden="true" /></button>
         <button type="button" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.25)}><Minus size={18} aria-hidden="true" /></button>
         <button type="button" aria-label="Fit to view" onClick={() => fit(true)}><Scan size={17} aria-hidden="true" /></button>
-        <button type="button" aria-label={full ? 'Exit full screen' : 'Full screen'} aria-pressed={full} onClick={toggleFull}>{full ? <Minimize2 size={17} aria-hidden="true" /> : <Expand size={17} aria-hidden="true" />}</button>
+        <button type="button" aria-label={full ? 'Exit full screen' : 'Full screen'} onClick={toggleFull}>{full ? <Minimize2 size={17} aria-hidden="true" /> : <Expand size={17} aria-hidden="true" />}</button>
         <button type="button" aria-label="Pause motion" aria-pressed={still} onClick={() => setStill((s) => !s)}>{still ? <Play size={17} aria-hidden="true" /> : <Pause size={17} aria-hidden="true" />}</button>
       </div>
       <div className="kg__legend" aria-hidden="true">
