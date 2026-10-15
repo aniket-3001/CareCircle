@@ -16,6 +16,8 @@ export const HI_MORE: Record<string, string> = {
   'Medicine': 'दवा', 'Slot': 'समय', 'Nothing recorded yet.': 'अभी कुछ दर्ज नहीं।', 'The circle': 'सर्कल', 'Who has seen what': 'किसने क्या देखा',
   'Every change is shown to every carer. Until someone acknowledges it, they count as behind, and older unseen changes count more.': 'हर बदलाव हर देखभालकर्ता को दिखता है। जब तक कोई उसे स्वीकार न करे, वह पीछे गिना जाता है, और पुराने अनदेखे बदलाव ज़्यादा गिने जाते हैं।',
   'Pretend it is later, to see reminders appear without waiting.': 'मान लें कि समय आगे बढ़ गया है, ताकि बिना इंतज़ार किए रिमाइंडर दिखें।', 'Showing': 'दिखा रहा है:', 'now': 'अभी', 'Real circles are always read as of now.': 'असली सर्कल हमेशा अभी के हिसाब से पढ़े जाते हैं।',
+  'Notifications': 'सूचनाएँ', 'Get a reminder on this phone or computer when a change has not been seen, without any chat app.': 'किसी चैट ऐप के बिना, इस फ़ोन या कंप्यूटर पर रिमाइंडर पाएँ जब कोई बदलाव देखा न गया हो।', 'Turn notifications on': 'सूचनाएँ चालू करें', 'Turn notifications off': 'सूचनाएँ बंद करें',
+  'Notifications are on for this browser.': 'इस ब्राउज़र के लिए सूचनाएँ चालू हैं।', 'Notifications are off for this browser.': 'इस ब्राउज़र के लिए सूचनाएँ बंद हैं।', 'Notifications are blocked in this browser. Allow them in the site settings.': 'इस ब्राउज़र में सूचनाएँ बंद हैं। साइट सेटिंग में उन्हें अनुमति दें।',
   'Show fewer': 'कम दिखाएँ',
   // Graph
   'Replay animation': 'एनीमेशन दोबारा चलाएँ', 'Most hazard-connected in this regimen': 'इस सूची में सबसे ज़्यादा जोखिम-जुड़ी दवाएँ',

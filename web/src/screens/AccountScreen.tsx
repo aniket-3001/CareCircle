@@ -10,6 +10,7 @@ import { useToast } from '../components/Toast';
 import { when } from '../lib/format';
 import { useApp, useLoad } from '../state';
 import { tr } from '../lib/i18n';
+import { PushToggle } from '../components/PushToggle';
 
 const BOT = 'CareCircleHelperBot';
 
@@ -79,6 +80,7 @@ export function AccountScreen(): React.JSX.Element {
             {p.demo && <p className="muted small">{tr('The demo accounts are shared by everyone, so their circle and name can be changed by anyone who uses them.')}</p>}
           </section>
 
+          <PushToggle />
           <section className="card" aria-labelledby="circ-title">
             <div className="card-head"><h2 id="circ-title">{tr('Your circles')}</h2><Pill tone="info">{p.circles.length}</Pill></div>
             {p.circles.length === 0 ? <p className="muted">{tr('You are not in a circle yet. Create one or join with a code below.')}</p> : (
