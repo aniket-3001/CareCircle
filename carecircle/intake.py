@@ -90,7 +90,7 @@ def rule_proposals(text: str, checker) -> list[dict]:
     out, seen = [], set()
     for line in [l.strip() for l in re.split(r"[\n;]|(?<=[.!?])\s", text) if l.strip()]:
         cands = checker.candidates(line, 3)
-        if not cands or cands[0]["score"] < 0.9:                  # line must actually contain a drug name
+        if not cands or cands[0]["score"] < 0.8:                  # line must actually contain a drug name
             continue
         dose = DOSE_RE.search(line)
         freq = FREQ_RE.search(line)

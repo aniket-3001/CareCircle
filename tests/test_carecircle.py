@@ -113,6 +113,13 @@ def test_rule_proposals_noisy_ocr_and_verify():
     assert not intake.quote_in_source("Warfarin 3 mg", text)
 
 
+def test_speech_misspelling_is_matched_and_plain_words_are_not():
+    ch = Checker()
+    p = intake.rule_proposals("The doctor started chlorythromycin 500 mg twice daily for seven days.", ch)   # a real Whisper transcript
+    assert p and p[0]["drug_candidates"][0]["name"] == "clarithromycin" and p[0]["dose_text"] == "500 mg"
+    assert not intake.rule_proposals("Take one tablet every morning with water and food. Bring the prescription tomorrow evening.", ch)
+
+
 def test_unsupported_and_corrupt_files_do_not_crash():
     assert intake.read_source(b"junk", "x.bin")["status"] == "unsupported"
     assert intake.read_source(b"%PDF-broken", "x.pdf")["status"] == "unsupported"

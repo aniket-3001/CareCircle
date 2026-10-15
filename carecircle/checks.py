@@ -69,5 +69,8 @@ class Checker:
                 scored[name] = 0.9 + min(len(nn), 12) / 200
         for name in difflib.get_close_matches(t, self._names, n=n, cutoff=0.6):
             scored.setdefault(name, difflib.SequenceMatcher(None, t, name).ratio())
+        for word in {w for w in t.split() if len(w) >= 6 and w.isalpha()}:      # speech/OCR misspell single words: "chlorythromycin"
+            for name in difflib.get_close_matches(word, self._names, n=n, cutoff=0.8):
+                scored[name] = max(scored.get(name, 0), difflib.SequenceMatcher(None, word, name).ratio())
         top = sorted(scored.items(), key=lambda kv: -kv[1])[:n]
         return [{"name": k, "score": round(v, 3)} for k, v in top]
