@@ -80,7 +80,7 @@ def _asr_text(data: bytes, filename: str, language: Optional[str]) -> str:
     import tempfile
     from faster_whisper import WhisperModel
     if _whisper is None:
-        _whisper = WhisperModel(os.getenv("CC_WHISPER", "base"), device="cpu", compute_type="int8")
+        _whisper = WhisperModel(os.getenv("CC_WHISPER", "small"), device="cpu", compute_type="int8")
     suffix = os.path.splitext(filename)[1] or ".wav"
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
         f.write(data)

@@ -140,3 +140,36 @@ async def test_a_reader_without_a_grant_cannot_ask(gm):
     t, c, now = await seeded(gm)
     with pytest.raises(PermissionDenied):
         await gm.open("stranger", t).care_chat_ask("asha", "help", now=now)
+
+
+async def test_hindi_answers_come_from_the_record_and_never_advise(gm):
+    t, c, now = await seeded(gm)
+    r = await say(c, "किसने बदलाव नहीं देखा?", now)
+    assert r["source"] == "rules" and "Ravi ने अभी नहीं देखा: Clarithromycin" in r["answer"] and "Meena" not in r["answer"]
+    r = await say(c, "रिकॉर्ड में कौन सी दवाइयाँ हैं?", now)
+    assert "Atorvastatin 20 mg at bedtime" in r["answer"] and "(3)" in r["answer"]
+    r = await say(c, "क्या कोई इंटरैक्शन है?", now)
+    assert "Atorvastatin और Clarithromycin: गंभीर (DDInter 2.0)" in r["answer"]
+    r = await say(c, "क्लैरिथ्रोमाइसिन के बारे में बताओ", now)
+    assert "Meena ने" in r["answer"] and "Ravi ने अभी नहीं देखा" in r["answer"]
+    r = await say(c, "हाल में क्या बदला", now)
+    assert r["answer"].startswith("हाल के बदलाव") and "Clarithromycin" in r["answer"]
+    r = await say(c, "खुराक किसने दी?", now)
+    assert "Metformin 2026-10-16 08:00 (Ravi ने)" in r["answer"]
+    r = await say(c, "what is on record", now, lang="hi")                       # the UI is in Hindi: the answer is in Hindi
+    assert "रिकॉर्ड में" in r["answer"]
+
+
+@pytest.mark.parametrize("q", ["क्या मम्मी मेटफॉर्मिन बंद कर दें?", "क्या यह दवा सुरक्षित है", "कितनी गोली लेनी चाहिए", "इसके साइड इफेक्ट क्या हैं", "kya main dawa chhod du, chahiye kya"])
+async def test_hindi_advice_questions_get_the_fixed_refusal(gm, q):
+    t, c, now = await seeded(gm)
+    r = await say(c, q, now)
+    assert r["source"] == "refusal" and "सलाह नहीं दे सकता" in r["answer"]
+
+
+async def test_hindi_emergency_and_add(gm):
+    t, c, now = await seeded(gm)
+    r = await say(c, "मम्मी बेहोश हो गई हैं", now)
+    assert r["source"] == "refusal" and "112" in r["answer"]
+    r = await say(c, "जोड़ें warfarin 5 mg once daily", now)
+    assert r["source"] == "proposal" and r["proposals"][0]["drug_candidates"][0]["name"] == "warfarin"

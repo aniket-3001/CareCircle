@@ -268,7 +268,7 @@ class CareViewMixin:
         return [dict(receipt=r[0], kind=r[1], sha256=r[2], at=r[3], when=iso(r[3]), by=who(r[4]), reason=r[5], removed=r[6]) for r in rows]
 
     # ------------------------------------------------------------------ the helper assistant: the conversation is kept in the circle's graph
-    async def care_chat_ask(self, person: str, question: str, now: Optional[int] = None, daily_limit: int = 60) -> dict:
+    async def care_chat_ask(self, person: str, question: str, now: Optional[int] = None, daily_limit: int = 60, lang: str = "") -> dict:
         """Ask the helper assistant about this circle. Both sides of the exchange are stored for the asking carer, so the chat is there on any device.
 
         Answers come from the circle's own record (rules first, then a guarded model); the assistant never changes anything and never advises."""
@@ -282,7 +282,7 @@ class CareViewMixin:
         if used >= daily_limit:
             raise ValueError(f"You have used today's {daily_limit} questions for the assistant. It resets tomorrow.")
         facts = await assistant.gather(self, person, t)
-        out = await asyncio.to_thread(assistant.ask, question, facts, checker())
+        out = await asyncio.to_thread(assistant.ask, question, facts, checker(), None, lang)
         qid, aid = new_id("msg"), new_id("msg")
         links = json.dumps(out.get("links", []))
         props = json.dumps(out.get("proposals", []))

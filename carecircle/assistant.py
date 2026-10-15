@@ -222,11 +222,14 @@ def ask_model(question: str, facts: Facts, generate=None) -> Optional[str]:
 
 
 # ------------------------------------------------------------------ the entry point
-def ask(question: str, facts: Facts, checker, generate=None) -> dict:
+def ask(question: str, facts: Facts, checker, generate=None, lang: str = "") -> dict:
     """{answer, source: rules|model|refusal|proposal, proposals?, links?}. Pure: no writes."""
     q = " ".join((question or "").split())[:MAX_Q]
     if not q:
         return {"answer": HELP, "source": "rules", "links": []}
+    from . import assistant_hi
+    if lang == "hi" or re.search("[ऀ-ॿ]", q) or len(assistant_hi.HINGLISH.findall(q)) >= 2:
+        return assistant_hi.ask(q, facts, checker)
     if EMERGENCY.search(q):
         return {"answer": EMERGENCY_LINE, "source": "refusal", "links": []}
     m = ADD.match(q)
