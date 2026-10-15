@@ -28,6 +28,8 @@ OPS = {
     # care circle
     "care_record": "write", "care_confirm": "write", "care_regimen": "read", "care_check": "read", "care_resolve": "read",
     "care_ack": "write", "care_divergence": "read", "care_nudges": "write", "care_give": "write", "care_gives": "read", "care_people": "read", "care_hubs": "read",
+    "care_graph": "read", "care_timeline": "read", "care_forget": "write", "care_forget_person": "write", "care_receipts": "read",
+    "care_export_fhir": "read",
     # memory
     "record_decision": "write", "explain": "read", "stats": "read", "graph_view": "read",
 }

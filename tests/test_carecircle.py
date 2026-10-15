@@ -1,4 +1,4 @@
-import math, pytest
+import json, math, pytest
 from carecircle import risk, reference
 from carecircle.checks import Checker
 
@@ -269,3 +269,99 @@ def test_speech_decodes_a_telegram_style_opus_voice_note():
     dst.close()
     src = intake.read_source(out.getvalue(), "voice/file_3.oga", "audio/ogg")
     assert src["status"] in ("ok", "empty") and src["kind"] != "unknown"      # a tone has no words: 'empty' is fine, a crash is not
+
+
+# ---- graph view, timeline, forgetting, FHIR ----
+async def _regimen_with_conflict(gm):
+    t, c = await circle(gm, "ravi", "meena")
+    for d in ("atorvastatin", "amlodipine", "metformin"):
+        await c["ravi"].care_record("asha", d, dose_text="10 mg", freq_text="once daily")
+    r = await c["meena"].care_record("asha", "clarithromycin", dose_text="500 mg", freq_text="twice daily", source_type="photo",
+                                     quote="Clarithromycin 500 mg tablets", source_text="DEMO\nClarithromycin 500 mg tablets\nTake one")
+    return t, c, r
+
+
+async def test_care_graph_has_nodes_edges_and_readable_metadata(gm):
+    t, c, r = await _regimen_with_conflict(gm)
+    g = await c["ravi"].care_graph("asha")
+    kinds = {n["kind"] for n in g["nodes"]}
+    assert {"patient", "carer", "dose", "drug", "enzyme"} <= kinds
+    ids = {n["id"] for n in g["nodes"]}
+    assert all(e["source"] in ids and e["target"] in ids for e in g["edges"])             # no dangling edges
+    cla = next(n for n in g["nodes"] if n["id"] == "drug:clarithromycin")
+    meta = dict(map(tuple, cla["meta"]))
+    assert "Interaction pairs in the reference data" in meta and meta["On record now"] == "yes"
+    dose = next(n for n in g["nodes"] if n["id"] == f"dose:{r['id']}")
+    dm = dict(map(tuple, dose["meta"]))
+    assert dm["Source"] == "read from a photo" and "Clarithromycin 500 mg tablets" in dm["Line it was read from"]
+    assert dm["Acknowledged by"] == "nobody yet" and dm["Recorded by"].startswith("Meena")
+    assert any(e["kind"] == "interacts" and e["level"] == "major" for e in g["edges"])
+    assert any(e["kind"] == "inhibits" for e in g["edges"]) and any(e["kind"] == "substrate" for e in g["edges"])
+    meena = next(n for n in g["nodes"] if n["id"].startswith("person:meena"))
+    assert dict(map(tuple, meena["meta"]))["Changes recorded"] == "1"
+    ravi = next(n for n in g["nodes"] if n["id"].startswith("person:ravi"))
+    assert "clarithromycin" in dict(map(tuple, ravi["meta"]))["Changes not yet seen"].lower()
+
+
+async def test_care_graph_text_never_advises_and_history_is_optional(gm):
+    from carecircle.safety import scan_advice
+    t, c, r = await _regimen_with_conflict(gm)
+    await c["ravi"].care_record("asha", "metformin", dose_text="850 mg")                    # supersedes
+    g = await c["ravi"].care_graph("asha")
+    for n in g["nodes"]:
+        assert not scan_advice(n["summary"]) and not any(scan_advice(str(v)) for _, v in n["meta"])
+    for e in g["edges"]:
+        assert not scan_advice(e["summary"])
+    assert any(n["kind"] == "dose_old" for n in g["nodes"]) and any(e["kind"] == "supersedes" for e in g["edges"])
+    g2 = await c["ravi"].care_graph("asha", include_history=False)
+    assert not any(n["kind"] == "dose_old" for n in g2["nodes"])
+
+
+async def test_timeline_reads_as_sentences(gm):
+    t, c, r = await _regimen_with_conflict(gm)
+    await c["ravi"].care_ack(r["id"])
+    await c["ravi"].care_give("asha", "metformin", "2026-10-16 08:00")
+    tl = await c["ravi"].care_timeline("asha")
+    texts = [e["text"] for e in tl]
+    assert any("Meena recorded Clarithromycin 500 mg twice daily, read from a photo" in x for x in texts)
+    assert any("Ravi acknowledged the entry for Clarithromycin" in x for x in texts)
+    assert any("recorded Metformin as given" in x for x in texts)
+    assert [e["at"] for e in tl] == sorted((e["at"] for e in tl), reverse=True)
+
+
+async def test_forget_entry_leaves_a_receipt_and_no_content(gm):
+    t, c, r = await _regimen_with_conflict(gm)
+    await c["ravi"].care_ack(r["id"])
+    out = await c["ravi"].care_forget(r["id"], reason="entered by mistake")
+    assert out["forgotten"] and len(out["sha256"]) == 64
+    assert "clarithromycin" not in {x["drug"] for x in await c["ravi"].care_regimen("asha")}
+    g = await c["ravi"].care_graph("asha")
+    assert "clarithromycin" not in json.dumps(g).lower()                                    # nothing left to show anywhere
+    rc = await c["ravi"].care_receipts()
+    assert rc[0]["receipt"] == out["receipt"] and rc[0]["reason"] == "entered by mistake"
+    assert "clarithromycin" not in json.dumps(rc).lower()
+    with pytest.raises(KeyError):
+        await c["ravi"].care_forget(r["id"])
+
+
+async def test_forget_person_needs_the_name_and_removes_everything(gm):
+    t, c, r = await _regimen_with_conflict(gm)
+    await c["ravi"].care_give("asha", "metformin", "slot-1")
+    with pytest.raises(ValueError):
+        await c["ravi"].care_forget_person("asha", confirm="nope")
+    out = await c["ravi"].care_forget_person("asha", confirm="Asha")
+    assert out["forgotten"] and out["removed_entries"] == 4 and out["removed_dose_records"] == 1
+    assert await c["ravi"].care_regimen("asha") == [] and await c["ravi"].care_gives("asha") == []
+    assert "asha" not in (await c["ravi"].care_people())["patients"]
+
+
+async def test_fhir_bundle_shape_and_free_text_only(gm):
+    t, c, r = await _regimen_with_conflict(gm)
+    b = await c["ravi"].care_export_fhir("asha")
+    assert b["resourceType"] == "Bundle" and b["entry"][0]["resource"]["resourceType"] == "Patient"
+    ms = [e["resource"] for e in b["entry"] if e["resource"]["resourceType"] == "MedicationStatement"]
+    assert len(ms) == 4 and all(m["status"] == "active" and m["subject"]["reference"] == "Patient/asha" for m in ms)
+    cla = next(m for m in ms if m["medicationCodeableConcept"]["text"] == "Clarithromycin")
+    assert "coding" not in cla["medicationCodeableConcept"] and cla["dosage"][0]["text"] == "500 mg twice daily"
+    assert "Quote verified" in cla["note"][0]["text"] and "photo" in cla["note"][0]["text"]
+    json.dumps(b)
