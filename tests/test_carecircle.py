@@ -120,6 +120,16 @@ def test_speech_misspelling_is_matched_and_plain_words_are_not():
     assert not intake.rule_proposals("Take one tablet every morning with water and food. Bring the prescription tomorrow evening.", ch)
 
 
+def test_real_photo_ocr_texts_strength_on_next_line_and_brands():
+    ch = Checker()     # OCR output from real bottle photos (Wikimedia Commons), copied verbatim
+    label = "NDC 62856-243-05\nRx only\nAcipHex\nrabeprazolesodium\n20mg\n5Delayed-ReleaseTablets"
+    p = intake.rule_proposals(label, ch)
+    assert p[0]["drug_candidates"][0]["name"] == "rabeprazole" and p[0]["dose_text"] == "20mg"
+    assert intake.quote_in_source(p[0]["quote"], label)
+    assert intake.rule_proposals("Advil\nLIQUI-GELS\nLiquidFilled\nCapsules", ch)[0]["drug_candidates"][0]["name"] == "ibuprofen"
+    assert intake.rule_proposals("GENUINE ASPIRIN\nORIGINAL", ch)[0]["drug_candidates"][0]["name"] == "acetylsalicylic acid"
+
+
 def test_unsupported_and_corrupt_files_do_not_crash():
     assert intake.read_source(b"junk", "x.bin")["status"] == "unsupported"
     assert intake.read_source(b"%PDF-broken", "x.pdf")["status"] == "unsupported"

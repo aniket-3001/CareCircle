@@ -88,18 +88,29 @@ def _asr_text(data: bytes, filename: str, language: Optional[str]) -> str:
 def rule_proposals(text: str, checker) -> list[dict]:
     """One proposal per line that names a known drug. Dose/frequency are copied as written, never interpreted."""
     out, seen = [], set()
-    for line in [l.strip() for l in re.split(r"[\n;]|(?<=[.!?])\s", text) if l.strip()]:
+    lines = [l.strip() for l in re.split(r"[\n;]|(?<=[.!?])\s", text) if l.strip()]
+    for i, line in enumerate(lines):
         cands = checker.candidates(line, 3)
         if not cands or cands[0]["score"] < 0.8:                  # line must actually contain a drug name
             continue
-        dose = DOSE_RE.search(line)
-        freq = FREQ_RE.search(line)
+        quote, dose = line, DOSE_RE.search(line)
+        for nxt in lines[i + 1:i + 3]:                            # labels put the strength on a later line ("AcipHex" / "20mg"); the quote spans the lines between so it stays contiguous
+            if dose:
+                break
+            c2 = checker.candidates(nxt, 1)
+            if c2 and c2[0]["score"] >= 0.8 and c2[0]["name"] != cands[0]["name"]:   # the next line names another drug: stop
+                break
+            quote = f"{quote} {nxt}"
+            dose = DOSE_RE.search(nxt)
+        if not dose:
+            quote = line                                          # nothing found ahead: quote only the drug line
+        freq = FREQ_RE.search(quote)
         key = (cands[0]["name"], dose.group(0).lower() if dose else "")
         if key in seen:
             continue
         seen.add(key)
         out.append({"drug_candidates": cands, "dose_text": dose.group(0) if dose else "", "freq_text": freq.group(0) if freq else "",
-                    "quote": line[:200], "method": "rules"})
+                    "quote": quote[:200], "method": "rules"})
     return out
 
 
