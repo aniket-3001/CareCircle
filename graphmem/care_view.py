@@ -61,8 +61,9 @@ def _title(drug: str) -> str:
 class CareViewMixin:
     # ------------------------------------------------------------------ the knowledge graph
     async def care_graph(self, person: str, include_history: bool = True, now: Optional[int] = None) -> dict:
-        """Nodes and edges for the circle's graph, each with `meta` ([label, value] rows in plain words), a one-line `summary`, and the
-        `cypher` pattern that the structure comes from. Safe to show to anyone in the circle; read scope only."""
+        """The circle as a graph: nodes and edges, each with plain-language metadata (read scope).
+
+        Every node and edge carries `meta` ([label, value] rows in plain words), a one-line `summary` and the `cypher` pattern it comes from."""
         from .care import _get_algos, checker
         t = now_ms() if now is None else now
         p = norm(person)
@@ -223,8 +224,10 @@ class CareViewMixin:
 
     # ------------------------------------------------------------------ forgetting, with a receipt
     async def care_forget(self, dose_id: str, reason: str = "") -> dict:
-        """Remove one entry for good: its dose, frequency, quote, links and acknowledgements are deleted. What stays is a receipt with a
-        SHA-256 of what was removed (so it can be matched to a copy someone kept, but does not reveal it), who did it, and when."""
+        """Remove one entry for good and return a receipt.
+
+        The dose, frequency, quote, links and acknowledgements are deleted. What stays is a receipt with a SHA-256 of what was removed
+        (so it can be matched to a copy someone kept, but does not reveal it), who did it, and when."""
         rows = await self._q("MATCH (x:Dose {id:$id}) RETURN x.drug, x.dose_text, x.freq_text, x.quote, x.by, x.at, x.status",
                              {"id": dose_id}, scope="write")
         if not rows:
@@ -260,13 +263,15 @@ class CareViewMixin:
         return {"receipt": rid, "forgotten": left == 0, "removed_entries": len(ids), "removed_dose_records": gives, "sha256": digest}
 
     async def care_receipts(self) -> list[dict]:
+        """Receipts of everything that was removed for good (hash, who, when), newest first."""
         rows = await self._q("MATCH (r:Receipt) RETURN r.id, r.kind, r.hash, r.at, r.by, r.reason, r.removed ORDER BY r.at DESC", scope="read")
         return [dict(receipt=r[0], kind=r[1], sha256=r[2], at=r[3], when=iso(r[3]), by=who(r[4]), reason=r[5], removed=r[6]) for r in rows]
 
     # ------------------------------------------------------------------ FHIR export
     async def care_export_fhir(self, person: str) -> dict:
-        """The regimen as a FHIR R4 Bundle (collection) of one Patient and MedicationStatement resources. Free text only: this tool does not
-        assign RxNorm or other medicine codes, so receiving systems must not treat the text as coded."""
+        """The regimen as a FHIR R4 Bundle of MedicationStatement resources (free text only).
+
+        A collection of one Patient and the statements. This tool does not assign RxNorm or other medicine codes, so receiving systems must not treat the text as coded."""
         p = norm(person)
         rows = await self._q(
             """MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p})
