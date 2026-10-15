@@ -109,6 +109,8 @@ def mount(app: FastAPI, gm: GraphMem, agent_id, demo_on: bool) -> Accounts:
 
     @app.post("/v1/auth/signin")
     async def signin(b: SignIn):
+        if cfg:
+            raise AuthProblem("Sign in through Amazon Cognito on the sign-in page.", 404)
         return await session_for(await acc.verify_password(b.email, b.password))
 
     @app.post("/v1/auth/exchange")
