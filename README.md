@@ -97,6 +97,7 @@ card with a big number and a face, white hairline cards, dashed add tiles, a flo
 - **Circle:** who has not seen which change (graph query), reminders with a time-warp control, and a once-per-slot dose log.
 - **Graph:** the circle as an animated force-directed graph (people, entries, medicines, enzymes). Nodes pop in, edges draw themselves, flagged edges carry flowing dashes, major interactions pulse. **Click any node or line** and a panel explains it in plain words: what it is, who recorded it and when, the source and quoted line, who acknowledged it, interaction counts and PageRank hub rank for medicines, and the graph pattern it comes from. Layers can be toggled, nodes dragged, the view zoomed; it is keyboard-reachable.
 - **History:** a look-back slider (regimen and flags as they were), a timeline written as sentences, **FHIR R4 export** (free-text `MedicationStatement`s; no medicine codes are invented), and **forget with a receipt**: remove one entry or everything about the person for good, leaving only a SHA-256 hash, who and when.
+- **Light and dark theme**, a toggle in the header; it follows the device until a person chooses, then remembers the choice. English and Hindi (toggle beside it).
 - **Telegram** does the same without an app: photo, voice, text, `/regimen`, `/check`, `/history`, `/ack`, `/gave`; proposals wait in the database, so a redeploy does not expire a Confirm button.
 
 ## The demo story (90 seconds)
