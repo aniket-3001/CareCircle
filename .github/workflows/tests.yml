@@ -15,6 +15,20 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python scripts/fetch_reference.py && python -c "from carecircle import reference as r; print(r.load())"
       - run: CC_LLM=0 python -m pytest -q tests
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Web app (typecheck, unit tests, build)
+        working-directory: web
+        run: npm ci --no-audit --no-fund && npm run typecheck && npm test && npm run build
+      - name: Browser end-to-end check
+        run: |
+          pip install playwright
+          CC_LLM=0 python -m graphmem.api > api.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:8000/healthz && break; sleep 1; done
+          PORT=8000 CC_SHOTS="$RUNNER_TEMP" python scripts/ui_e2e.py || { tail -30 api.log; exit 1; }
 
   # Every push to main that passes the tests is deployed to the live site. AWS access is by short-lived OIDC credentials
   # (no keys stored in GitHub): the role can only be assumed from this repo's main branch and can only run a command on one instance.
