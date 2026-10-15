@@ -40,7 +40,7 @@ class Checker:
         mech, seen_paths = [], set()
         for x, rel, strength, enz, y, src in self.g.ro_query(MECH, {"d": d}).result_set:
             w = ENZYME_WEIGHT[strength]
-            kind = "raises exposure of" if rel == "INHIBITS" else "lowers exposure of"
+            kind = "raise exposure of" if rel == "INHIBITS" else "lower exposure of"
             key = tuple(sorted((x, y)))
             if (x, rel, enz, y) in seen_paths:
                 continue
