@@ -98,3 +98,31 @@ async def test_resolve_noisy_ocr(gm):
     t, c = await circle(gm, "ravi")
     top = await c["ravi"].care_resolve("WarfarinSodium5mgtablets")
     assert top and top[0]["name"].startswith("warfarin")
+
+
+# ---- intake ----
+from carecircle import intake
+
+
+def test_rule_proposals_noisy_ocr_and_verify():
+    ch = Checker()
+    text = "CITY PHARMACY\nWarfarinSodium5mgtablets\nTake ONE tablet daily at bedtime"
+    p = intake.rule_proposals(text, ch)
+    assert p and p[0]["drug_candidates"][0]["name"].startswith("warfarin") and p[0]["dose_text"].lower() == "5mg"
+    assert intake.quote_in_source(p[0]["quote"], text)
+    assert not intake.quote_in_source("Warfarin 3 mg", text)
+
+
+def test_unsupported_and_corrupt_files_do_not_crash():
+    assert intake.read_source(b"junk", "x.bin")["status"] == "unsupported"
+    assert intake.read_source(b"%PDF-broken", "x.pdf")["status"] == "unsupported"
+    assert intake.read_source(b"   ", "n.txt")["status"] == "empty"
+
+
+def test_image_roundtrip_ocr_and_llm_off(monkeypatch):
+    monkeypatch.setenv("CC_LLM", "0")
+    data = open(reference.DATA.parent.parent.parent / "data" / "checks" / "label.png", "rb").read()
+    src = intake.read_source(data, "label.png", "image/png")
+    assert src["status"] == "ok"
+    props = intake.propose(src["text"], Checker())
+    assert props and props[0]["drug_candidates"][0]["name"].startswith("warfarin") and props[0]["verified"]

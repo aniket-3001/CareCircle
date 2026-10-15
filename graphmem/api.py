@@ -18,7 +18,7 @@ import os
 import time
 from typing import Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from pathlib import Path
 
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -148,6 +148,27 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
     @app.exception_handler(branch.ForkError)
     async def _fork_err(_: Request, e: branch.ForkError):
         return JSONResponse({"error": str(e)}, status_code=409)
+
+    @app.post("/v1/tenants/{tenant}/intake")
+    async def intake(tenant: str, file: UploadFile = File(None), text: str = Form(""), language: str = Form(""),
+                     agent: str = Depends(agent_id)):
+        """Photo / voice / PDF / DOCX / text -> proposed medication entries (nothing is written; each needs a person's confirmation)."""
+        import asyncio
+        from carecircle import intake as ci
+        m = gm.open(agent, tenant)
+        await m.care_resolve("x")                                    # read-scope check on the tenant
+        from graphmem.care import checker
+        if file is not None:
+            data = await file.read(ci.MAX_BYTES + 1)
+            src = await asyncio.to_thread(ci.read_source, data, file.filename or "", file.content_type or "", language or None)
+        else:
+            src = ci._done("typed", text, "text")
+        if src["status"] != "ok":
+            return {"source": {k: src[k] for k in ("kind", "method", "status", "note")}, "text": "", "proposals": []}
+        img = data if file is not None and src["kind"] == "image" else None
+        fmt = (file.filename.rsplit(".", 1)[-1].lower() if img else "png").replace("jpg", "jpeg")
+        props = await asyncio.to_thread(ci.propose, src["text"], checker(), img, fmt if fmt in ("png", "jpeg", "webp") else "png")
+        return {"source": {k: src[k] for k in ("kind", "method", "status", "note")}, "text": src["text"], "proposals": props}
 
     @app.post("/v1/tenants/{tenant}/forks")
     async def fork_create(tenant: str, b: ForkBody, agent: str = Depends(agent_id)):
