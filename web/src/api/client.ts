@@ -1,4 +1,4 @@
-import type {
+import type { DrugInfo,
   Account, AuthConfig, CareGraph, ChatMessage, CheckResult, Divergence, FhirBundle, GiveRecord, GiveResult, Hubs, IntakeResult, Invite, Member, Reminder, People,
   Profile, Receipt, RegimenEntry, Session, TimelineEvent, CircleInfo,
 } from './types';
@@ -32,6 +32,7 @@ export function apiFor(s: Session) {
   return {
     check: (as_of?: number) => op<CheckResult>('care_check', { person: p, ...(as_of === undefined ? {} : { as_of }) }),
     regimen: (as_of?: number) => op<RegimenEntry[]>('care_regimen', { person: p, ...(as_of === undefined ? {} : { as_of }) }),
+    drugInfo: (drug: string) => op<DrugInfo>('care_drug_info', { drug }),
     people: () => op<People>('care_people'),
     divergence: (now: number) => op<Divergence>('care_divergence', { person: p, now }),
     reminders: (now: number) => op<Reminder[]>('care_reminders', { person: p, now }),

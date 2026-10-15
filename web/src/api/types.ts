@@ -265,3 +265,12 @@ export interface ChatMessage {
   proposal_text?: string;
   left_today?: number;
 }
+
+export interface DrugInfo {
+  drug: string;
+  in_interaction_reference: boolean;
+  rxnorm: { name: string; rxcui: string; source: string } | null;
+  label: { boxed_warning: string; indications: string; effective: string; brand: string; url: string; source: string } | null;
+  available: boolean;
+  note: string;
+}
