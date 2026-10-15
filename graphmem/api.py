@@ -24,7 +24,7 @@ from pathlib import Path
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-from . import branch, ops, spaces
+from . import accounts_api, branch, ops, spaces
 from .db import Db, Overloaded
 from .policy import GraphMem, PermissionDenied
 
@@ -150,6 +150,7 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
 
     demo_on = os.getenv("CC_DEMO", "1") == "1"
     demo_circles: list[str] = []
+    app.state.accounts = accounts_api.mount(app, gm, agent_id, demo_on)            # sign-in, profiles, circles, invitations
 
     @app.post("/demo/start")
     async def demo_start():

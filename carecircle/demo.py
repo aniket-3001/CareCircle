@@ -37,7 +37,7 @@ async def start(gm, prefix: str = "demo") -> dict:
     agents = {c: f"{c}-{circle[-8:]}" for c in CARERS}          # agent ids are global in the control graph: make them unique per circle
     keys = {}
     for c, a in agents.items():
-        await gm.grant(a, circle, ("read", "write"))
+        await gm.grant(a, circle, ("read", "write", "admin"))
         keys[c] = await gm.issue_key(a)
     ravi, meena = gm.open(agents["ravi"], circle), gm.open(agents["meena"], circle)
     ids = []
@@ -47,3 +47,34 @@ async def start(gm, prefix: str = "demo") -> dict:
         await meena.care_ack(i)
     await meena.care_record(PERSON, "vitamin d", dose_text="1000 iu", freq_text="once daily")      # makes meena a known carer
     return {"circle": circle, "person": PERSON, "agents": agents, "keys": keys}
+
+
+async def seed_shared(gm, acc) -> None:
+    """The two public demo accounts and the circle they share. Idempotent; `reset_shared` rebuilds the circle. Demo accounts are ordinary accounts
+    (so sign-in, profile and circles behave exactly as for anyone) whose password is shown on the sign-in page."""
+    from .accounts import DEMO_ACCOUNTS, DEMO_PASSWORD, SHARED_CIRCLE
+    agents = []
+    for email, name in DEMO_ACCOUNTS:
+        row = await acc.by_email(email) or await acc.create(email, name, DEMO_PASSWORD, demo=True)
+        agents.append(row["agent"])
+    if await acc.role(agents[0], SHARED_CIRCLE):
+        return
+    from graphmem.db import now_ms
+    await gm.create_tenant(SHARED_CIRCLE)
+    for i, a in enumerate(agents):
+        await gm.grant(a, SHARED_CIRCLE, ("read", "write", "admin") if i == 0 else ("read", "write"))
+        await acc._q("MATCH (a:Account {agent:$ag}), (t:Tenant {id:$c}) CREATE (a)-[:MEMBER {role:$r, at:$t}]->(t)",
+                     {"ag": a, "c": SHARED_CIRCLE, "r": "owner" if i == 0 else "carer", "t": now_ms()})
+    await acc._q("MATCH (t:Tenant {id:$c}) SET t.name=\"Asha's circle (demo)\", t.person=$p, t.owner=$o, t.demo=true", {"c": SHARED_CIRCLE, "p": PERSON, "o": agents[0]})
+    ravi, meena = gm.open(agents[0], SHARED_CIRCLE), gm.open(agents[1], SHARED_CIRCLE)
+    ids = [(await ravi.care_record(PERSON, d, dose_text=dose, freq_text=freq, source_type="typed"))["id"] for d, dose, freq in BASELINE]
+    for i in ids:
+        await meena.care_ack(i)
+    await meena.care_record(PERSON, "vitamin d", dose_text="1000 iu", freq_text="once daily")
+
+
+async def reset_shared(gm, acc) -> None:
+    from .accounts import SHARED_CIRCLE
+    await gm.db.drop_tenant(SHARED_CIRCLE)
+    await acc._q("MATCH (t:Tenant {id:$c}) DETACH DELETE t", {"c": SHARED_CIRCLE})
+    await seed_shared(gm, acc)
