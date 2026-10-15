@@ -202,7 +202,12 @@ class Accounts:
                          CREATE (a)-[:MEMBER {role:'owner', at:$t}]->(t)""", {"ag": agent, "c": cid, "n": name, "p": person, "t": now_ms()})
         mem = self.gm.open(agent, cid)
         await mem._q("MERGE (p:Person {id:$p}) ON CREATE SET p.role='patient'", {"p": person})
+        await self._register_carer(agent, cid)
         return next(c for c in await self.circles(agent) if c["id"] == cid)
+
+    async def _register_carer(self, agent: str, circle: str) -> None:
+        """A member of the circle is a carer from the moment they join, so "who has not seen this" counts them before they have done anything."""
+        await self.gm.open(agent, circle)._q("MERGE (c:Person {id:$a}) ON CREATE SET c.role='carer'", {"a": agent.lower()})
 
     async def role(self, agent: str, circle: str) -> Optional[str]:
         r = await self._q("MATCH (:Account {agent:$ag})-[m:MEMBER]->(:Tenant {id:$c}) RETURN m.role", {"ag": agent, "c": circle})
@@ -244,6 +249,7 @@ class Accounts:
         if not await self.role(agent, cid):
             await self.gm.grant(agent, cid, ("read", "write"))
             await self._q("MATCH (a:Account {agent:$ag}), (t:Tenant {id:$c}) CREATE (a)-[:MEMBER {role:'carer', at:$t}]->(t)", {"ag": agent, "c": cid, "t": now_ms()})
+            await self._register_carer(agent, cid)
         return next(c for c in await self.circles(agent) if c["id"] == cid)
 
     async def leave(self, agent: str, circle: str, target: Optional[str] = None) -> dict:
@@ -258,6 +264,7 @@ class Accounts:
         try:                                              # what they said to the assistant goes with them
             g = await self.gm.db.tenant_graph(circle)
             await g.query("MATCH (m:ChatMsg {by:$who}) DELETE m", {"who": who.lower()})
+            await g.query("MATCH (p:Person {id:$who, role:'carer'}) DETACH DELETE p", {"who": who.lower()})     # no longer counted as behind
         except Exception:
             pass
         await self.gm.revoke(who, circle)
