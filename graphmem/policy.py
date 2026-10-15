@@ -52,6 +52,11 @@ class GraphMem:
 
     async def authenticate(self, token: str) -> Optional[str]:
         """Return the agent id owning this key, or None. Lookup is by hash, never by plaintext."""
+        if token and token.startswith("cs_") and len(token) <= 200:           # a signed-in person's session (carecircle/accounts.py)
+            g = await self._ctl()
+            r = (await g.query("MATCH (s:Session {hash:$h})-[:OF]->(a:Account) WHERE s.exp > $now RETURN a.agent",
+                               {"h": hashlib.sha256(token.encode()).hexdigest(), "now": now_ms()})).result_set
+            return r[0][0] if r else None
         if not token or not token.startswith("gm_") or len(token) > 200:
             return None
         h = hashlib.sha256(token.encode()).hexdigest()

@@ -1,0 +1,303 @@
+"""Accounts, profiles, circles and invitations, kept in the control graph next to agents and grants.
+
+ (:Account {id, agent, email, name, hash, salt, provider, sub, demo, created_at, tg_code, tg_exp})
+ (:Session {hash, exp, at})-[:OF]->(:Account)                          a signed-in browser or phone; only the SHA-256 of its token is stored
+ (:Account)-[:MEMBER {role, at}]->(:Tenant {id, name, person, owner})  a circle; `role` is owner or carer
+ (:Agent {id})-[:GRANTED {scopes}]->(:Tenant)                          the engine's own access check, written alongside membership
+ (:Invite {hash, circle, role, by, exp})                               a one-time code to join a circle
+ (:Throttle {key, n, exp})                                             sign-in and assistant limits
+
+An account's agent id is `<firstname>-<6 hex>`, so the engine's per-agent identity, the carer's display name and the audit trail all stay as before.
+Two providers: `local` (email and password here, scrypt-hashed) and `cognito` (Amazon Cognito proves the email, we verify its token and keep the
+account here). Everything a person sees about their account is read from these nodes; the browser holds only a session token.
+"""
+from __future__ import annotations
+
+import hashlib
+import hmac
+import os
+import re
+import secrets
+import time
+from typing import Optional
+
+from graphmem.db import now_ms
+from graphmem.policy import GraphMem, PermissionDenied
+
+EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,190}\.[^@\s]{2,}$")
+SESSION_DAYS = 30
+INVITE_HOURS = 72
+TG_CODE_MINUTES = 15
+DEMO_PASSWORD = "carecircle-demo1"
+DEMO_ACCOUNTS = (("ravi@demo.carecircle.app", "Ravi"), ("meena@demo.carecircle.app", "Meena"))
+SHARED_CIRCLE = "demo-shared"
+
+
+class AuthProblem(Exception):
+    """A failure with words a person can act on. `status` is the HTTP status to send."""
+
+    def __init__(self, message: str, status: int = 400):
+        super().__init__(message)
+        self.status = status
+
+
+def password_problem(pw: str) -> Optional[str]:
+    if len(pw) < 8 or not re.search(r"[A-Za-z]", pw) or not re.search(r"\d", pw):
+        return "The password needs at least 8 characters, with a letter and a number."
+    if len(pw) > 128:
+        return "That password is too long."
+    return None
+
+
+def _hash(pw: str, salt: bytes) -> str:
+    return hashlib.scrypt(pw.encode(), salt=salt, n=2**14, r=8, p=1, dklen=32).hex()
+
+
+def _slug(name: str) -> str:
+    first = (name.strip().split() or ["user"])[0].lower()
+    return re.sub(r"[^a-z0-9]", "", first)[:12] or "user"
+
+
+def _sha(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+class Accounts:
+    def __init__(self, gm: GraphMem):
+        self.gm = gm
+
+    async def _g(self):
+        return await self.gm._ctl()
+
+    async def _q(self, cypher: str, params: Optional[dict] = None) -> list:
+        return (await (await self._g()).query(cypher, params or {})).result_set
+
+    # ------------------------------------------------------------------ limits
+    async def hit(self, key: str, limit: int, window_s: int) -> bool:
+        """Count one use of `key`; False once `limit` uses have happened in the window. One conditional write, so racing callers cannot both pass."""
+        now = int(time.time())
+        rows = await self._q(
+            """MERGE (t:Throttle {key:$k})
+               ON CREATE SET t.n = 0, t.exp = $e
+               WITH t, CASE WHEN t.exp < $now THEN 0 ELSE t.n END AS n
+               SET t.n = n + 1, t.exp = CASE WHEN t.exp < $now THEN $e ELSE t.exp END
+               RETURN t.n""", {"k": key, "e": now + window_s, "now": now})
+        return rows[0][0] <= limit
+
+    # ------------------------------------------------------------------ accounts
+    def public(self, row: dict) -> dict:
+        return {"id": row["agent"], "email": row["email"], "name": row["name"], "provider": row["provider"],
+                "demo": bool(row.get("demo")), "created_at": row["created_at"]}
+
+    async def _row(self, where: str, params: dict) -> Optional[dict]:
+        r = await self._q(f"MATCH (a:Account) WHERE {where} RETURN a LIMIT 1", params)
+        return dict(r[0][0].properties) if r else None
+
+    async def by_email(self, email: str) -> Optional[dict]:
+        return await self._row("a.email = $e", {"e": email.strip().lower()})
+
+    async def by_agent(self, agent: str) -> Optional[dict]:
+        return await self._row("a.agent = $a", {"a": agent})
+
+    async def create(self, email: str, name: str, password: Optional[str], provider: str = "local", sub: str = "", demo: bool = False) -> dict:
+        email = email.strip().lower()
+        if not EMAIL_RE.match(email):
+            raise AuthProblem("That does not look like an email address.")
+        name = " ".join(name.split())[:60] or email.split("@")[0].title()
+        if await self.by_email(email):
+            raise AuthProblem("There is already an account with that email. Sign in instead.", 409)
+        agent = f"{_slug(name)}-{secrets.token_hex(3)}"
+        salt = secrets.token_bytes(16)
+        pw_hash = _hash(password, salt) if password else ""
+        await self.gm.register_agent(agent)
+        await self._q("CREATE (:Account {agent:$ag, email:$e, name:$n, hash:$h, salt:$s, provider:$p, sub:$sub, demo:$d, created_at:$t})",
+                      {"ag": agent, "e": email, "n": name, "h": pw_hash, "s": salt.hex(), "p": provider, "sub": sub, "d": demo, "t": now_ms()})
+        return await self.by_agent(agent)  # type: ignore[return-value]
+
+    async def signup_local(self, email: str, password: str, name: str) -> dict:
+        problem = password_problem(password)
+        if problem:
+            raise AuthProblem(problem)
+        if not await self.hit(f"signup|{email.strip().lower()}", 5, 3600):
+            raise AuthProblem("Too many tries. Wait a little and try again.", 429)
+        return await self.create(email, name, password)
+
+    async def verify_password(self, email: str, password: str) -> dict:
+        email = email.strip().lower()
+        if not await self.hit(f"signin|{email}", 10, 900):
+            raise AuthProblem("Too many tries. Wait a few minutes and try again.", 429)
+        row = await self.by_email(email)
+        # the same answer and about the same work whether or not the email exists, so the form does not reveal who has an account
+        salt = bytes.fromhex(row["salt"]) if row and row.get("salt") else b"\0" * 16
+        got = _hash(password, salt)
+        if not row or not row.get("hash") or not hmac.compare_digest(got, row["hash"]):
+            raise AuthProblem("That email and password do not match.", 401)
+        return row
+
+    async def upsert_cognito(self, email: str, sub: str, name: str = "") -> dict:
+        row = await self.by_email(email)
+        if row:
+            if row.get("sub") and row["sub"] != sub:
+                raise AuthProblem("That email belongs to a different sign-in.", 409)
+            if not row.get("sub"):
+                await self._q("MATCH (a:Account {agent:$ag}) SET a.sub=$s, a.provider='cognito'", {"ag": row["agent"], "s": sub})
+            return row
+        return await self.create(email, name or email.split("@")[0].title(), None, provider="cognito", sub=sub)
+
+    async def update(self, agent: str, name: str) -> dict:
+        name = " ".join(name.split())[:60]
+        if not name:
+            raise AuthProblem("A name cannot be empty.")
+        await self._q("MATCH (a:Account {agent:$ag}) SET a.name=$n", {"ag": agent, "n": name})
+        return await self.by_agent(agent)  # type: ignore[return-value]
+
+    async def change_password(self, agent: str, old: str, new: str) -> None:
+        row = await self.by_agent(agent)
+        if not row or row["provider"] != "local":
+            raise AuthProblem("This account signs in with Amazon Cognito: change the password from the sign-in page ('Forgot your password?').")
+        if not row.get("hash") or not hmac.compare_digest(_hash(old, bytes.fromhex(row["salt"])), row["hash"]):
+            raise AuthProblem("The current password is not right.", 401)
+        problem = password_problem(new)
+        if problem:
+            raise AuthProblem(problem)
+        salt = secrets.token_bytes(16)
+        await self._q("MATCH (a:Account {agent:$ag}) SET a.hash=$h, a.salt=$s", {"ag": agent, "h": _hash(new, salt), "s": salt.hex()})
+        await self._q("MATCH (a:Account {agent:$ag})<-[:OF]-(s:Session) DETACH DELETE s", {"ag": agent})   # every other device signs in again
+
+    # ------------------------------------------------------------------ sessions
+    async def new_session(self, agent: str) -> str:
+        token = "cs_" + secrets.token_urlsafe(32)
+        await self._q("MATCH (a:Account {agent:$ag}) CREATE (:Session {hash:$h, at:$t, exp:$e})-[:OF]->(a)",
+                      {"ag": agent, "h": _sha(token), "t": now_ms(), "e": now_ms() + SESSION_DAYS * 86_400_000})
+        return token
+
+    async def end_session(self, token: str) -> None:
+        await self._q("MATCH (s:Session {hash:$h}) DETACH DELETE s", {"h": _sha(token)})
+
+    async def agent_for_session(self, token: str) -> Optional[str]:
+        if not token.startswith("cs_") or len(token) > 200:
+            return None
+        r = await self._q("MATCH (s:Session {hash:$h})-[:OF]->(a:Account) WHERE s.exp > $now RETURN a.agent", {"h": _sha(token), "now": now_ms()})
+        return r[0][0] if r else None
+
+    # ------------------------------------------------------------------ circles
+    async def circles(self, agent: str) -> list[dict]:
+        rows = await self._q(
+            """MATCH (:Account {agent:$ag})-[m:MEMBER]->(t:Tenant)
+               OPTIONAL MATCH (:Account)-[:MEMBER]->(t)
+               WITH t, m, count(*) AS n RETURN t.id, t.name, t.person, m.role, n, t.demo ORDER BY m.at""", {"ag": agent})
+        return [{"id": r[0], "name": r[1] or r[0], "person": r[2] or "", "role": r[3], "members": r[4], "demo": bool(r[5])} for r in rows]
+
+    async def create_circle(self, agent: str, name: str, person: str) -> dict:
+        name, person = " ".join(name.split())[:60], " ".join(person.split())[:40].lower()
+        if not name or not person:
+            raise AuthProblem("A circle needs a name and the name of the person it looks after.")
+        if len(await self.circles(agent)) >= 10:
+            raise AuthProblem("You can be in up to 10 circles.")
+        cid = f"c-{_slug(person)}-{secrets.token_hex(3)}"
+        await self.gm.create_tenant(cid)
+        await self.gm.grant(agent, cid, ("read", "write", "admin"))
+        await self._q("""MATCH (a:Account {agent:$ag}), (t:Tenant {id:$c})
+                         SET t.name=$n, t.person=$p, t.owner=$ag
+                         CREATE (a)-[:MEMBER {role:'owner', at:$t}]->(t)""", {"ag": agent, "c": cid, "n": name, "p": person, "t": now_ms()})
+        mem = self.gm.open(agent, cid)
+        await mem._q("MERGE (p:Person {id:$p}) ON CREATE SET p.role='patient'", {"p": person})
+        return next(c for c in await self.circles(agent) if c["id"] == cid)
+
+    async def role(self, agent: str, circle: str) -> Optional[str]:
+        r = await self._q("MATCH (:Account {agent:$ag})-[m:MEMBER]->(:Tenant {id:$c}) RETURN m.role", {"ag": agent, "c": circle})
+        return r[0][0] if r else None
+
+    async def members(self, agent: str, circle: str) -> list[dict]:
+        if not await self.role(agent, circle):
+            raise PermissionDenied("not a member of this circle")
+        rows = await self._q("MATCH (a:Account)-[m:MEMBER]->(:Tenant {id:$c}) RETURN a.agent, a.name, m.role, m.at ORDER BY m.at", {"c": circle})
+        return [{"id": r[0], "name": r[1], "role": r[2], "since": r[3], "you": r[0] == agent} for r in rows]
+
+    async def rename_circle(self, agent: str, circle: str, name: str) -> None:
+        if await self.role(agent, circle) != "owner":
+            raise PermissionDenied("only the owner can rename a circle")
+        name = " ".join(name.split())[:60]
+        if not name:
+            raise AuthProblem("A circle needs a name.")
+        await self._q("MATCH (t:Tenant {id:$c}) SET t.name=$n", {"c": circle, "n": name})
+
+    async def invite(self, agent: str, circle: str) -> dict:
+        if await self.role(agent, circle) != "owner":
+            raise PermissionDenied("only the owner can invite carers")
+        if not await self.hit(f"invite|{agent}", 20, 3600):
+            raise AuthProblem("Too many invitations. Wait a little.", 429)
+        alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+        code = "".join(secrets.choice(alphabet) for _ in range(8))
+        exp = now_ms() + INVITE_HOURS * 3_600_000
+        await self._q("CREATE (:Invite {hash:$h, circle:$c, by:$ag, exp:$e})", {"h": _sha(code), "c": circle, "ag": agent, "e": exp})
+        return {"code": f"{code[:4]}-{code[4:]}", "expires_at": exp, "hours": INVITE_HOURS}
+
+    async def join(self, agent: str, code: str) -> dict:
+        code = re.sub(r"[^A-Za-z0-9]", "", code).upper()
+        if not await self.hit(f"join|{agent}", 10, 900):
+            raise AuthProblem("Too many tries. Wait a few minutes.", 429)
+        r = await self._q("MATCH (i:Invite {hash:$h}) WHERE i.exp > $now WITH i, i.circle AS c DETACH DELETE i RETURN c", {"h": _sha(code), "now": now_ms()})
+        if not r:
+            raise AuthProblem("That code is not valid, or it has expired or been used.", 404)
+        cid = r[0][0]
+        if not await self.role(agent, cid):
+            await self.gm.grant(agent, cid, ("read", "write"))
+            await self._q("MATCH (a:Account {agent:$ag}), (t:Tenant {id:$c}) CREATE (a)-[:MEMBER {role:'carer', at:$t}]->(t)", {"ag": agent, "c": cid, "t": now_ms()})
+        return next(c for c in await self.circles(agent) if c["id"] == cid)
+
+    async def leave(self, agent: str, circle: str, target: Optional[str] = None) -> dict:
+        """A member leaves, or the owner removes someone. The last owner leaving deletes the circle; with other carers still in it, ownership passes to the longest-standing one."""
+        who = target or agent
+        mine = await self.role(agent, circle)
+        if not mine or (target and target != agent and mine != "owner"):
+            raise PermissionDenied("not allowed")
+        theirs = await self.role(who, circle)
+        if not theirs:
+            raise AuthProblem("They are not in this circle.", 404)
+        await self.gm.revoke(who, circle)
+        await self._q("MATCH (:Account {agent:$ag})-[m:MEMBER]->(:Tenant {id:$c}) DELETE m", {"ag": who, "c": circle})
+        await self._q("MATCH (c:TgChat {circle:$c, agent:$ag}) DELETE c", {"c": circle, "ag": who})
+        left = await self._q("MATCH (a:Account)-[m:MEMBER]->(:Tenant {id:$c}) RETURN a.agent ORDER BY m.at", {"c": circle})
+        if not left:
+            await self.gm.db.drop_tenant(circle)
+            await self._q("MATCH (t:Tenant {id:$c}) DETACH DELETE t", {"c": circle})
+            return {"deleted_circle": True}
+        if theirs == "owner":
+            nxt = left[0][0]
+            await self._q("MATCH (a:Account {agent:$ag})-[m:MEMBER]->(t:Tenant {id:$c}) SET m.role='owner', t.owner=$ag", {"ag": nxt, "c": circle})
+            await self.gm.grant(nxt, circle, ("read", "write", "admin"))
+        return {"deleted_circle": False}
+
+    async def delete_account(self, agent: str, confirm: str) -> dict:
+        row = await self.by_agent(agent)
+        if not row:
+            raise AuthProblem("No such account.", 404)
+        if confirm.strip().lower() != row["email"]:
+            raise AuthProblem("Type your email address to confirm.")
+        gone = 0
+        for c in await self.circles(agent):
+            gone += bool((await self.leave(agent, c["id"]))["deleted_circle"])
+        await self._q("MATCH (a:Account {agent:$ag}) OPTIONAL MATCH (a)<-[:OF]-(s:Session) DETACH DELETE s, a", {"ag": agent})
+        await self._q("MATCH (a:Agent {id:$ag}) OPTIONAL MATCH (a)-[:HAS_KEY]->(k) DETACH DELETE k, a", {"ag": agent})
+        await self._q("MATCH (c:TgChat {agent:$ag}) DELETE c", {"ag": agent})
+        return {"deleted": True, "circles_deleted": gone}
+
+    # ------------------------------------------------------------------ Telegram link code
+    async def telegram_code(self, agent: str) -> dict:
+        code = "".join(secrets.choice("ABCDEFGHJKMNPQRSTUVWXYZ23456789") for _ in range(6))
+        exp = int(time.time()) + TG_CODE_MINUTES * 60
+        await self._q("MATCH (a:Account {agent:$ag}) SET a.tg_code=$h, a.tg_exp=$e", {"ag": agent, "h": _sha(code), "e": exp})
+        return {"code": code, "minutes": TG_CODE_MINUTES}
+
+    async def redeem_telegram_code(self, code: str) -> Optional[str]:
+        code = re.sub(r"[^A-Za-z0-9]", "", code).upper()
+        r = await self._q("MATCH (a:Account {tg_code:$h}) WHERE a.tg_exp > $now SET a.tg_code = null RETURN a.agent", {"h": _sha(code), "now": int(time.time())})
+        return r[0][0] if r else None
+
+    async def telegram_links(self, agent: str) -> list[dict]:
+        rows = await self._q("MATCH (c:TgChat {agent:$ag}) RETURN c.chat, c.circle", {"ag": agent})
+        return [{"chat": r[0], "circle": r[1]} for r in rows]
+
+    async def unlink_telegram(self, agent: str) -> None:
+        await self._q("MATCH (c:TgChat {agent:$ag}) DELETE c", {"ag": agent})

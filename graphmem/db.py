@@ -32,11 +32,12 @@ TENANT_INDEXES = [
     ("Code", "id"), ("Commit", "sha"), ("Person", "id"),
     ("Dose", "id"), ("Give", "key"), ("Nudge", "key"), ("Drug", "name"),
 ]
-CTL_INDEXES = [("Tenant", "id"), ("Agent", "id"), ("ApiKey", "hash"), ("Fork", "id")]
+CTL_INDEXES = [("Tenant", "id"), ("Agent", "id"), ("ApiKey", "hash"), ("Fork", "id"), ("Account", "email"), ("Account", "agent"), ("Account", "sub"),
+               ("Session", "hash"), ("Invite", "hash"), ("Throttle", "key"), ("TgChat", "chat")]
 # UNIQUE constraints enforced by FalkorDB itself (need the matching exact-match index above): even a buggy writer cannot
 # create two Entities with one key, two Tasks with one id, two keys with one hash.
 TENANT_UNIQUE = [("Entity", "key"), ("Task", "id"), ("Session", "id"), ("Episode", "id"), ("Plan", "id")]
-CTL_UNIQUE = [("Tenant", "id"), ("Agent", "id"), ("ApiKey", "hash"), ("Fork", "id")]
+CTL_UNIQUE = [("Tenant", "id"), ("Agent", "id"), ("ApiKey", "hash"), ("Fork", "id"), ("Account", "email"), ("Account", "agent"), ("Throttle", "key")]
 
 
 def now_ms() -> int:
