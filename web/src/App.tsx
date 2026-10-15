@@ -163,7 +163,7 @@ export function App(): React.JSX.Element {
                 {!session && (
                   <>
                     <button type="button" className="btn btn--ghost btn--sm" onClick={() => openAuth('signin')} data-testid="top-signin">Sign in</button>
-                    <button type="button" className="btn btn--sm" onClick={() => openAuth('signup')} data-testid="top-signup" aria-label="Create account">Create<span className="wide-only"> account</span></button>
+                    <button type="button" className="btn btn--sm" onClick={() => openAuth('signup')} data-testid="top-signup" aria-label="Create account"><span className="wide-only">Create account</span><span className="narrow-only">Sign up</span></button>
                   </>
                 )}
                 {session && <button type="button" className="btn btn--ghost btn--sm" onClick={() => void signOut()} data-testid="top-signout"><LogOut size={16} aria-hidden="true" /> Sign out</button>}
