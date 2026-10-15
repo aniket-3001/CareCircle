@@ -15,6 +15,7 @@ const behind = (score: number, n: number): SeverityKey => (n === 0 ? 'none' : sc
 
 export function CircleScreen(): React.JSX.Element {
   const app = useApp();
+  const sole = useLoad((a) => a.api.soleKnowers(), [app.rev]);
   const toast = useToast();
   const t = app.now();
   const div = useLoad((a) => a.api.divergence(a.now()), [app.warp]);
@@ -35,6 +36,16 @@ export function CircleScreen(): React.JSX.Element {
       <PageHead crumb="The circle" title="Who has seen what" lede="Every change is shown to every carer. Until someone acknowledges it, they count as behind, and older unseen changes count more." />
       <div className="layout">
         <div className="col">
+          <Async state={sole}>
+            {(s) => s.sole.length === 0 ? <></> : (
+              <section className="card" aria-labelledby="sole-title" data-testid="sole-knowers">
+                <h2 id="sole-title">Only one carer knows</h2>
+                <p className="muted">If that carer is away, nobody else has been told. Ask the others to open the change and press &quot;I have seen this&quot;.</p>
+                <ul className="steps">{s.sole.map((x) => <li key={x.dose}><span><b>{title(x.drug)}</b>: only {nameOf(x.only)}</span></li>)}</ul>
+                {s.keystone && <p className="muted small">{nameOf(s.keystone)} is the only one who knows {plural(s.keystone_count, 'current entry', 'current entries')}.</p>}
+              </section>
+            )}
+          </Async>
           <Async state={div}>
             {(d) => (
               <div className="people-grid">
