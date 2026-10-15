@@ -84,7 +84,8 @@ export function Welcome({ onSession, request }: { onSession: (s: Session) => voi
     setView('signin');
     setNote('Your password is changed. Sign in with it.');
   });
-  const demoAccount = (e: string, p: string) => run(async () => onSession(sessionFrom(await signInLocal(e, p), 'local')));
+  // a demo account is an ordinary account: this fills the sign-in form and you press Sign in
+  const demoAccount = (e: string, p: string) => { go('signin'); setEmail(e); setPassword(p); setNote('Demo account filled in. Press Sign in to continue.'); window.scrollTo({ top: 0 }); };
   const anonymous = () => run(async () => onSession(await startDemo()));
 
   const emailField = <label className="field">Email<input type="email" value={email} autoComplete="email" inputMode="email" required onChange={(e) => setEmail(e.target.value)} /></label>;
@@ -202,8 +203,8 @@ export function Welcome({ onSession, request }: { onSession: (s: Session) => voi
               <p className="muted">Two carers who already share a circle for Asha. Sign in as one, then as the other in another window, to see how a change reaches the second carer. The password is public.</p>
               <div className="stack">
                 {config!.demo_accounts.map((d) => (
-                  <button key={d.email} type="button" className="btn btn--soft" disabled={busy} onClick={() => void demoAccount(d.email, d.password)} data-testid={`demo-${d.name.toLowerCase()}`}>
-                    <Users size={18} aria-hidden="true" /> Continue as {d.name} <span className="muted small">{d.email}</span>
+                  <button key={d.email} type="button" className="btn btn--soft" disabled={busy} onClick={() => demoAccount(d.email, d.password)} data-testid={`demo-${d.name.toLowerCase()}`}>
+                    <Users size={18} aria-hidden="true" /> Sign in as {d.name} <span className="muted small">{d.email}</span>
                   </button>
                 ))}
               </div>

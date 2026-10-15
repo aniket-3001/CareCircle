@@ -123,6 +123,7 @@ with sync_playwright() as p:
     p3 = ctx3.new_page()
     p3.goto(base)
     p3.get_by_test_id("demo-ravi").click()
+    p3.get_by_test_id("auth").get_by_role("button", name="Sign in", exact=True).click()
     expect(p3.get_by_text("Metformin").first).to_be_visible(timeout=15000)
     p3.locator(".tabbar").get_by_text("Circle", exact=True).click()
     expect(p3.get_by_text("Time warp (demo only)")).to_be_visible()
