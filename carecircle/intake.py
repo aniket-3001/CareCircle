@@ -19,7 +19,7 @@ from typing import Optional
 from .verify import quote_in_source
 
 DOSE_RE = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?)\s?(mcg|µg|mg|ml|iu|units?|g)", re.I)   # OCR glues words: "Sodium5mgtablets"
-FREQ_RE = re.compile(r"\b(once|twice|thrice|daily|every \d+ ?(?:hours?|hrs?)|\d+ times (?:a|per) day|at bedtime|bedtime|morning|evening|"
+FREQ_RE = re.compile(r"\b((?:once|twice|thrice) (?:a day|daily|per day|weekly)|once|twice|thrice|daily|every \d+ ?(?:hours?|hrs?)|\d+ times (?:a|per) day|at bedtime|bedtime|morning|evening|"
                      r"with (?:food|meals)|before (?:food|meals)|after (?:food|meals)|as needed|prn|od|bd|bid|tid|qid)\b", re.I)
 MAX_BYTES = 12 * 1024 * 1024
 _whisper = None
