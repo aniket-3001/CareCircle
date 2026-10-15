@@ -89,7 +89,7 @@ export function HistoryScreen(): React.JSX.Element {
             <div className="row row--wrap">
               <button type="button" className="btn btn--soft" onClick={() => void exportFhir()}><Download size={18} aria-hidden="true" /> {tr('Export as FHIR (JSON)')}</button>
               <button type="button" className="btn btn--soft" onClick={() => window.print()}><Printer size={18} aria-hidden="true" /> {tr('Print a summary')}</button>
-              <button type="button" className="btn btn--soft" style={{ color: '#b0413e' }} onClick={() => setErase(true)}><Trash2 size={18} aria-hidden="true" /> Remove everything about {title(app.session.person)}</button>
+              <button type="button" className="btn btn--soft" style={{ color: 'var(--danger)' }} onClick={() => setErase(true)}><Trash2 size={18} aria-hidden="true" /> Remove everything about {title(app.session.person)}</button>
             </div>
             <Async state={receipts}>
               {(r) => (r.length > 0 && (
@@ -116,7 +116,7 @@ export function HistoryScreen(): React.JSX.Element {
                         {e.quote && <div className="item__sub">“{e.quote}”</div>}
                         <div className="item__sub">{e.when} · {e.ago}</div>
                         {(e.kind === 'record' || e.kind === 'stop') && e.dose && (
-                          <button type="button" className="btn btn--ghost btn--sm" style={{ color: '#b0413e', paddingInline: 0 }} onClick={() => setForgetting(e.dose!)}>{tr('Remove for good')}</button>
+                          <button type="button" className="btn btn--ghost btn--sm" style={{ color: 'var(--danger)', paddingInline: 0 }} onClick={() => setForgetting(e.dose!)}>{tr('Remove for good')}</button>
                         )}
                       </li>
                     ))}

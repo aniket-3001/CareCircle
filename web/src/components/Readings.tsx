@@ -41,7 +41,7 @@ function Chart({ t }: { t: Trend }): React.JSX.Element {
       {t.changes.map((c) => (
         <g key={c.dose}>
           <line x1={X(c.at)} y1={P / 2} x2={X(c.at)} y2={H - P} stroke="#d77a61" strokeDasharray="4 4" />
-          <text x={X(c.at) + 3} y={P / 2 + 8} fontSize="10" fill="#b0413e">{c.action === 'stop' ? 'stopped' : c.text.slice(0, 18)}</text>
+          <text x={X(c.at) + 3} y={P / 2 + 8} fontSize="10" fill="var(--danger)">{c.action === 'stop' ? 'stopped' : c.text.slice(0, 18)}</text>
         </g>
       ))}
       <polyline fill="none" stroke="var(--ink)" strokeWidth="2" points={pts.map((r) => `${X(r.at)},${Y(r.value)}`).join(' ')} />

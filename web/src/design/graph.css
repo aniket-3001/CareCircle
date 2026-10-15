@@ -60,3 +60,10 @@
 
 .kg--full { position: fixed; inset: 0; z-index: 60; border-radius: 0; width: 100vw; height: 100dvh; }
 .kg--full .kg__svg { height: 100dvh; }
+
+:root[data-theme='dark'] .kg { background: radial-gradient(ellipse at 50% 38%, #1d2835 0%, #151e29 70%, #111922 100%); }
+:root[data-theme='dark'] .kg__edge { stroke: #7f8da1; }
+:root[data-theme='dark'] .kg__body { stroke: #18212c; }
+:root[data-theme='dark'] .kg__label { fill: #e3eaf3; stroke: #111922; }
+:root[data-theme='dark'] .kg__ctl button[aria-pressed='true'] { background: #eef3f9; color: #0f151d; }
+:root[data-theme='dark'] .kg__legend, :root[data-theme='dark'] .kg__hint { background: rgb(24 33 44 / 0.92); }

@@ -99,7 +99,7 @@ export function AccountScreen(): React.JSX.Element {
             {p.telegram.length > 0 && (
               <div className="rows">
                 {p.telegram.map((t) => <div key={t.chat} className="item"><div><div className="item__title">Chat {t.chat}</div><div className="item__sub">{p.circles.find((c) => c.id === t.circle)?.name ?? t.circle}</div></div></div>)}
-                <button type="button" className="btn btn--ghost btn--sm" style={{ justifySelf: 'start', color: '#b0413e' }} onClick={() => void acct.telegramUnlink().then(app.refreshProfile).then(() => toast('Telegram unlinked'))}>{tr('Unlink Telegram')}</button>
+                <button type="button" className="btn btn--ghost btn--sm" style={{ justifySelf: 'start', color: 'var(--danger)' }} onClick={() => void acct.telegramUnlink().then(app.refreshProfile).then(() => toast('Telegram unlinked'))}>{tr('Unlink Telegram')}</button>
               </div>
             )}
             {tg ? (
@@ -126,7 +126,7 @@ export function AccountScreen(): React.JSX.Element {
             <section className="card" aria-labelledby="del-title">
               <div className="row"><ShieldAlert size={20} strokeWidth={1.75} aria-hidden="true" /><h2 id="del-title">{tr('Delete my account')}</h2></div>
               <p className="muted">Deletes your account, your sessions and every circle you are the only member of, with everything recorded in it. Circles with other carers stay, and the longest-standing carer becomes their owner. This cannot be undone.</p>
-              <button type="button" className="btn btn--soft" style={{ color: '#b0413e', justifySelf: 'start' }} onClick={() => setSure(true)}><Trash2 size={18} aria-hidden="true" /> {tr('Delete my account…')}</button>
+              <button type="button" className="btn btn--soft" style={{ color: 'var(--danger)', justifySelf: 'start' }} onClick={() => setSure(true)}><Trash2 size={18} aria-hidden="true" /> {tr('Delete my account…')}</button>
             </section>
           )}
         </div>
@@ -178,7 +178,7 @@ function CircleRow({ c }: { c: CircleInfo }): React.JSX.Element {
               </div>
             </>
           )}
-          <button type="button" className="btn btn--ghost btn--sm" style={{ justifySelf: 'start', color: '#b0413e' }} onClick={() => setLeaving(true)}>{tr('Leave this circle')}</button>
+          <button type="button" className="btn btn--ghost btn--sm" style={{ justifySelf: 'start', color: 'var(--danger)' }} onClick={() => setLeaving(true)}>{tr('Leave this circle')}</button>
         </div>
       )}
       <Sheet open={leaving} title={`Leave ${c.name}?`} onClose={() => setLeaving(false)}>
@@ -200,7 +200,7 @@ function MemberList({ id, owner }: { id: string; owner: boolean }): React.JSX.El
           {list.map((x) => (
             <div key={x.id} className="item">
               <div><div className="item__title">{x.name}{x.you ? ' (you)' : ''}</div><div className="item__sub">{x.role} · since {when(x.since)}</div></div>
-              {owner && !x.you && <button type="button" className="btn btn--ghost btn--sm" style={{ color: '#b0413e' }} onClick={() => void app.acct!.remove(id, x.id).then(() => { app.bump(); return app.refreshProfile(); }, (e) => toast(e.message))}>{tr('Remove')}</button>}
+              {owner && !x.you && <button type="button" className="btn btn--ghost btn--sm" style={{ color: 'var(--danger)' }} onClick={() => void app.acct!.remove(id, x.id).then(() => { app.bump(); return app.refreshProfile(); }, (e) => toast(e.message))}>{tr('Remove')}</button>}
             </div>
           ))}
         </div>
