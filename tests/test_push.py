@@ -16,7 +16,12 @@ def test_off_without_keys(monkeypatch):
     monkeypatch.delenv("CC_VAPID_PUBLIC", raising=False)
     assert not webpush.enabled()
     k = webpush.new_keys()
-    assert len(k["CC_VAPID_PUBLIC"]) == 87 and "PRIVATE KEY" in k["CC_VAPID_PRIVATE"]
+    assert len(k["CC_VAPID_PUBLIC"]) == 87 and "\n" not in k["CC_VAPID_PRIVATE"]
+    monkeypatch.setenv("CC_VAPID_PRIVATE", k["CC_VAPID_PRIVATE"])
+    assert "BEGIN PRIVATE KEY" in webpush._private_pem()
+    import os
+    os.environ["CC_VAPID_PRIVATE"] = k["CC_VAPID_PRIVATE"]
+    assert "BEGIN PRIVATE KEY" in webpush._private_pem()
 
 
 async def test_subscribe_validates_and_dead_endpoints_are_removed(gm, keys, monkeypatch):

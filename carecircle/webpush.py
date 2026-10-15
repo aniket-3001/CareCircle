@@ -32,7 +32,14 @@ def new_keys() -> dict:
     v.generate_keys()
     raw_pub = v.public_key.public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
     pem = v.private_pem().decode()
-    return {"CC_VAPID_PUBLIC": base64.urlsafe_b64encode(raw_pub).rstrip(b"=").decode(), "CC_VAPID_PRIVATE": pem.replace("\n", "\\n")}
+    return {"CC_VAPID_PUBLIC": base64.urlsafe_b64encode(raw_pub).rstrip(b"=").decode(), "CC_VAPID_PRIVATE": base64.b64encode(pem.encode()).decode()}   # one line: a multi-line PEM breaks .env files
+
+
+def _private_pem() -> str:
+    """The private key is kept as one base64 line; a plain PEM (with real or escaped newlines) is still accepted."""
+    import base64
+    raw = os.getenv("CC_VAPID_PRIVATE", "")
+    return raw.replace("\\n", "\n") if "BEGIN" in raw else base64.b64decode(raw).decode()
 
 
 def _sig(endpoint: str) -> str:
@@ -65,7 +72,7 @@ def _send_one(sub: dict, payload: dict) -> Optional[bool]:
     from pywebpush import WebPushException, webpush
     try:
         webpush(subscription_info={"endpoint": sub["endpoint"], "keys": {"p256dh": sub["p256dh"], "auth": sub["auth"]}}, data=json.dumps(payload),
-                vapid_private_key=os.getenv("CC_VAPID_PRIVATE", "").replace("\\n", "\n"), vapid_claims={"sub": os.getenv("CC_VAPID_SUBJECT", "mailto:carecircle@example.com")}, ttl=3600, timeout=8)
+                vapid_private_key=_private_pem(), vapid_claims={"sub": os.getenv("CC_VAPID_SUBJECT", "mailto:carecircle@example.com")}, ttl=3600, timeout=8)
         return True
     except WebPushException as e:
         code = getattr(getattr(e, "response", None), "status_code", None)
