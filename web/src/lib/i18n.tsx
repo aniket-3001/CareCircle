@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { HI_MORE } from './hi_more';
 
 /** English and Hindi. The English text is the key, so a string with no Hindi entry simply stays English. The choice is a per-browser convenience
  *  (it is not account data); the helper, voice input and read-aloud follow it too. */
@@ -78,8 +79,9 @@ const HI: Record<string, string> = {
   'Conversation deleted': 'बातचीत हटा दी गई',
 };
 
+export const tr = (s: string): string => translate(s);
 export function translate(s: string, l: Lang = current): string {
-  return l === 'hi' ? HI[s] ?? s : s;
+  return l === 'hi' ? HI[s] ?? HI_MORE[s] ?? s : s;
 }
 
 /** `const t = useT()`: re-renders when the language changes. */
