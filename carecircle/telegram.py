@@ -78,6 +78,8 @@ class Bot:
         link = await self._link(chat)
         if not link:
             return self.api.send(chat, "Please link this chat first: /link <key> <circle>")
+        if text.startswith("/circles"):
+            return await self._cmd_circles(chat, link, text.split())
         mem = self.gm.open(link["agent"], link["circle"])
         arg = (text.split() + ["", ""])[1]
         if not arg and text.startswith(("/regimen", "/check", "/ack", "/history")):
@@ -117,14 +119,46 @@ class Bot:
         return patients[0] if patients else "mum"
 
     async def _cmd_link(self, chat, parts):
+        """`/link <code>` with the six-character code from the Account page (preferred), or `/link <key> <circle>` for an API key."""
+        if len(parts) < 2:
+            return self.api.send(chat, "Usage: /link <code from your Account page>")
+        g = await self.gm._ctl()
+        if not parts[1].startswith("gm_"):
+            from carecircle.accounts import Accounts
+            acc = Accounts(self.gm)
+            if not await acc.hit(f"tglink|{chat}", 8, 900):
+                return self.api.send(chat, "Too many tries. Wait a few minutes.")
+            agent = await acc.redeem_telegram_code(parts[1])
+            if not agent:
+                return self.api.send(chat, "That code is not valid or has expired. Make a new one on the Account page.")
+            circles = await acc.circles(agent)
+            if not circles:
+                return self.api.send(chat, "Your account has no circle yet. Create one in the app, then link again.")
+            want = parts[2].lower() if len(parts) > 2 else ""
+            pick = next((c for c in circles if c["id"] == want or c["name"].lower() == want), circles[0])
+            await g.query("MERGE (c:TgChat {chat:$c}) SET c.agent=$a, c.circle=$t", {"c": chat, "a": agent, "t": pick["id"]})
+            return self.api.send(chat, f"Linked to {pick['name']}. Send a photo, voice note or text about a medicine. /circles lists your circles.")
         if len(parts) < 3:
             return self.api.send(chat, "Usage: /link <key> <circle>")
         agent = await self.gm.authenticate(parts[1])
         if not agent or parts[2] not in await self.gm.tenants_of(agent):
             return self.api.send(chat, "That key does not give access to that circle.")
-        g = await self.gm._ctl()
         await g.query("MERGE (c:TgChat {chat:$c}) SET c.agent=$a, c.circle=$t", {"c": chat, "a": agent, "t": parts[2]})
         self.api.send(chat, f"Linked as {agent} to circle {parts[2]}. Send a photo, voice note or text about a medicine.")
+
+    async def _cmd_circles(self, chat, link, parts):
+        from carecircle.accounts import Accounts
+        acc = Accounts(self.gm)
+        circles = await acc.circles(link["agent"])
+        if not circles:
+            return self.api.send(chat, "This chat is linked with a key, not an account, so it has one circle.")
+        if len(parts) > 1 and parts[1].isdigit() and 1 <= int(parts[1]) <= len(circles):
+            pick = circles[int(parts[1]) - 1]
+            g = await self.gm._ctl()
+            await g.query("MATCH (c:TgChat {chat:$c}) SET c.circle=$t", {"c": chat, "t": pick["id"]})
+            return self.api.send(chat, f"Now using {pick['name']}.")
+        nl = chr(10)
+        self.api.send(chat, nl.join(f"{n}. {c['name']}{' (here)' if c['id'] == link['circle'] else ''}" for n, c in enumerate(circles, 1)) + nl + "Send /circles <number> to switch.")
 
     async def _media(self, chat, m):
         item = (m.get("photo") or [None])[-1] or m.get("voice") or m.get("audio") or m.get("document")
