@@ -1,0 +1,55 @@
+/* The knowledge graph and its inspector, in the soft Vayu Project palette. */
+.kg { position: relative; padding: 0; overflow: hidden; touch-action: none; background: radial-gradient(ellipse at 50% 38%, #ffffff 0%, #f4f8fc 70%, #edf3fa 100%); }
+.kg__svg { display: block; width: 100%; height: min(72dvh, 40rem); min-height: 24rem; cursor: grab; user-select: none; }
+.kg__svg:active { cursor: grabbing; }
+.kg__backdrop { fill: transparent; }
+.kg__edge { fill: none; stroke: #8a98ab; stroke-opacity: 0.4; stroke-width: 1.4; stroke-linecap: round; transition: stroke-opacity 0.25s, stroke-width 0.25s; }
+.kg__edge--for, .kg__edge--of { stroke-opacity: 0.14; stroke-dasharray: 2 4; }
+.kg__edge--recorded { stroke: #b08fd6; stroke-opacity: 0.35; }
+.kg__edge--acked { stroke: #7fb04a; stroke-opacity: 0.8; stroke-width: 1.8; }
+.kg__edge--supersedes { stroke: #9aa7b8; stroke-dasharray: 5 4; stroke-opacity: 0.7; }
+.kg__edge--interacts { stroke-width: 3; stroke-opacity: 0.9; }
+.kg__edge--major { stroke: #e87878; stroke-width: 4.5; }
+.kg__edge--moderate { stroke: #f0a04b; }
+.kg__edge--minor { stroke: #e3c23b; }
+.kg__edge--unknown { stroke: #aab6c6; stroke-dasharray: 3 5; stroke-width: 2; stroke-opacity: 0.6; }
+.kg__edge--inhibits, .kg__edge--induces { stroke: #7d8fe0; stroke-width: 2.6; stroke-opacity: 0.9; }
+.kg__edge--substrate { stroke: #7d8fe0; stroke-opacity: 0.45; stroke-dasharray: 1 5; stroke-width: 2; }
+.kg__draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: kg-draw 0.9s cubic-bezier(0.2, 0.9, 0.25, 1) forwards; animation-delay: var(--d, 0s); }
+@keyframes kg-draw { to { stroke-dashoffset: 0; } }
+.kg__flow { fill: none; stroke: #fff; stroke-opacity: 0.95; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 1 14; animation: kg-flow 1.1s linear infinite; pointer-events: none; }
+.kg__flow--major { stroke: #c0504d; stroke-width: 3.5; }
+@keyframes kg-flow { to { stroke-dashoffset: -15; } }
+.kg__hit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; }
+.kg__node { cursor: pointer; outline: none; }
+.kg__pop { transform-box: fill-box; transform-origin: center; animation: kg-pop 0.6s cubic-bezier(0.2, 0.9, 0.25, 1) both; animation-delay: var(--d, 0s); }
+@keyframes kg-pop { from { opacity: 0; transform: scale(0.2); } }
+.kg__body { fill: var(--nc); stroke: #fff; stroke-width: 3; transition: filter 0.2s; }
+.kg__node:hover .kg__body, .kg__node:focus-visible .kg__body { filter: drop-shadow(0 3px 6px rgb(61 74 92 / 0.35)); }
+.kg__glyph { fill: #334155; font: 800 11px 'Hanken Grotesk Variable', system-ui, sans-serif; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+.kg__label { fill: #334155; font: 700 11.5px 'Hanken Grotesk Variable', system-ui, sans-serif; text-anchor: middle; paint-order: stroke; stroke: #f8fbfe; stroke-width: 3.5px; stroke-linejoin: round; pointer-events: none; }
+.kg__sel { fill: none; stroke: #3b82c4; stroke-width: 3; opacity: 0; transition: opacity 0.2s; }
+.kg__node--selected .kg__sel { opacity: 1; animation: kg-ring 1.6s ease-in-out infinite; }
+@keyframes kg-ring { 50% { stroke-opacity: 0.35; } }
+.kg__halo { fill: none; stroke: #e87878; stroke-width: 2; opacity: 0; animation: kg-pulse 2.2s ease-out infinite; transform-box: fill-box; transform-origin: center; pointer-events: none; }
+@keyframes kg-pulse { 0% { opacity: 0.85; transform: scale(1); } 100% { opacity: 0; transform: scale(2.1); } }
+.kg--still .kg__flow, .kg--still .kg__halo, .kg--still .kg__node--selected .kg__sel { animation: none; }
+.kg--dim .kg__node:not(.kg__node--hi), .kg--dim .kg__edge:not(.kg__edge--hi) { opacity: 0.16; }
+.kg__edge--hi { stroke-opacity: 1; stroke-width: 3.5; }
+.kg__edge--picked { stroke-opacity: 1; stroke-width: 5; filter: drop-shadow(0 0 4px #3b82c4); }
+.kg__node, .kg__edge { transition: opacity 0.25s; }
+.kg__ctl { position: absolute; top: 12px; right: 12px; display: grid; gap: 8px; }
+.kg__ctl button { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 50%; background: var(--card); color: var(--muted); cursor: pointer; box-shadow: 0 6px 16px -10px rgb(61 74 92 / 0.5); }
+.kg__ctl button[aria-pressed='true'] { background: var(--ink); color: #fff; }
+.kg__legend { position: absolute; left: 12px; bottom: 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; max-width: calc(100% - 72px); padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: rgb(255 255 255 / 0.9); font-size: 12px; font-weight: 600; color: var(--muted); }
+.kg__legend span { display: inline-flex; align-items: center; gap: 6px; }
+.kg__legend i { width: 12px; height: 12px; border-radius: 50%; background: var(--nc); }
+.kg__hint { position: absolute; left: 12px; top: 12px; padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: rgb(255 255 255 / 0.9); font-size: 12px; font-weight: 600; color: var(--muted); pointer-events: none; }
+.layout-graph { display: grid; gap: 16px; align-items: start; }
+@media (min-width: 56rem) { .layout-graph { grid-template-columns: minmax(0, 1.6fr) minmax(18rem, 1fr); } .inspector--docked { position: sticky; top: 16px; } }
+.inspector__title { margin: 0 0 4px; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+.neighbours { display: grid; gap: 6px; }
+.neighbours button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); font-size: 14px; text-align: left; cursor: pointer; }
+.neighbours button:hover { background: var(--blue-soft); }
+.dot { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--nc, var(--blue)); }
+@media (prefers-reduced-motion: reduce) { .kg__draw { stroke-dashoffset: 0; } .kg__flow, .kg__halo { animation: none; } }

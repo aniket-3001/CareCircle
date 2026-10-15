@@ -1,9 +1,9 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
-import './design/tokens.css';
-import './design/vayu-base.css';
-import './design/app.css';
+import '@fontsource-variable/hanken-grotesk';
+import './design/vayu.css';
+import './design/graph.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
