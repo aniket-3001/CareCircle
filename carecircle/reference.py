@@ -102,6 +102,11 @@ def load(host: str = "localhost", port: int = 6379, data_dir: Path = DATA) -> di
     for i in range(0, len(rows), 2000):
         g.query("UNWIND $r AS x MATCH (a:Drug {name:x.a}) MATCH (b:Drug {name:x.b}) "
                 "CREATE (a)-[:INTERACTS {level:x.l, source:'DDInter 2.0'}]->(b)", {"r": rows[i:i + 2000]})
+    # PageRank needs a symmetric graph (INTERACTS is stored once per pair, a<b): add both directions for moderate/major pairs only.
+    sym = [{"a": a, "b": b, "w": 0.7 if l == "major" else 0.3} for a, b, l in pairs if l in ("major", "moderate")]
+    for i in range(0, len(sym), 2000):
+        g.query("UNWIND $r AS x MATCH (a:Drug {name:x.a}) MATCH (b:Drug {name:x.b}) "
+                "CREATE (a)-[:HAZARD {w:x.w}]->(b) CREATE (b)-[:HAZARD {w:x.w}]->(a)", {"r": sym[i:i + 2000]})
     enzymes = sorted({e for _, e, *_ in fda["inhibits"] + fda["induces"]} | {e for _, e in fda["substrates"]} | {e for _, e, *_ in CURATED_SUBSTRATES})
     g.query("UNWIND $r AS n MERGE (:Enzyme {name:n})", {"r": enzymes})
     for rel, items in (("INHIBITS", fda["inhibits"]), ("INDUCES", fda["induces"])):
