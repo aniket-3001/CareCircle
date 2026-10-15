@@ -1,153 +1,129 @@
-# graphmem - a coordination layer for AI agents, built on FalkorDB
+# Care Circle
 
-Graph Hacks 2026, Track 02 (Agent Memory & Coordination).
+**One shared, verified memory of a loved one's medicines, for the family who look after them.**
+Graph Hacks 2026 (WeMakeDevs x FalkorDB), Track 02: Agent Memory & Coordination.
 
-Several coding agents work on one project. They lose each other's context, act on plans whose inputs have since changed, and
-cannot explain what they relied on. graphmem keeps all of that in a FalkorDB graph: episodic/semantic/procedural memory, task
-handoffs, plans that remember the exact facts they were derived from, a code-structure graph with graph algorithms, and
-branch/dry-run/merge of memory using `GRAPH.COPY`. Remove FalkorDB and there is no product: there is no second store.
-No LLM key or GPU is needed for the core.
+When several people care for one person, nobody holds the whole picture. A photo of a new prescription lands in one chat, a dose
+changes by phone, a sibling gives a tablet the other already gave. Care Circle keeps one memory in a FalkorDB graph. Each carer reaches
+it through a web app or Telegram (their own agent identity), adds a medicine by **photo, voice note, PDF/Word or text**, and the circle then
+knows what is on record, **who has seen each change**, which entries **interact** according to public sources, and which dose slots are **already given**.
 
-## Run it (one command)
+**It records and cross-checks. It never advises.** It never says what to take, stop or change. Every flag shows its source and the graph
+path behind it, and "no flag" is never reported as "safe". All data in the demo is synthetic; no real person's data is used.
 
+![Today](docs/img/flags.png)
+
+## Why the graph is the product
+Remove FalkorDB and nothing is left: the reference knowledge (about 218,000 interaction pairs, enzyme links), every circle's history, the
+carer-acknowledgement state, the dose-slot guard and the access grants all live in it, and the checks are graph traversals and algorithms.
+
+| Feature | What the graph does | Without it |
+|---|---|---|
+| Interaction check | `(a:Drug)-[:INTERACTS {level}]-(b:Drug)` over the regimen, plus a 2-hop enzyme path `(x)-[:INHIBITS]->(:Enzyme)<-[:SUBSTRATE_OF]-(y)` | no shared knowledge to check against |
+| Who has not seen a change | `(:Carer)-[:ACKED]->(:Dose)` absence per carer; age-weighted divergence | a flat log cannot say who is behind (baseline "last change only" is right in 0/40 circles, the graph query in 40/40) |
+| History, "what did we know then?" | `Dose -[:SUPERSEDES]-> Dose` with `valid_from/valid_to`; as-of queries | overwrites lose the past |
+| No double dose | one `MERGE (:Give {key})` claim per slot, single atomic query | two carers both think they gave it (exactly one winner in 100/100 races of 10 concurrent claims) |
+| Verified intake | each entry keeps `source_type` and the exact `quote` from the OCR/transcript | an unexplained entry |
+| Hubs | `algo.pageRank` over the interaction graph; degree inside the regimen | no way to rank which medicine matters most |
+| Privacy | one graph per circle (`mem__<circle>`), grants on every query | rows in a shared table |
+
+## Run it
 ```bash
-GRAPHMEM_ADMIN_KEY=change-me docker compose up -d --build     # FalkorDB (append-only volume) + API + UI
-open http://localhost:8000          # UI (paste an agent key)        |   http://localhost:3000  FalkorDB Browser (inspect the graph)
+# everything: FalkorDB (append-only volume) + app. First start downloads the public reference data and loads it (a few minutes).
+GRAPHMEM_ADMIN_KEY=change-me docker compose up -d --build
+open http://localhost:8000          # press "Start a demo circle"     (FalkorDB Browser: http://localhost:3000)
 ```
+Without Docker (needs a FalkorDB on :6379, e.g. `docker run -p 6379:6379 falkordb/falkordb`):
 ```bash
-python -m venv .venv && .venv/bin/pip install falkordb pytest pytest-asyncio fastapi uvicorn mcp httpx   # Windows: .venv/Scripts
-python -m pytest -q                       # 52 tests against a live FalkorDB on :6379
-PYTHONPATH=. python demo.py               # handoff + stale plan + decision trace walkthrough
-PYTHONPATH=. python bench/proof.py        # 8 end-to-end scenarios
-python scripts/seed_demo.py http://127.0.0.1:8000 change-me     # demo tenant through the real admin API
+python -m venv .venv && .venv/bin/pip install -r requirements.txt          # Windows: .venv/Scripts
+python scripts/fetch_reference.py                                           # DDInter + FDA tables into data/ref (gitignored)
+python -c "from carecircle import reference as r; print(r.load())"          # build the shared cc_ref graph
+python -m graphmem.api                                                      # http://127.0.0.1:8000
+python -m pytest -q tests                                                   # 65 tests against live FalkorDB
+PORT=8000 python scripts/ui_e2e.py                                          # browser check (needs Chrome)
+PYTHONPATH=. python bench/care_bench.py                                     # benchmarks below
 ```
-Create an agent with `POST /admin/agents`, grant it a tenant with `POST /admin/grants`, and use the returned `gm_...` key as a bearer
-token (HTTP) or `GRAPHMEM_API_KEY` (MCP: `python -m graphmem.mcp_server`). Keys are stored only as SHA-256 hashes.
+Optional: `CC_MODEL` / `AWS_REGION` + AWS credentials let Amazon Bedrock (default `us.amazon.nova-pro-v1:0`) structure what the OCR read;
+`CC_LLM=0` or no credentials falls back to rules. Set `TELEGRAM_BOT_TOKEN` to also run the Telegram bot in the server process (`/link <key> <circle>`, then send a photo, voice note or text).
 
-### Use it from Claude Code / any MCP client
-```bash
-claude mcp add graphmem -e GRAPHMEM_API_KEY=gm_... -e FALKORDB_HOST=localhost -- python -m graphmem.mcp_server
-```
-Tools: `whoami`, `list_ops`, `call(tenant, op, args_json)`, `remember`, `recall`, `fork_memory`, `fork_call`, `merge_fork`, `discard_fork`,
-`space_recall`, `publish_facts`. Walkthrough on a real repo: `PYTHONPATH=. python demo_crew.py path/to/python/repo`.
-
-![graph view](docs/img/ui-graph.png)
-![code graph tab](docs/img/ui-code-graph.png)
-
-UI checked end to end in headless Chrome (`scripts/ui_check.py`).
+## The demo story (90 seconds)
+1. **Start a demo circle.** Asha takes metformin, amlodipine, atorvastatin; two carers, Ravi and Meena, have acknowledged them.
+2. **Add > "Use a sample label".** A synthetic pharmacy label is read by OCR. You see the proposed entry with the **exact line it came from** and a
+   *quote verified* badge. Nothing is saved yet. Confirm it (as Ravi).
+3. **Today** now flags clarithromycin + atorvastatin as *major* (DDInter), with the enzyme path `clarithromycin -INHIBITS(strong)-> CYP3A <-SUBSTRATE_OF- atorvastatin`.
+   Pairs the source lists without a severity are shown as *unrated*, not safe.
+4. **Circle.** Meena has not acknowledged the change. Slide the time warp to 13 hours: a reminder is produced for Meena, and an escalation for Ravi. Each is produced exactly once.
+5. **Doses.** Record a dose as Ravi, then as Meena: the second is refused and names who already gave it.
+6. **History.** Slide back to see the regimen and flags as they were.
 
 ## Graph data model
-
-One graph per tenant (`mem__<tenant>`), a control graph `ctl` for policy, `shared__<space>` graphs for explicit sharing,
-`fork__<tenant>__<id>` graphs for branches.
-
 ```
-mem__<tenant>
-  Session <-IN_SESSION- Episode -NEXT-> Episode                  immutable ordered conversation
-  Fact -SUBJECT/OBJECT-> Entity ; Fact -EXTRACTED_FROM-> Episode  semantic memory with provenance
-  Fact -SUPERSEDES-> Fact (valid_from / valid_to)                 bi-temporal chain
-  Fact -INFERRED_FROM-> Fact                                      derived knowledge (lineage)
-  Tombstone -TOMBSTONES-> Fact                                    forgetting
-  Skill <-OF- Run -FOR-> Task ; Skill -LEARNED_FROM-> Episode     procedural memory (success counters)
-  Task -CLAIMED_BY / HANDED_OFF-> Agent                           shared state and handoff chain
-  Plan -FOR-> Task ; Plan -DERIVED_FROM-> Fact ; Plan -REVISES-> Plan
-  Decision -USED-> Fact | Episode | Plan | Skill                  traceable decisions
-  Code -DEPENDS_ON {cap}-> Code ; Code -DEFINES-> Code ; Code -CALLS-> Code      code structure (file / function)
-  Person -AUTHORED-> Commit -TOUCHED-> Code                       git history
-ctl:  (Agent)-[:GRANTED {scopes}]->(Tenant) ; (Agent)-[:HAS_KEY]->(ApiKey {hash}) ; (Agent)-[:MEMBER]->(Space) ; (Fork)
+cc_ref   (shared, read-only reference graph; built from public data)
+  (Drug {name}) -[:INTERACTS {level, source:'DDInter 2.0'}]-> (Drug)       about 218,000 pairs (level may be 'Unknown': shown as unrated)
+  (Drug) -[:HAZARD {w}]-> (Drug)                                           moderate/major only, symmetric, for algorithms
+  (Drug) -[:INHIBITS|INDUCES {strength, source:'FDA CYP index table'}]-> (Enzyme)
+  (Drug) -[:SUBSTRATE_OF {source}]-> (Enzyme)                              FDA index substrates + a small "curated (unverified)" list
+
+mem__<circle>   (one graph per circle)
+  (Person {id, role: patient|carer})
+  (Dose {id, drug, dose_text, freq_text, valid_from, valid_to, cur, action: set|stop, status: confirmed|pending,
+         source_type: typed|photo|voice|document, quote, verified, by, at})
+  (Dose)-[:FOR]->(Person)   (Dose)-[:OF]->(Drug)   (Dose)-[:SUPERSEDES]->(Dose)   (Person:carer)-[:ACKED {at}]->(Dose)
+  (Give {key: person|drug|slot, by, at})          unique per dose slot
+  (Nudge {key})                                   reminder produced once
+ctl     (agents, grants, hashed API keys, Telegram chat links)
 ```
 
-## The graph queries and algorithms the product relies on
-
-Everything below is a real query in `graphmem/` (file and function in the right column).
-
+## Queries and algorithms
 | Behaviour | Cypher / algorithm | Where |
 |---|---|---|
-| Atomic ordered append | `MERGE (s:Session) ... SET s.n = s.n+1 ... CREATE (e)-[:NEXT]` in one query | `memory.py add_episode` |
-| Create-or-reinforce fact; supersede old value | `MERGE (f:Fact {skey,pred,okey,cur:true})` then `SET old.cur=false ... CREATE (f)-[:SUPERSEDES]->(old)` | `assert_fact` |
-| Multi-hop recall with path | `MATCH (en)<-[:SUBJECT\|OBJECT]-(f1)-[:SUBJECT\|OBJECT]->(mid)<-[:SUBJECT\|OBJECT]-(f2)` | `recall` |
-| Atomic task claim / handoff | single `MATCH (t:Task) WHERE t.status='open' ... SET ...` (compare-and-set in the WHERE) | `claim_task`, `handoff` |
-| Stale plan, including transitive | `(p)-[:DERIVED_FROM]->(f)<-[:SUPERSEDES*1..10]-(n {cur:true})` and `(f)-[:INFERRED_FROM*1..8]->(u {cur:false})` | `check_plan` |
-| Skill ranking | `(wins+1)/(runs+2) ORDER BY score` over `Run` counters | `best_skills` |
-| Branch memory | `GRAPH.COPY mem__t fork__t__id`, same engine on the fork, dry-run merge compares fork-new facts to tenant changes | `branch.py` |
-| Blast radius | `MATCH p=(x:Code)-[:DEPENDS_ON*1..d]->(:Code {id})` | `codegraph.py blast_radius` |
-| Dependencies | `algo.BFS` | `dependencies_of` |
-| Most critical files | `algo.pageRank('Code','DEPENDS_ON')` | `criticality` |
-| Single points of failure | `algo.betweenness` | `single_points_of_failure` |
-| Failure domains / communities | `algo.WCC`, `algo.labelPropagation` | `failure_domains`, `communities` |
-| Independent routes | `algo.maxFlow` with `capacityProperty` | `failover_capacity` |
-| Cheapest route | `algo.SPpaths` | `cheapest_route` |
-| Who to ask, what co-changes | `(Person)-[:AUTHORED]->(Commit)-[:TOUCHED]->(Code)` aggregations | `who_to_ask`, `co_changed`, `change_impact` |
-| Semantic recall (optional) | `CREATE VECTOR INDEX FOR (f:Fact) ON (f.embedding)` + `CALL db.idx.vector.queryNodes`, fused with graph recall by reciprocal rank | `recall(mode=...)`, `embed.py` |
-| Full-text search over conversation | `CREATE FULLTEXT INDEX FOR (e:Episode) ON (e.content)` + `CALL db.idx.fulltext.queryNodes` | `search_text` |
-| Authorization | `(Agent)-[:GRANTED]->(Tenant)` read on every query, so revocation is immediate | `policy.py` |
+| Direct interactions in a regimen | `MATCH (x:Drug)-[m:INTERACTS]-(y:Drug) WHERE x.name IN $d AND y.name IN $d` | `carecircle/checks.py` |
+| Enzyme path | `(x)-[:INHIBITS\|INDUCES]->(e:Enzyme)<-[:SUBSTRATE_OF]-(y)` | `carecircle/checks.py` |
+| Hub medicines | `CALL algo.pageRank('Drug','HAZARD')` | `carecircle/algos.py hub_drugs` |
+| Hazard clusters | `CALL algo.WCC({nodeLabels:['Drug'], relationshipTypes:['HAZARD']})` | `algos.py clusters` |
+| Most hazard-connected in this regimen | degree and summed weight inside the induced `HAZARD` subgraph | `algos.py regimen_hubs` |
+| Change history / as-of | `valid_from <= $t AND (valid_to IS NULL OR valid_to > $t)` over `SUPERSEDES` chains | `graphmem/care.py care_regimen` |
+| Supersede on confirm | `OPTIONAL MATCH (old:Dose {cur:true, drug:x.drug}) ... FOREACH ... CREATE (x)-[:SUPERSEDES]->(old)` | `care.py _care_activate` |
+| Atomic dose-slot claim | `MERGE (g:Give {key:$k}) ON CREATE SET ... g.won=true` then `SET g.won=false` | `care.py care_give` |
+| Reminder once | `MERGE (n:Nudge {key:$k}) ON CREATE SET n.fresh=true` | `care.py care_nudges` |
+| Isolation and revocation | `(Agent)-[:GRANTED]->(Tenant)` checked on every query | `graphmem/policy.py` |
 
-Every code-graph tool returns the Cypher it ran. FalkorDB features used: graph per tenant (multi-graph), indexes, UNIQUE constraints (`GRAPH.CONSTRAINT`), `GRAPH.COPY`,
-variable-length paths, `algo.BFS/pageRank/betweenness/WCC/labelPropagation/maxFlow/SPpaths`, `FOREACH`, `UNWIND` bulk loads,
-full-text index (`db.idx.fulltext.queryNodes`, `search_text`), vector index (`db.idx.vector.queryNodes`, optional), append-only
-persistence.
+Each flag and each hub list shown in the app carries the query or path that produced it. FalkorDB features used: multiple graphs (one per circle),
+indexes, unique constraints, variable-length paths, `FOREACH`, `UNWIND` bulk loads, `algo.pageRank`, `algo.WCC`, read-only queries (`GRAPH.RO_QUERY`),
+`GRAPH.COPY` (memory forks), full-text and vector indexes (optional recall), append-only persistence.
 
-## Interfaces
-HTTP API (FastAPI: bearer auth, admin plane gated by `GRAPHMEM_ADMIN_KEY`, per-agent rate limit, 503 + `Retry-After` when
-FalkorDB's queue is full), MCP server (stdio, same operations), web UI at `/` (graph, recall with as-of, history, tasks & handoffs,
-skills, decision trace, shared spaces, code graph). The two interfaces share one whitelisted op table (`graphmem/ops.py`).
-Branches: `POST /v1/tenants/{t}/forks`, `POST /v1/forks/{id}/{op}`, `POST /v1/forks/{id}/merge` (dry run unless `apply`), `DELETE /v1/forks/{id}`.
+## Safety by design
+- **No advice.** A scanner (`carecircle/safety.py`) rejects outgoing text that tells someone to take, stop, skip or change a dose. Messages are
+  templates whose facts (drug, hours, carer) are checked before sending.
+- **Refuses to judge.** States are `no_data`, `partial`, `flags` or `no_known_conflict`; the last always says "this is not a statement of safety".
+- **Quote and verify.** The model only structures text the OCR/ASR already read. Each quote must appear in that text; otherwise the entry stays
+  *pending* and never reaches the regimen or the checks until a person confirms it. Every proposal needs a person's confirmation.
+- **Unknown stays unknown.** 26% of DDInter pairs have severity "Unknown": shown as *unrated*.
 
-## Track 02 requirement -> where it lives
-| Requirement | Graph structure | Code / test |
-|---|---|---|
-| Episodic | `Episode -NEXT-> Episode`, `-IN_SESSION-> Session` | `add_episode`, `history` / `test_episodic_*` |
-| Semantic | facts, `SUPERSEDES`, `as_of` queries | `assert_fact`, `recall`, `fact_history` |
-| Procedural | `Skill <-OF- Run`; ranking from outcomes | `add_skill`, `record_run`, `best_skills` |
-| Persistent history | everything lives in FalkorDB | `test_memory_survives_new_client`, `bench/proof.py` restart scenario |
-| Shared state & handoffs | `Task` version + `HANDED_OFF` chain, `Plan -DERIVED_FROM-> Fact` | `claim_task`, `handoff`, `check_plan`, `rebase_plan`, `resume` |
-| High concurrency | graph per tenant; atomic single-query transitions | `test_concurrent_writers_*`, `test_claim_race_*`, `bench/http_load.py` |
-| Per tenant | graph `mem__<tenant>` + grants checked on every query | `policy.py`, `test_adversarial.py` |
-| Traceable decisions | `Decision -USED->` + provenance + path | `record_decision`, `explain` |
-| Forgetting | tombstone, value scrubbed, published copies removed | `forget_fact` |
+## Measured (single runs on one laptop; `docs/BENCHMARKS.md`)
+- **Enzyme-path rule vs DDInter:** of 38 pairs flagged through FDA substrates, 31 are also in DDInter, all moderate/major; the rule recovers 61 of 145 moderate/major pairs between the same drug sets (42%): precise but narrow, so it supplements the direct lookup.
+- **Carer staleness (graph query vs independent oracle):** exact in 40/40 generated circles; "last change only" baseline 0/40.
+- **Double-dose guard:** one winner in 100/100 rounds of 10 concurrent claims.
 
-## Measured (see `docs/BENCHMARKS.md` for tables, seeds and caveats)
-- **Stale-plan detection (B1, 5 seeds):** graph lineage missed 0 and wasted 0 redos; flat memory missed 54.8 stale plans; a global-version
-  OCC baseline wasted 145 redos; per-key versions missed 33.
-- **Real git history (B4, click / flask / requests):** co-change + import graph fused beats random by 3-5x on recall@10 and is best or
-  near-best in two of three repos; co-change alone wins on click. We do not claim the graph beats history, only that both live in one graph.
-- **Load (B7):** 244 -> 448 req/s going from 1 to 4 API processes, 0 failed requests, every acknowledged write verified; survives `docker kill`.
-- **Retrieval (B6):** recall@3 on paraphrased questions 0.17 (graph only) -> 1.00 (hybrid); multi-hop 0.50 (graph) vs 0.00 (vector only). Small hand-written set.
-- **Isolation (B3):** 6 adversarial tests (forged keys, hostile tenant ids, foreign forks/spaces, injection strings, revocation): 0 leaks.
+**Not measured:** OCR/voice accuracy on real photos and voices (only synthetic labels tried), severity accuracy against clinical truth, any patient outcome.
 
-## Real agents, not a script
-`scripts/agent_crew.py` launches two headless Claude Code agents (`claude -p`, Haiku) that see only graphmem's MCP tools. The planner
-inspects the blast radius of a ticket on click's code graph, records the scope as a fact, writes a plan derived from it and hands the task
-off; the script then re-scopes the ticket behind its back; the implementer resumes, finds the plan stale, rebases it and records a decision.
-The script then verifies in the graph (not from what the agents said) that the handoff, the revised plan and the decision trace exist. One
-run: planner 8 turns, implementer 7 turns, about $0.015 total, 3/3 checks passed. This is one run of one scenario with a small model; it shows
-that an unmodified agent can use the tools to coordinate, not how reliably it does so (run it repeatedly to see the variance).
+## Limits, stated plainly
+- Interaction severity weights (minor .1, moderate .3, major .7; enzyme strong .7, moderate .3; staleness half-life 72 h) are **assumptions**, not clinical values.
+- The FDA CYP table is an index list, not exhaustive. Sources may disagree. Flags are for discussion with a prescriber or pharmacist.
+- The Telegram bot is tested against a fake Telegram API, not live. Voice uses a local Whisper `base` model; accuracy varies with accent and noise.
+- Anthropic models on Bedrock were unavailable on the account used (verification pending), so the default structuring model is Amazon Nova; rules work without any model.
+- Per-process rate limiting; no TLS in the compose file (put a proxy in front); one shared database credential across circles.
 
-## Is the graph decoration? (ablation, from the benchmarks above)
-Take the graph structure away and the same question gets worse: without `DERIVED_FROM`/`INFERRED_FROM` lineage, flat memory misses 54.8 stale
-plans (B1); without fork/merge, last-writer-wins silently overwrites every conflicting write (B2); without the import/co-change graph,
-recall@10 for "what changes with this file" falls to random or file-name similarity (B4); without per-tenant graphs and grant edges there
-is nothing for the isolation suite to test (B3). A dict-backed reimplementation of the whole product was not built.
+## Data and licences
+Interaction data: **DDInter 2.0**, CC BY-NC-SA 4.0 (**non-commercial** use; attribution required), downloaded by `scripts/fetch_reference.py`, not stored in this repository.
+Enzyme data: the FDA "Drug Development and Drug Interactions" substrates/inhibitors/inducers table. A snapshot of the FDA table (US government work) is bundled in `carecircle/snapshot/` as a fallback when the FDA site blocks scripted downloads. Demo circles, labels and people are synthetic.
 
-## Security notes (what is and is not protected)
-Protected: database-level read-only user (set `GRAPHMEM_RO_PASSWORD`: every read-scope operation then runs as a Redis ACL user that may only call `GRAPH.RO_QUERY`, so a bug in a read path cannot write), tenant isolation (separate graphs plus a grant check on every query; revocation is immediate), hashed API keys, parameterised
-Cypher everywhere (no string-built queries from user input), only whitelisted operations are callable, rate limits, size caps on forks.
-Not protected: stored content can contain prompt-injection text that a downstream LLM may obey (graphmem returns it as data, it never
-executes it); rate limiting is per API process; no TLS (put a proxy in front); the admin key is a single shared secret; FalkorDB
-ACLs are not per tenant (writes of all tenants share one database credential; the optional read-only user only splits read from write).
+## AI use disclosure
+This project was built with substantial help from Claude (Anthropic) via Claude Code: design discussion, code, tests and docs were written with
+AI assistance and reviewed and run by the author. At runtime, an optional Amazon Bedrock model (Amazon Nova) only turns OCR/transcript text into
+proposed fields; it never decides interactions or doses.
 
-## Honest limits
-- Extraction: rules (narrow) or an optional OpenAI-compatible LLM (`GRAPHMEM_LLM_URL/MODEL/KEY`); the LLM path is tested only against a fake server.
-- Recall is lexical entity matching + graph expansion by default; paraphrases need the optional embeddings (`GRAPHMEM_EMBEDDINGS=1`, `pip install fastembed`, B6). No LoCoMo/LongMemEval numbers are claimed.
-- Fork work is additive: edits a fork makes to items that already existed are not merged. Merge is not one atomic transaction.
-- Code graph is static Python analysis (imports and bare-name calls); other languages are not parsed.
-- All performance numbers are single runs on one Windows laptop. FalkorDB quirk found: `MATCH (a) WHERE ... MATCH (a)-[..]` silently returns no
-  rows unless a `WITH a` sits between.
-
-## AI assistance disclosure
-This project was designed and written with substantial help from an AI coding assistant (Anthropic's Claude, via Claude Code). Test
-runs, benchmark runs and numbers in this repository were produced by running the code in the repository.
-
-## Data
-All data is synthetic, generated by the scripts, or public open-source repositories used read-only for the B4 benchmark:
-pallets/click and pallets/flask (BSD-3-Clause), psf/requests (Apache-2.0). Nothing private is included.
+## Layout
+`carecircle/` product logic (reference graph, checks, risk math, safety, intake, Telegram, algorithms, demo) · `graphmem/` the multi-tenant graph
+memory engine (tenants, grants, HTTP API, MCP server, forks, spaces) · `web/` the app · `tests/` · `bench/` · `scripts/` · `docs/ARCHITECTURE.md`.
+MCP: `claude mcp add carecircle -e GRAPHMEM_API_KEY=gm_... -- python -m graphmem.mcp_server` exposes every operation (`call(tenant, "care_check", ...)`).
