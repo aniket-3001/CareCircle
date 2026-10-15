@@ -13,7 +13,7 @@ async def plant(client, gm):
     alice = await make_agent(client, gm, "tt-alice", ta)
     await client.post(f"/v1/tenants/{ta}/add_episode", json={"session": "s", "role": "user", "content": f"launch code {SECRET}"}, headers=alice)
     f = (await client.post(f"/v1/tenants/{ta}/assert_fact", json={"subject": "vault", "predicate": "holds", "obj": SECRET}, headers=alice)).json()["result"]
-    await client.post(f"/v1/tenants/{ta}/code_load", json={"files": [{"id": "secret.py", "name": "secret.py", "path": "secret.py", "kind": "file"}]}, headers=alice)
+    await client.post(f"/v1/tenants/{ta}/care_record", json={"person": "mum", "drug": "metformin", "dose_text": SECRET}, headers=alice)
     fk = (await client.post(f"/v1/tenants/{ta}/forks", json={"label": "a-fork"}, headers=alice)).json()["result"]
     return ta, alice, f["id"], fk["id"]
 
@@ -26,8 +26,10 @@ async def test_no_op_leaks_to_agent_without_grant(client, gm):
         ("POST", f"/v1/tenants/{ta}/recall", {"query": "vault"}), ("POST", f"/v1/tenants/{ta}/history", {"session": "s"}),
         ("POST", f"/v1/tenants/{ta}/search_episodes", {"query": "launch code"}), ("POST", f"/v1/tenants/{ta}/graph_view", {}),
         ("POST", f"/v1/tenants/{ta}/fact_history", {"subject": "vault", "predicate": "holds"}),
-        ("POST", f"/v1/tenants/{ta}/explain", {"decision_id": "dec_x"}), ("POST", f"/v1/tenants/{ta}/code_stats", {}),
-        ("POST", f"/v1/tenants/{ta}/blast_radius", {"path": "secret.py"}), ("POST", f"/v1/tenants/{ta}/who_to_ask", {"path": "secret.py"}),
+        ("POST", f"/v1/tenants/{ta}/explain", {"decision_id": "dec_x"}), ("POST", f"/v1/tenants/{ta}/care_regimen", {"person": "mum"}),
+        ("POST", f"/v1/tenants/{ta}/care_check", {"person": "mum"}), ("POST", f"/v1/tenants/{ta}/care_divergence", {"person": "mum"}),
+        ("POST", f"/v1/tenants/{ta}/care_people", {}), ("POST", f"/v1/tenants/{ta}/care_give", {"person": "mum", "drug": "metformin", "slot": "s"}),
+        ("POST", f"/v1/tenants/{ta}/intake", {}),
         ("POST", f"/v1/tenants/{ta}/forget_fact", {"fact_id": fact_id, "reason": "x"}),
         ("POST", f"/v1/tenants/{ta}/forks", {}), ("GET", f"/v1/tenants/{ta}/forks", None),
         ("POST", f"/v1/forks/{fork_id}/recall", {"query": "vault"}), ("POST", f"/v1/forks/{fork_id}/graph_view", {}),
