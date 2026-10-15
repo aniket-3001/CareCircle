@@ -98,9 +98,22 @@ class Facts:
 
 
 async def gather(mem, person: str, now: int) -> Facts:
-    check, div, tl, gives, people = await asyncio.gather(mem.care_check(person), mem.care_divergence(person, now), mem.care_timeline(person, limit=12, now=now),
-                                                         mem.care_gives(person, limit=10), mem.care_people())
-    return Facts(person, now, check, div, tl, gives, people)
+    check, div, tl, gives, people, sole = await asyncio.gather(mem.care_check(person), mem.care_divergence(person, now), mem.care_timeline(person, limit=12, now=now),
+                                                               mem.care_gives(person, limit=10), mem.care_people(), mem.care_sole_knowers(person))
+    f = Facts(person, now, check, div, tl, gives, people)
+    f.sole = sole
+    return f
+
+
+SOLE = re.compile(r"\b(only (one|\w+) (carer )?(who )?knows?|who alone|single point|sole(ly)? (knows|aware)|nobody else (knows|has been told))\b", re.I)
+
+
+def _a_sole(f: Facts) -> str:
+    s = getattr(f, "sole", None) or {"sole": []}
+    if not s["sole"]:
+        return "Every current entry is known to more than one carer, or there is only one carer."
+    bits = "; ".join(f"{_title(x['drug'])}: only {_who(x['only'])}" for x in s["sole"][:6])
+    return f"Known to only one carer: {bits}. If that carer is away, nobody else has been told. Ask the others to open Circle and press \"I have seen this\"."
 
 
 # ------------------------------------------------------------------ rule answers
@@ -247,6 +260,8 @@ def ask(question: str, facts: Facts, checker, generate=None, lang: str = "") -> 
     drug = next((r["drug"] for r in facts.regimen if r["drug"] in low), None)
     if drug and not (UNSEEN.search(q) or DOSES.search(q)):
         return {"answer": _a_drug(facts, drug), "source": "rules", "links": [{"tab": "graph", "label": "See it in the graph"}]}
+    if SOLE.search(q):
+        return {"answer": _a_sole(facts), "source": "rules", "links": [{"tab": "circle", "label": "Open Circle"}]}
     if UNSEEN.search(q):
         return {"answer": _a_unseen(facts), "source": "rules", "links": [{"tab": "circle", "label": "Open Circle"}]}
     if FLAGS.search(q):

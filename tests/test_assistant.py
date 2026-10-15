@@ -173,3 +173,9 @@ async def test_hindi_emergency_and_add(gm):
     assert r["source"] == "refusal" and "112" in r["answer"]
     r = await say(c, "जोड़ें warfarin 5 mg once daily", now)
     assert r["source"] == "proposal" and r["proposals"][0]["drug_candidates"][0]["name"] == "warfarin"
+
+
+async def test_helper_names_what_only_one_carer_knows(gm):
+    t, c, now = await seeded(gm)
+    r = await say(c, "what does only one carer know?", now)
+    assert r["source"] == "rules" and "only Meena" in r["answer"] and "Clarithromycin" in r["answer"] and not scan_advice(r["answer"])
