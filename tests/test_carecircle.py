@@ -397,3 +397,14 @@ def test_ocr_letter_o_inside_numbers_is_read_as_zero_only_there():
     assert intake.fix_digits("Clarithromycin 5o0 mg") == "Clarithromycin 500 mg"
     assert intake.fix_digits("take 1OO mg; 2O mg") == "take 100 mg; 20 mg"
     assert intake.fix_digits("Oral dose; Omeprazole; TOP 10; Rx 00481") == "Oral dose; Omeprazole; TOP 10; Rx 00481"
+
+
+async def test_graph_of_a_larger_regimen_with_heavy_drugs_is_fast_enough(gm):
+    import time
+    t, c = await circle(gm, "ravi")
+    for d in ("warfarin", "fluconazole", "metformin", "atorvastatin", "clarithromycin", "amlodipine", "simvastatin", "omeprazole", "sertraline"):
+        await c["ravi"].care_record("asha", d, dose_text="10 mg")
+    t0 = time.time()
+    g = await c["ravi"].care_graph("asha")
+    assert time.time() - t0 < 3.0                                   # FalkorDB's own query timeout is 1 s per query
+    assert sum(n["kind"] == "drug" for n in g["nodes"]) == 9

@@ -30,12 +30,14 @@ class Algos:
         return r
 
     def drug_profile(self, drugs: list[str]) -> dict:
-        """Interaction counts per drug by listed severity (DDInter), for the metadata shown on a graph node."""
-        rows = self.g.ro_query("UNWIND $d AS n MATCH (:Drug {name:n})-[r:INTERACTS]-() RETURN n, r.level, count(r)", {"d": drugs}).result_set
-        out = {d: {"levels": {}, "total": 0} for d in drugs}
-        for n, lvl, c in rows:
-            out[n]["levels"][str(lvl).lower()] = c
-            out[n]["total"] += c
+        """Interaction counts per drug by listed severity (DDInter), for the metadata shown on a graph node.
+        One indexed query per drug: a single UNWIND form cannot use the name index and times out for heavy drugs."""
+        out = {}
+        for d in drugs:
+            levels: dict[str, int] = {}
+            for lvl, c in self.g.ro_query("MATCH (:Drug {name:$n})-[r:INTERACTS]-() RETURN r.level, count(r)", {"n": d}).result_set:
+                levels[str(lvl).lower()] = c
+            out[d] = {"levels": levels, "total": sum(levels.values())}
         return out
 
     def clusters(self, n: int = 5) -> dict:
