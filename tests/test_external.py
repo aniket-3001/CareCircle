@@ -64,3 +64,19 @@ async def test_sole_knowers_flags_what_only_one_carer_knows(gm):
     await meena.care_ack(next(r["id"] for r in await ravi.care_regimen("asha") if r["drug"] == "warfarin"))
     out = await ravi.care_sole_knowers("asha")
     assert [x["drug"] for x in out["sole"]] == ["vitamin d"] and out["keystone"] == "meena" and out["keystone_count"] == 1
+
+
+def test_lookups_survive_a_restart_through_the_reference_graph(monkeypatch):
+    monkeypatch.setenv("CC_EXTERNAL", "1")
+    calls = []
+    class R:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def read(self): return b'{"results": [{"x": 1}]}'
+    monkeypatch.setattr(external.urllib.request, "urlopen", lambda req, timeout=0: calls.append(1) or R())
+    url = "https://example.test/lookup?name=cache-test-xyz"
+    external._cache.clear()
+    assert external._get(url) == {"results": [{"x": 1}]} and len(calls) == 1
+    external._cache.clear()                                                    # a restart: the in-memory cache is gone
+    assert external._get(url) == {"results": [{"x": 1}]} and len(calls) == 1   # served from the graph, no second call
+    external._ref().query("MATCH (c:Cached {url:$u}) DELETE c", {"u": url})

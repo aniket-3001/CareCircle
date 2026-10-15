@@ -27,10 +27,46 @@ def enabled() -> bool:
     return os.getenv("CC_EXTERNAL", "1") != "0"
 
 
+_store = None   # the reference graph, opened lazily: lookups are cached there so they survive a restart and are shared by every worker
+
+
+def _ref():
+    global _store
+    if _store is None:
+        from falkordb import FalkorDB
+        from .reference import REF_GRAPH
+        _store = FalkorDB(host=os.getenv("FALKORDB_HOST", "localhost"), port=int(os.getenv("FALKORDB_PORT", "6379"))).select_graph(REF_GRAPH)
+    return _store
+
+
+def _stored(url: str) -> Optional[dict]:
+    """A cached public answer (name-only lookups, never personal data) from the reference graph, if still fresh."""
+    if os.getenv("CC_EXTERNAL_CACHE", "1") == "0":
+        return None
+    try:
+        rows = _ref().ro_query("MATCH (c:Cached {url:$u}) WHERE c.at > $t RETURN c.body", {"u": url, "t": int((time.time() - TTL) * 1000)}).result_set
+        return json.loads(rows[0][0]) if rows else None
+    except Exception:
+        return None
+
+
+def _keep(url: str, data: dict) -> None:
+    if os.getenv("CC_EXTERNAL_CACHE", "1") == "0" or len(json.dumps(data)) > 200_000:
+        return
+    try:
+        _ref().query("MERGE (c:Cached {url:$u}) SET c.at=$t, c.body=$b", {"u": url, "t": int(time.time() * 1000), "b": json.dumps(data)})
+    except Exception:
+        pass
+
+
 def _get(url: str) -> Optional[dict]:
     hit = _cache.get(url)
     if hit and time.time() - hit[0] < TTL:
         return hit[1]  # type: ignore[return-value]
+    saved = _stored(url)
+    if saved is not None:
+        _cache[url] = (time.time(), saved)
+        return saved
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "CareCircle/1.0 (hackathon; read-only lookups)"})
         with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
@@ -38,6 +74,7 @@ def _get(url: str) -> Optional[dict]:
     except Exception:
         return None
     _cache[url] = (time.time(), data)
+    _keep(url, data)
     return data
 
 
