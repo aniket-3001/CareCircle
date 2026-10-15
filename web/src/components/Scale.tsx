@@ -1,5 +1,6 @@
 import type { CheckResult } from '../api/types';
 import { SEVERITY, sevKey, type SeverityKey } from '../design/levels';
+import { tr } from '../lib/i18n';
 
 const ORDER: SeverityKey[] = ['none', 'minor', 'moderate', 'major', 'unrated'];
 
@@ -9,7 +10,7 @@ export function Scale({ check }: { check: CheckResult }): React.JSX.Element {
   for (const f of check.direct) count[sevKey(f.level)] += 1;
   return (
     <section className="card" aria-labelledby="scale-title">
-      <h2 id="scale-title">How to read a flag</h2>
+      <h2 id="scale-title">{tr('How to read a flag')}</h2>
       <div className="scale">
         <div className="scale-bar" aria-hidden="true">
           {ORDER.map((k) => (
@@ -25,7 +26,7 @@ export function Scale({ check }: { check: CheckResult }): React.JSX.Element {
           ))}
         </div>
       </div>
-      <p className="muted small">Severity is as listed by DDInter 2.0. Unrated means the source lists the pair without a severity: that is not the same as safe. Enzyme paths come from the FDA table and are shown separately.</p>
+      <p className="muted small">{tr('Severity is as listed by DDInter 2.0. Unrated means the source lists the pair without a severity: that is not the same as safe. Enzyme paths come from the FDA table and are shown separately.')}</p>
     </section>
   );
 }

@@ -8,6 +8,7 @@ import { Pill, Spinner } from '../components/Pill';
 import { useToast } from '../components/Toast';
 import { title } from '../lib/format';
 import { useApp } from '../state';
+import { tr } from '../lib/i18n';
 
 const KINDS: Record<string, 'photo' | 'voice' | 'document' | 'typed'> = { image: 'photo', voice: 'voice', document: 'document', typed: 'typed' };
 const METHOD: Record<string, string> = { rapidocr: 'read with OCR', 'faster-whisper': 'heard with speech recognition', pypdf: 'text from a PDF', 'python-docx': 'text from a Word file', text: 'typed' };
@@ -73,18 +74,18 @@ export function AddScreen(): React.JSX.Element {
 
   return (
     <div className="screen">
-      <PageHead crumb="Add to the record" title="Add a medicine" lede="From a photo, a voice note, a document or text. Nothing is saved until you confirm, and every reading shows the exact line it came from." />
+      <PageHead crumb={tr('Add to the record')} title={tr('Add a medicine')} lede={tr('From a photo, a voice note, a document or text. Nothing is saved until you confirm, and every reading shows the exact line it came from.')} />
       <div className="layout">
         <div className="col">
           <section className="card" aria-labelledby="add-title">
             <div className="card-head">
-              <h2 id="add-title">Choose how</h2>
+              <h2 id="add-title">{tr('Choose how')}</h2>
               {busy && <Spinner />}
             </div>
             <div className="tiles">
               <button type="button" className={`tile${over === 'photo' ? ' tile--over' : ''}`} onClick={() => photo.current?.click()} {...drop('photo')}>
                 <span className="ico"><Camera size={26} strokeWidth={1.75} aria-hidden="true" /></span>
-                <b>Photo</b>
+                <b>{tr('Photo')}</b>
                 <span>of a label or box</span>
               </button>
               {pick(photo, 'image/*', 'Choose a photo of a label')}
@@ -95,26 +96,26 @@ export function AddScreen(): React.JSX.Element {
               </button>
               <button type="button" className={`tile${over === 'doc' ? ' tile--over' : ''}`} onClick={() => doc.current?.click()} {...drop('doc')}>
                 <span className="ico"><FileText size={26} strokeWidth={1.75} aria-hidden="true" /></span>
-                <b>Document</b>
-                <span>PDF or Word</span>
+                <b>{tr('Document')}</b>
+                <span>{tr('PDF or Word')}</span>
               </button>
               {pick(doc, 'audio/*,.pdf,.docx,.txt', 'Choose a document or audio file')}
               <button type="button" className="tile" disabled={busy} onClick={async () => send(await sampleLabel())}>
                 <span className="ico"><ScanLine size={26} strokeWidth={1.75} aria-hidden="true" /></span>
-                <b>Sample label</b>
+                <b>{tr('Sample label')}</b>
                 <span>try it without a photo</span>
               </button>
             </div>
           </section>
           <section className="card" aria-labelledby="type-title">
-            <h2 id="type-title">Or type it</h2>
+            <h2 id="type-title">{tr('Or type it')}</h2>
             <label className="field">
-              <span className="sr-only">Medicine, dose and how often</span>
+              <span className="sr-only">{tr('Medicine, dose and how often')}</span>
               <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Clarithromycin 500 mg twice daily for 7 days" />
             </label>
             <div className="row">
               <button type="button" className="btn" disabled={busy || !text.trim()} onClick={() => { const fd = new FormData(); fd.append('text', text); void run(fd); }}>
-                Read it
+                {tr('Read it')}
               </button>
             </div>
           </section>
@@ -123,7 +124,7 @@ export function AddScreen(): React.JSX.Element {
           {result && (
             <section className="card">
               <div className="card-head">
-                <h2>What was read</h2>
+                <h2>{tr('What was read')}</h2>
                 <Pill tone="mute">{METHOD[result.source.method] ?? result.source.method}</Pill>
               </div>
               <pre className="quote" style={{ whiteSpace: 'pre-wrap', margin: 0, font: 'inherit' }}>{result.text || result.source.note || 'Nothing readable.'}</pre>
@@ -172,27 +173,27 @@ export function ProposalCard({ p, kind, sourceText, onDone }: { p: Proposal; kin
       <blockquote className="quote">“{p.quote}”</blockquote>
       <div className="grid-2">
         <label className="field">
-          Medicine (pick the right one)
+          {tr('Medicine (pick the right one)')}
           <select value={drug} onChange={(e) => setDrug(e.target.value)}>
             {p.drug_candidates.map((c) => <option key={c.name} value={c.name}>{title(c.name)}</option>)}
           </select>
         </label>
         <label className="field">
-          For
+          {tr('For')}
           <input type="text" value={app.session.person} readOnly aria-readonly="true" />
         </label>
         <label className="field">
-          Dose as written
+          {tr('Dose as written')}
           <input type="text" value={dose} onChange={(e) => setDose(e.target.value)} />
         </label>
         <label className="field">
-          How often as written
+          {tr('How often as written')}
           <input type="text" value={freq} onChange={(e) => setFreq(e.target.value)} />
         </label>
       </div>
       <div className="row">
-        <button type="button" className="btn" disabled={busy || !drug} onClick={() => void confirm()}>Confirm and save</button>
-        <button type="button" className="btn btn--soft" onClick={onDone}>Discard</button>
+        <button type="button" className="btn" disabled={busy || !drug} onClick={() => void confirm()}>{tr('Confirm and save')}</button>
+        <button type="button" className="btn btn--soft" onClick={onDone}>{tr('Discard')}</button>
         {busy && <Spinner />}
       </div>
     </section>

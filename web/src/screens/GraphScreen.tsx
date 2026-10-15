@@ -8,6 +8,7 @@ import { KnowledgeGraph, type Selection } from '../graph/KnowledgeGraph';
 import { ALL_LAYERS, LAYER_LABEL, visibleGraph, type Layer } from '../graph/model';
 import { title } from '../lib/format';
 import { useApp, useLoad } from '../state';
+import { tr } from '../lib/i18n';
 
 const LAYER_DOT: Record<Layer, string> = { people: 'var(--c-carer)', entries: 'var(--c-dose)', history: 'var(--c-dose-old)', enzymes: 'var(--c-enzyme)' };
 
@@ -25,12 +26,12 @@ export function GraphScreen(): React.JSX.Element {
   return (
     <div className="screen">
       <PageHead
-        crumb="As stored in FalkorDB"
-        title="The circle as a graph"
-        lede="People, entries, medicines and liver enzymes. Coral lines are major interactions (they pulse), orange moderate, blue enzyme paths. Click any node or line to read what it is and where it came from."
+        crumb={tr('As stored in FalkorDB')}
+        title={tr('The circle as a graph')}
+        lede={tr('People, entries, medicines and liver enzymes. Coral lines are major interactions (they pulse), orange moderate, blue enzyme paths. Click any node or line to read what it is and where it came from.')}
         action={
           <button type="button" className="btn btn--soft btn--sm" onClick={() => setReplay((r) => r + 1)}>
-            <RotateCcw size={16} aria-hidden="true" /> Replay animation
+            <RotateCcw size={16} aria-hidden="true" /> {tr('Replay animation')}
           </button>
         }
       />
@@ -38,7 +39,7 @@ export function GraphScreen(): React.JSX.Element {
         <Async state={graph}>
           {(g) => (
             <>
-              <fieldset className="chips" aria-label="Layers">
+              <fieldset className="chips" aria-label={tr('Layers')}>
                 {ALL_LAYERS.map((l) => (
                   <label key={l} className="fchip">
                     <input type="checkbox" checked={layers.has(l)} onChange={() => toggle(l)} />
@@ -58,10 +59,10 @@ export function GraphScreen(): React.JSX.Element {
           {(h) => (
             <div className="layout layout--even" style={{ marginTop: 0 }}>
               <section className="card" aria-labelledby="rh-title">
-                <h2 id="rh-title">Most hazard-connected in this regimen</h2>
-                <p className="muted small">Degree and summed weight inside the moderate and major interaction subgraph of the medicines on record.</p>
+                <h2 id="rh-title">{tr('Most hazard-connected in this regimen')}</h2>
+                <p className="muted small">{tr('Degree and summed weight inside the moderate and major interaction subgraph of the medicines on record.')}</p>
                 {h.regimen_hubs.rows.length === 0 ? (
-                  <p className="muted">No hazard lines inside this regimen.</p>
+                  <p className="muted">{tr('No hazard lines inside this regimen.')}</p>
                 ) : (
                   <div className="rows">
                     {h.regimen_hubs.rows.map((r) => (
@@ -75,8 +76,8 @@ export function GraphScreen(): React.JSX.Element {
                 <code className="code">{h.regimen_hubs.cypher}</code>
               </section>
               <section className="card" aria-labelledby="gh-title">
-                <h2 id="gh-title">Hub medicines across the reference graph</h2>
-                <p className="muted small">PageRank over moderate and major interaction pairs: the medicines that sit in the most hazards.</p>
+                <h2 id="gh-title">{tr('Hub medicines across the reference graph')}</h2>
+                <p className="muted small">{tr('PageRank over moderate and major interaction pairs: the medicines that sit in the most hazards.')}</p>
                 <div className="rows">
                   {h.global_hubs.rows.map((r, i) => (
                     <div key={r.drug} className="item">

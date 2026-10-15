@@ -3,6 +3,7 @@ import { Async } from './Async';
 import { Pill } from './Pill';
 import { title } from '../lib/format';
 import { useLoad } from '../state';
+import { tr } from '../lib/i18n';
 
 /** Ongoing public recalls listed for the medicines on record. Shown as published: whether one applies depends on the pack at home. */
 export function Recalls(): React.JSX.Element | null {
@@ -10,7 +11,7 @@ export function Recalls(): React.JSX.Element | null {
   if (state.data && (!state.data.available || state.data.checked.length === 0)) return null;
   return (
     <section className="card" aria-labelledby="recall-title" data-testid="recalls">
-      <div className="card-head"><h2 id="recall-title">Recalls to check</h2><PackageX size={20} aria-hidden="true" /></div>
+      <div className="card-head"><h2 id="recall-title">{tr('Recalls to check')}</h2><PackageX size={20} aria-hidden="true" /></div>
       <Async state={state}>
         {(r) => r.recalls.length === 0 ? (
           <p className="muted">No ongoing recall is listed for the {r.checked.length} medicines on record (openFDA, US recalls). That does not cover every country or every pack.</p>

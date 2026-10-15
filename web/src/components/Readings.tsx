@@ -7,6 +7,7 @@ import { Sheet } from './Sheet';
 import { useToast } from './Toast';
 import { ago, nameOf, title } from '../lib/format';
 import { useApp, useLoad } from '../state';
+import { tr } from '../lib/i18n';
 
 const KINDS: Record<string, { label: string; units: string[] }> = {
   bp_systolic: { label: 'Blood pressure, top number', units: ['mmHg'] },
@@ -24,7 +25,7 @@ const KINDS: Record<string, { label: string; units: string[] }> = {
 function Chart({ t }: { t: Trend }): React.JSX.Element {
   const W = 560, H = 220, P = 34;
   const pts = t.series;
-  if (pts.length < 2) return <p className="muted">Add at least two readings to see a line.</p>;
+  if (pts.length < 2) return <p className="muted">{tr('Add at least two readings to see a line.')}</p>;
   const xs = pts.map((r) => r.at), ys = pts.map((r) => r.value);
   const x0 = Math.min(...xs, ...t.changes.map((c) => c.at)), x1 = Math.max(...xs);
   const y0 = Math.min(...ys), y1 = Math.max(...ys);
@@ -84,28 +85,28 @@ export function Readings(): React.JSX.Element {
 
   return (
     <section className="card" aria-labelledby="read-title" data-testid="readings">
-      <div className="card-head"><h2 id="read-title">Readings</h2><Activity size={20} aria-hidden="true" /></div>
-      <p className="muted small">Blood pressure, sugar, INR and so on, kept next to the medicine changes. The app draws what was typed and never says whether a number is good or bad.</p>
+      <div className="card-head"><h2 id="read-title">{tr('Readings')}</h2><Activity size={20} aria-hidden="true" /></div>
+      <p className="muted small">{tr('Blood pressure, sugar, INR and so on, kept next to the medicine changes. The app draws what was typed and never says whether a number is good or bad.')}</p>
       <form className="grid-2" onSubmit={add}>
-        <label className="field">What
+        <label className="field">{tr('What')}
           <select value={kind} onChange={(e) => { setKind(e.target.value); setUnit(KINDS[e.target.value].units[0]); }}>
             {Object.entries(KINDS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
         </label>
-        <label className="field">Reading
+        <label className="field">{tr('Reading')}
           <span className="row">
             <input type="number" step="any" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} required />
             {KINDS[kind].units.length > 1
-              ? <select aria-label="Unit" value={unit} onChange={(e) => setUnit(e.target.value)}>{KINDS[kind].units.map((u) => <option key={u}>{u}</option>)}</select>
+              ? <select aria-label={tr('Unit')} value={unit} onChange={(e) => setUnit(e.target.value)}>{KINDS[kind].units.map((u) => <option key={u}>{u}</option>)}</select>
               : <span className="muted">{unit}</span>}
           </span>
         </label>
-        <div className="row"><button type="submit" className="btn btn--sm" disabled={busy || value === ''}>Save reading</button>{busy && <Spinner />}</div>
+        <div className="row"><button type="submit" className="btn btn--sm" disabled={busy || value === ''}>{tr('Save reading')}</button>{busy && <Spinner />}</div>
       </form>
       <Async state={list}>
-        {(rows) => rows.length === 0 ? <p className="muted">No readings yet.</p> : (
+        {(rows) => rows.length === 0 ? <p className="muted">{tr('No readings yet.')}</p> : (
           <>
-            <div className="chips" aria-label="Charts">
+            <div className="chips" aria-label={tr('Charts')}>
               {kindsWith(rows).map((k) => <button key={k} type="button" className="fchip" onClick={() => void open(k)}><LineChart size={14} aria-hidden="true" /> {KINDS[k]?.label ?? k}</button>)}
             </div>
             <div className="rows">
@@ -122,7 +123,7 @@ export function Readings(): React.JSX.Element {
       <Sheet open={!!view} title={view ? (KINDS[view.kind]?.label ?? view.kind) : ''} onClose={() => setView(null)}>
         {!trend ? <Spinner /> : (
           <div className="stack">
-            <label className="field">Mark the changes of
+            <label className="field">{tr('Mark the changes of')}
               <select value={view?.drug ?? ''} onChange={(e) => void open(view!.kind, e.target.value)}>
                 <option value="">no medicine</option>
                 {(reg.data ?? []).map((r) => <option key={r.id} value={r.drug}>{title(r.drug)}</option>)}

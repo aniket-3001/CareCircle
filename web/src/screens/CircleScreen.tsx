@@ -11,6 +11,7 @@ import { useToast } from '../components/Toast';
 import { SEVERITY, type SeverityKey } from '../design/levels';
 import { ago, nameOf, pct, plural, title, when } from '../lib/format';
 import { useApp, useLoad } from '../state';
+import { tr } from '../lib/i18n';
 
 const behind = (score: number, n: number): SeverityKey => (n === 0 ? 'none' : score < 0.2 ? 'minor' : score < 0.5 ? 'moderate' : 'major');
 
@@ -34,14 +35,14 @@ export function CircleScreen(): React.JSX.Element {
 
   return (
     <div className="screen">
-      <PageHead crumb="The circle" title="Who has seen what" lede="Every change is shown to every carer. Until someone acknowledges it, they count as behind, and older unseen changes count more." />
+      <PageHead crumb={tr('The circle')} title={tr('Who has seen what')} lede={tr('Every change is shown to every carer. Until someone acknowledges it, they count as behind, and older unseen changes count more.')} />
       <div className="layout">
         <div className="col">
           <Async state={sole}>
             {(s) => s.sole.length === 0 ? <></> : (
               <section className="card" aria-labelledby="sole-title" data-testid="sole-knowers">
-                <h2 id="sole-title">Only one carer knows</h2>
-                <p className="muted">If that carer is away, nobody else has been told. Ask the others to open the change and press &quot;I have seen this&quot;.</p>
+                <h2 id="sole-title">{tr('Only one carer knows')}</h2>
+                <p className="muted">{tr('If that carer is away, nobody else has been told. Ask the others to open the change and press "I have seen this".')}</p>
                 <ul className="steps">{s.sole.map((x) => <li key={x.dose}><span><b>{title(x.drug)}</b>: only {nameOf(x.only)}</span></li>)}</ul>
                 {s.keystone && <p className="muted small">{nameOf(s.keystone)} is the only one who knows {plural(s.keystone_count, 'current entry', 'current entries')}.</p>}
               </section>
@@ -76,12 +77,12 @@ export function CircleScreen(): React.JSX.Element {
                                 <div className="item__title">{title(u.drug)} {u.action === 'stop' ? 'stopped' : 'changed'}</div>
                                 <div className="item__sub">{ago(t - u.age_hours * 3_600_000, t)}</div>
                               </div>
-                              {c === app.me && <button type="button" className="btn btn--sm" style={{ whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => void ack(u.dose)}>I have seen this</button>}
+                              {c === app.me && <button type="button" className="btn btn--sm" style={{ whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => void ack(u.dose)}>{tr('I have seen this')}</button>}
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <div className="row"><Check size={18} aria-hidden="true" /> <span>Up to date with every change.</span></div>
+                        <div className="row"><Check size={18} aria-hidden="true" /> <span>{tr('Up to date with every change.')}</span></div>
                       )}
                     </motion.section>
                   );
@@ -95,17 +96,17 @@ export function CircleScreen(): React.JSX.Element {
         <div className="col">
           {app.isDemo && (
             <section className="card" aria-labelledby="warp-title">
-              <div className="row"><Clock size={20} strokeWidth={1.75} aria-hidden="true" /><h2 id="warp-title">Time warp (demo only)</h2></div>
-              <p className="muted">Pretend it is later, to see reminders appear without waiting. Showing {app.warp === 0 ? 'now' : `now + ${app.warp} hours (${when(t)})`}. Real circles are always read as of now.</p>
+              <div className="row"><Clock size={20} strokeWidth={1.75} aria-hidden="true" /><h2 id="warp-title">{tr('Time warp (demo only)')}</h2></div>
+              <p className="muted">{tr('Pretend it is later, to see reminders appear without waiting.')} {tr('Showing')} {app.warp === 0 ? tr('now') : `now + ${app.warp} h (${when(t)})`}. {tr('Real circles are always read as of now.')}</p>
               <Segmented name="warp" label="Hours to add to now" value={app.warp} onChange={app.setWarp} options={[{ value: 0, label: 'Now' }, { value: 6, label: '+6 h' }, { value: 13, label: '+13 h' }, { value: 24, label: '+1 day' }]} />
             </section>
           )}
           <Async state={nudges}>
             {(n) => (
               <section className="card" aria-labelledby="nudge-title">
-                <div className="row"><BellRing size={20} strokeWidth={1.75} aria-hidden="true" /><h2 id="nudge-title">Reminders due</h2></div>
+                <div className="row"><BellRing size={20} strokeWidth={1.75} aria-hidden="true" /><h2 id="nudge-title">{tr('Reminders due')}</h2></div>
                 {n.length === 0 ? (
-                  <p className="muted">None due. A reminder is produced once an unseen change is 4 hours old, and an escalation at 12 hours.</p>
+                  <p className="muted">{tr('None due. A reminder is produced once an unseen change is 4 hours old, and an escalation at 12 hours.')}</p>
                 ) : (
                   <div className="rows">
                     {n.map((x) => (
@@ -149,17 +150,17 @@ function Doses(): React.JSX.Element {
   return (
     <section className="card" aria-labelledby="dose-title">
       <div className="card-head">
-        <h2 id="dose-title">Doses given</h2>
+        <h2 id="dose-title">{tr('Doses given')}</h2>
         <Pill tone="info">once per slot</Pill>
       </div>
-      <p className="muted">A dose slot can be recorded once. If two carers try, the second is told who already did.</p>
+      <p className="muted">{tr('A dose slot can be recorded once. If two carers try, the second is told who already did.')}</p>
       <Async state={reg}>
         {(r) => (
           <div className="grid-2">
-            <label className="field">Medicine
+            <label className="field">{tr('Medicine')}
               <select value={drug || r[0]?.drug || ''} onChange={(e) => setDrug(e.target.value)}>{r.map((x) => <option key={x.id} value={x.drug}>{title(x.drug)}</option>)}</select>
             </label>
-            <label className="field">Slot
+            <label className="field">{tr('Slot')}
               <input type="text" value={slot} onChange={(e) => setSlot(e.target.value)} />
             </label>
             <div className="row">
@@ -170,7 +171,7 @@ function Doses(): React.JSX.Element {
       </Async>
       {msg && <div className="banner banner--bad" role="alert" data-testid="duplicate">{msg}</div>}
       <Async state={log}>
-        {(l) => (l.length ? <><div className="rows">{l.slice(0, showAll ? undefined : 10).map((g) => <div key={g.drug + g.slot} className="item"><div><div className="item__title">{title(g.drug)} <span className="muted">{g.slot}</span></div><div className="item__sub">recorded by {nameOf(g.by)}</div></div></div>)}</div>{l.length > 10 && <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowAll((v) => !v)}>{showAll ? 'Show fewer' : `Show all ${l.length}`}</button>}</> : <p className="muted">Nothing recorded yet.</p>)}
+        {(l) => (l.length ? <><div className="rows">{l.slice(0, showAll ? undefined : 10).map((g) => <div key={g.drug + g.slot} className="item"><div><div className="item__title">{title(g.drug)} <span className="muted">{g.slot}</span></div><div className="item__sub">recorded by {nameOf(g.by)}</div></div></div>)}</div>{l.length > 10 && <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowAll((v) => !v)}>{showAll ? 'Show fewer' : `Show all ${l.length}`}</button>}</> : <p className="muted">{tr('Nothing recorded yet.')}</p>)}
       </Async>
     </section>
   );

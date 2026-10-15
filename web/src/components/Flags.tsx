@@ -3,13 +3,14 @@ import type { CheckResult } from '../api/types';
 import { SEVERITY, sevKey } from '../design/levels';
 import { title } from '../lib/format';
 import { Pill, type Tone } from './Pill';
+import { tr } from '../lib/i18n';
 
 const TONE: Record<string, Tone> = { major: 'bad', moderate: 'warn', minor: 'minor', unrated: 'mute' };
 
 /** Every flag with its source and the graph pattern behind it. Unrated pairs are shown as unrated, never as safe. */
 export function Flags({ check }: { check: CheckResult }): React.JSX.Element {
   const none = !check.direct.length && !check.enzyme_paths.length && !check.unrated.length;
-  if (none) return <p className="muted">No flags from the reference data. That is not a statement of safety.</p>;
+  if (none) return <p className="muted">{tr('No flags from the reference data. That is not a statement of safety.')}</p>;
   return (
     <div className="stack">
       {check.direct.map((f) => {
