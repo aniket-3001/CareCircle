@@ -44,13 +44,33 @@ python scripts/fetch_reference.py                                           # DD
 python -c "from carecircle import reference as r; print(r.load())"          # build the shared cc_ref graph
 (cd web && npm ci && npm run build)                                         # the React app (served by the API from web/dist)
 python -m graphmem.api                                                      # http://127.0.0.1:8000
-python -m pytest -q tests                                                   # 80 tests against live FalkorDB
+python -m pytest -q tests                                                   # 112 tests against live FalkorDB
 (cd web && npm test)                                                        # UI unit tests; `npm run dev` for hot reload (proxies to :8000)
-PORT=8000 python scripts/ui_e2e.py                                          # browser walk-through (needs Chrome and `pip install playwright`)
+PORT=8000 python scripts/ui_e2e.py && PORT=8000 python scripts/ui_e2e_accounts.py    # browser walk-throughs: demo, then accounts (need Chrome and `pip install playwright`)
 PYTHONPATH=. python bench/care_bench.py                                     # benchmarks below
 ```
-Optional: `CC_MODEL` / `AWS_REGION` + AWS credentials let Amazon Bedrock (default `us.amazon.nova-pro-v1:0`) structure what the OCR read;
+Optional: `CC_COGNITO_POOL_ID` / `CC_COGNITO_CLIENT_ID` (email sign-up through Amazon Cognito; unset = built-in accounts), `CC_ASSISTANT=0` (the helper answers from rules only), `CC_MODEL` / `AWS_REGION` + AWS credentials let Amazon Bedrock (default `us.amazon.nova-pro-v1:0`) structure what the OCR read;
 `CC_LLM=0` or no credentials falls back to rules. Set `TELEGRAM_BOT_TOKEN` to also run the Telegram bot in the server process (`/link <key> <circle>`, then send a photo, voice note or text).
+
+## Accounts, circles and the helper
+- **Sign in with email.** On the deployed site Amazon Cognito proves the email (a code by email on sign-up and for a forgotten password), the page signs in straight to Cognito as
+  [The Vayu Project](https://github.com/hrsh-kr/the-vayu-project) does, and the server checks the ID token's signature, issuer, audience, expiry and verified email (`carecircle/cognito.py`)
+  before it creates the account in FalkorDB. Without Cognito configured (local development, CI) the app has its own email-and-password accounts (scrypt hashes, sign-in throttling, 30-day sessions
+  stored only as a SHA-256). Set `CC_COGNITO_POOL_ID` and `CC_COGNITO_CLIENT_ID` to switch.
+- **Demo accounts.** Two ordinary accounts, Ravi and Meena, share a demo circle for Asha; their password is shown on the sign-in page so anyone can try how a change reaches the second carer.
+  "Reset the demo circle" restores it. There is also a throw-away anonymous demo with no account.
+- **Your data is real and on the server.** A new account and a new circle start **empty**: nothing is pre-filled or invented. Profile, circles, roles, invitations, medicines, acknowledgements,
+  doses, reminders, the helper conversation and Telegram links are all read from the graph on every load; the browser keeps only a sign-in token and which circle is open
+  (`web/src/lib/session.ts`, with a test that nothing else is stored). Demo-only tools (the time warp, seeded people) appear only in demo circles.
+- **Circles and carers.** Create a circle for one person, invite carers with a one-time code (72 hours, one use), rename it, remove or leave. A carer counts toward "who has not seen this" from the
+  moment they join. The owner alone can invite, remove carers and erase everything about the person; if the owner leaves, the longest-standing carer becomes owner; the last member leaving deletes the circle.
+  Deleting an account removes it and every circle it alone was in.
+- **Profile and account page.** Name, circles and members, invitations, the Telegram link (a six-character one-time code: `/link CODE`, `/circles` to switch), password change, sign out, delete account.
+- **The helper** (the sparkles button). It answers from the circle's own record: who has not seen a change, what is on record, what is flagged and why, what changed, who gave a dose, and "tell me about <medicine>". "Add warfarin 5 mg once daily"
+  becomes a proposal you confirm. Questions that ask for advice (*should she stop...*, *is it safe...*, *how much...*) get a fixed refusal pointing to a prescriber or pharmacist, and an emergency gets the emergency line.
+  Rules answer first; only a question no rule covers goes to Amazon Bedrock, with names masked, and its answer is used only if it has no advice, no reassurance words, no imperative, no link and no number that is not in the facts
+  (`carecircle/assistant.py`, 20 tests including a prompt-injection attempt). The conversation is stored on the server per carer (60 questions a day), can be cleared, and can be asked by voice and read aloud.
+- **More:** change a recorded dose or record a medicine as stopped (a new entry, the old one stays in the history), a printable one-page summary for a pharmacist, FHIR export, forget with a receipt.
 
 ## What is in the app
 The web app is React + TypeScript + Vite, in the visual language of [The Vayu Project](https://github.com/hrsh-kr/the-vayu-project) (Hanken Grotesk, a soft wash in the colour of the most serious flag, a status
@@ -88,7 +108,11 @@ mem__<circle>   (one graph per circle)
   (Dose)-[:FOR]->(Person)   (Dose)-[:OF]->(Drug)   (Dose)-[:SUPERSEDES]->(Dose)   (Person:carer)-[:ACKED {at}]->(Dose)
   (Give {key: person|drug|slot, by, at})          unique per dose slot
   (Nudge {key})                                   reminder produced once
-ctl     (agents, grants, hashed API keys, Telegram chat links)
+ctl     (agents, grants, hashed API keys, Telegram chat links, and accounts)
+  (:Account {agent, email, name, hash, salt, provider, sub, demo})  (:Session {hash, exp})-[:OF]->(:Account)    only a SHA-256 of a session token is stored
+  (:Account)-[:MEMBER {role: owner|carer}]->(:Tenant {id, name, person, owner})        a circle;  (:Agent)-[:GRANTED {scopes}]->(:Tenant) is the engine's access check
+  (:Invite {hash, circle, exp})   (:Throttle {key, n, exp})
+mem__<circle> also has  (:ChatMsg {by, role, text, at})  the helper conversation, per carer
 ```
 
 ## Queries and algorithms
@@ -133,8 +157,9 @@ FalkorDB is snapshotted to a private S3 bucket every 6 hours, CloudWatch alarms 
 ## Limits, stated plainly
 - Interaction severity weights (minor .1, moderate .3, major .7; enzyme strong .7, moderate .3; staleness half-life 72 h) are **assumptions**, not clinical values.
 - The FDA CYP table is an index list, not exhaustive. Sources may disagree. Flags are for discussion with a prescriber or pharmacist.
-- The Telegram bot is tested against a fake Telegram API and, by hand, live (`/link`, `/regimen`, a typed medicine, Confirm, `/check`, a photo of a label, a reminder arriving after a back-dated unseen change, `/ack`); a spoken note, where Whisper heard "Arferin" and the matcher still offered warfarin first, with the heard text shown for a person to confirm. A photo reading shows the strength but not a frequency written two lines below the drug name. Voice uses a local Whisper `base` model; accuracy varies with accent and noise.
+- The Telegram bot is tested against a fake Telegram API and, by hand, live (`/link`, `/regimen`, a typed medicine, Confirm, `/check`, a photo of a label, a reminder arriving after a back-dated unseen change, `/ack`); a spoken note, where Whisper heard "Arferin" and the matcher still offered warfarin first, with the heard text shown for a person to confirm. Voice uses a local Whisper `base` model; accuracy varies with accent and noise.
 - Anthropic models on Bedrock were unavailable on the account used (verification pending), so the default structuring model is Amazon Nova; rules work without any model.
+- Cognito's default email sender is capped at 50 messages a day, so sign-ups beyond that need Amazon SES. The Telegram link-by-code and the account pages were tested against the fake API and in Chrome, not yet live in Telegram. The helper has not been evaluated with real families: its refusal rules are keyword-based and can miss an unusual phrasing, which is why every answer is also checked for advice before it is sent.
 - Per-process rate limiting; no TLS in the compose file (put a proxy in front); one shared database credential across circles.
 
 ## Data and licences
