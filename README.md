@@ -31,6 +31,11 @@ claude mcp add graphmem -e GRAPHMEM_API_KEY=gm_... -e FALKORDB_HOST=localhost --
 Tools: `whoami`, `list_ops`, `call(tenant, op, args_json)`, `remember`, `recall`, `fork_memory`, `fork_call`, `merge_fork`, `discard_fork`,
 `space_recall`, `publish_facts`. Walkthrough on a real repo: `PYTHONPATH=. python demo_crew.py path/to/python/repo`.
 
+![graph view](docs/img/ui-graph.png)
+![code graph tab](docs/img/ui-code-graph.png)
+
+UI checked end to end in headless Chrome (`scripts/ui_check.py`).
+
 ## Graph data model
 
 One graph per tenant (`mem__<tenant>`), a control graph `ctl` for policy, `shared__<space>` graphs for explicit sharing,
