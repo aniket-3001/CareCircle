@@ -27,7 +27,7 @@ def sign_up(pg, name, email):
     pg.get_by_label("Your name").fill(name)
     pg.get_by_label("Email").fill(email)
     pg.get_by_label("Password").fill(PW)
-    pg.get_by_role("button", name="Create account").click()
+    pg.get_by_test_id("auth").get_by_role("button", name="Create account").click()
 
 
 with sync_playwright() as p:
@@ -108,11 +108,11 @@ with sync_playwright() as p:
 
     # ---- sign out, sign in again: everything is still there
     pg.get_by_test_id("open-account").click()
-    pg.get_by_role("button", name="Sign out").click()
+    pg.get_by_test_id("top-signout").click()
     pg.get_by_test_id("open-signin").click()
     pg.get_by_label("Email").fill(f"priya{stamp}@e2e.test")
     pg.get_by_label("Password").fill(PW)
-    pg.get_by_role("button", name="Sign in", exact=True).click()
+    pg.get_by_test_id("auth").get_by_role("button", name="Sign in", exact=True).click()
     expect(pg.get_by_text("Warfarin").first).to_be_visible(timeout=15000)
     pg.get_by_test_id("open-account").click()
     pg.get_by_label("Show details of Mum's medicines").click()
@@ -135,7 +135,7 @@ with sync_playwright() as p:
     pg.get_by_test_id("open-signin").click()
     pg.get_by_label("Email").fill(f"priya{stamp}@e2e.test")
     pg.get_by_label("Password").fill(PW)
-    pg.get_by_role("button", name="Sign in", exact=True).click()
+    pg.get_by_test_id("auth").get_by_role("button", name="Sign in", exact=True).click()
     expect(pg.get_by_text("do not match")).to_be_visible(timeout=15000)
     # Omar, now the owner of the shared circle, still has the data
     p2.reload()
