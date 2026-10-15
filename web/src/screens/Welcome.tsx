@@ -15,7 +15,7 @@ const sessionFrom = (s: Signed, provider: 'local' | 'cognito', tokens?: Tokens):
 });
 
 /** What a signed-out visitor sees: a way in (email and password, with a code by email on Cognito), the demo accounts, and a way to look around first. */
-export function Welcome({ onSession }: { onSession: (s: Session) => void }): React.JSX.Element {
+export function Welcome({ onSession, request }: { onSession: (s: Session) => void; request?: { view: 'signin' | 'signup'; n: number } }): React.JSX.Element {
   const [config, setConfig] = useState<AuthConfig | null>(null);
   const [view, setView] = useState<View>('start');
   const [email, setEmail] = useState('');
@@ -27,6 +27,8 @@ export function Welcome({ onSession }: { onSession: (s: Session) => void }): Rea
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { authConfig().then(setConfig, () => setProblem('Could not reach the server. Check your connection and reload.')); }, []);
+  // the header's Sign in / Create account buttons open the matching form
+  useEffect(() => { if (request) { setView(request.view); setProblem(undefined); setNote(undefined); setCode(''); } }, [request]);
   const client: CognitoClient | null = config?.cognito ? cognito(config.cognito) : null;
   const go = (v: View) => { setView(v); setProblem(undefined); setNote(undefined); setCode(''); };
   const tidy = (e: unknown) => (e instanceof AuthError || e instanceof ApiError || e instanceof Error ? e.message : 'Something went wrong. Try again in a moment.');

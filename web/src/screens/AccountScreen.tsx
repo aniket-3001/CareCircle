@@ -43,16 +43,6 @@ export function AccountScreen(): React.JSX.Element {
     }
   }
 
-  async function signOut(): Promise<void> {
-    await fetch('/v1/auth/signout', { method: 'POST', headers: { authorization: `Bearer ${app.session.keys.me}` } }).catch(() => undefined);
-    if (app.session.account?.provider === 'cognito' && app.session.account.tokens) {
-      const { cognito } = await import('../lib/cognito');
-      const cfg = await fetch('/v1/auth/config').then((r) => r.json() as Promise<{ cognito: { region: string; userPoolId: string; clientId: string } | null }>).catch(() => null);
-      if (cfg?.cognito) await cognito(cfg.cognito).signOut(app.session.account.tokens.accessToken).catch(() => undefined);
-    }
-    app.leave();
-  }
-
   async function deleteAccount(): Promise<void> {
     try {
       await acct.deleteAccount(confirm);
@@ -123,8 +113,9 @@ export function AccountScreen(): React.JSX.Element {
           <section className="card" aria-labelledby="sess-title">
             <h2 id="sess-title">Session</h2>
             <div className="row row--wrap">
-              <button type="button" className="btn btn--soft" onClick={() => void signOut()}><LogOut size={18} aria-hidden="true" /> Sign out</button>
-              {p.demo && <button type="button" className="btn btn--soft" onClick={() => void acct.resetDemo().then(() => { app.bump(); toast('The demo circle is back to its starting point.'); }, (e) => toast(e.message))}>Reset the demo circle</button>}
+              <button type="button" className="btn btn--soft" onClick={() => void app.signOut()}><LogOut size={18} aria-hidden="true" /> Sign out</button>
+              {p.demo && <button type="button" className="btn btn--soft" onClick={() => void acct.resetDemo().then(() => { app.bump(); toast('The demo circle is back to its starting point.'); }, (e) => toast(e.message))}>Reset demo data</button>}
+              {p.demo && <p className="muted small" style={{ flexBasis: '100%' }}>Reset demo data puts the shared demo circle (Asha) back to its starting medicines and history. Real circles are never affected.</p>}
             </div>
           </section>
 

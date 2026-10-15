@@ -1,4 +1,4 @@
-import { Info, ShieldCheck } from 'lucide-react';
+import { Info, LogOut, ShieldCheck } from 'lucide-react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Profile, Session } from './api/types';
@@ -37,6 +37,8 @@ export function App(): React.JSX.Element {
   const [about, setAbout] = useState(false);
   const [assistant, setAssistant] = useState<{ open: boolean; q?: string }>({ open: false });
   const [sev, setSev] = useState<SeverityKey>('none');
+  const [welcomeReq, setWelcomeReq] = useState<{ view: 'signin' | 'signup'; n: number } | undefined>();
+  const openAuth = (view: 'signin' | 'signup') => { setWelcomeReq((r) => ({ view, n: (r?.n ?? 0) + 1 })); window.scrollTo({ top: 0 }); };
 
   // each tab is a history entry, so Back walks through the tabs you visited before it leaves the app
   const go = useCallback((t: TabId) => {
@@ -51,6 +53,18 @@ export function App(): React.JSX.Element {
 
   const persist = useCallback((s: Session | null) => { saveSession(s); setSession(s); }, []);
   const reset = useCallback(() => { persist(null); setProfile(null); setProfileError(null); setAbout(false); setAssistant({ open: false }); setSev('none'); setWarp(0); }, [persist]);
+
+  const signOut = useCallback(async () => {
+    if (session?.account) {
+      await fetch('/v1/auth/signout', { method: 'POST', headers: { authorization: `Bearer ${session.keys.me}` } }).catch(() => undefined);
+      if (session.account.provider === 'cognito' && session.account.tokens) {
+        const { cognito } = await import('./lib/cognito');
+        const cfg = await fetch('/v1/auth/config').then((r) => r.json() as Promise<{ cognito: { region: string; userPoolId: string; clientId: string } | null }>).catch(() => null);
+        if (cfg?.cognito) await cognito(cfg.cognito).signOut(session.account.tokens.accessToken).catch(() => undefined);
+      }
+    }
+    reset();
+  }, [session, reset]);
 
   /** Everything about the account (name, circles, roles, linked chats) is read from the server; nothing is cached across sign-ins. */
   const refreshProfile = useCallback(async () => {
@@ -91,8 +105,8 @@ export function App(): React.JSX.Element {
   const state = useMemo<AppState | null>(() => session && {
     session, me: profile?.id ?? session.as, api: makeApi(session), acct, profile, circle, refreshProfile, selectCircle,
     rev, bump: () => setRev((r) => r + 1), warp, setWarp, isDemo: !!session.demoCircle || !!circle?.demo,
-    now: () => Date.now() + warp * 3_600_000, go, leave: reset, actAs, askAssistant: (q?: string) => setAssistant({ open: true, q }),
-  }, [session, acct, profile, circle, refreshProfile, selectCircle, rev, warp, go, reset, actAs]);
+    now: () => Date.now() + warp * 3_600_000, go, leave: reset, signOut, actAs, askAssistant: (q?: string) => setAssistant({ open: true, q }),
+  }, [session, acct, profile, circle, refreshProfile, selectCircle, rev, warp, go, reset, signOut, actAs]);
 
   // the page takes the colour of the most serious thing the record flags (the "level" wash)
   useEffect(() => {
@@ -146,6 +160,13 @@ export function App(): React.JSX.Element {
                     ))}
                   </fieldset>
                 )}
+                {!session && (
+                  <>
+                    <button type="button" className="btn btn--ghost btn--sm" onClick={() => openAuth('signin')} data-testid="top-signin">Sign in</button>
+                    <button type="button" className="btn btn--sm" onClick={() => openAuth('signup')} data-testid="top-signup" aria-label="Create account">Create<span className="wide-only"> account</span></button>
+                  </>
+                )}
+                {session && <button type="button" className="btn btn--ghost btn--sm" onClick={() => void signOut()} data-testid="top-signout"><LogOut size={16} aria-hidden="true" /> Sign out</button>}
                 {profile && (
                   <button type="button" className="avatar-btn" onClick={() => go('account')} aria-label={`Account: ${profile.name}`} data-testid="open-account">
                     {profile.name.charAt(0).toUpperCase()}
@@ -174,7 +195,7 @@ export function App(): React.JSX.Element {
                 {ready && !needsCircle && <Assistant open={assistant.open} initial={assistant.q} onClose={() => setAssistant({ open: false })} />}
               </AppCtx.Provider>
             ) : (
-              <main id="main"><Welcome onSession={start} /></main>
+              <main id="main"><Welcome onSession={start} request={welcomeReq} /></main>
             )}
           </div>
 
@@ -204,7 +225,6 @@ export function App(): React.JSX.Element {
               <h3>AI use</h3>
               <p>Built with substantial help from Claude via Claude Code. At runtime an optional Amazon Bedrock model structures text that OCR or speech recognition already read, and may phrase a helper answer from the record's facts; every quoted line must appear in the source text, answers are checked for advice and invented numbers, and a person confirms every entry.</p>
             </section>
-            {session && <button type="button" className="btn btn--soft" onClick={reset}>Leave this browser session</button>}
           </Sheet>
         </div>
       </ToastProvider>

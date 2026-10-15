@@ -29,6 +29,8 @@ export interface AppState {
   go: (tab: TabId) => void;
   /** Forget this browser's session and return to the welcome screen. */
   leave: () => void;
+  /** End the session on the server (and at Cognito), then return to the sign-in page. */
+  signOut: () => Promise<void>;
   /** Switch which carer is acting (anonymous demo only). */
   actAs: (agent: string) => void;
   /** Open the helper assistant. */
