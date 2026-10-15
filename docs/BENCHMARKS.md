@@ -39,6 +39,21 @@ With no overlap all systems agree (0 conflicts). The graph approach redoes only 
 and never overwrites silently; at 50% overlap it is slower in wall time than OCC in this model because resolution writes go through one
 graph. The point is lost work and safety, not speed. Synthetic; OCC/lock/LWW are models, not measured systems.
 
+## B6 Retrieval: lexical vs graph vs vector vs hybrid (`bench/retrieval_bench.py`)
+
+30 hand-written facts, 28 questions with one expected fact each (recall@3). Embeddings: BAAI/bge-small-en-v1.5 (CPU, `fastembed`) stored as
+`Fact.embedding` behind a FalkorDB vector index; hybrid fuses the graph list and the vector list by reciprocal rank.
+
+| system | exact (n=10) | paraphrase (n=12) | multi-hop (n=6) |
+|---|---|---|---|
+| lexical entity match | 1.00 | 0.17 | 0.00 |
+| graph (lexical + 2-hop expansion) | 1.00 | 0.17 | 0.50 |
+| vector only | 1.00 | 1.00 | 0.00 |
+| hybrid (graph + vector, RRF) | 1.00 | 1.00 | 0.50 |
+
+Each retrieval kind wins where its mechanism applies, and hybrid keeps both. Small, hand-written and authored by the same people who built the
+system: it shows the mechanism, it is not a leaderboard number (no LoCoMo / LongMemEval claims).
+
 ## B4 Real git history (`bench/real_history.py`)
 
 Question: given a file, which other files change in the same commit? The graph (imports, calls, co-change counts) is built from

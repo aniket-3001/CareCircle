@@ -20,6 +20,7 @@ from typing import Awaitable, Callable, Iterable, Optional
 
 from .db import Db, new_id, norm, now_ms
 from .codegraph import CodeGraphMixin
+from .embed import get_embedder
 from .extract import RuleExtractor
 
 STOP = set("a an and are as at be by did do does for from has have how i in is it of on or that the this to was "
@@ -169,6 +170,10 @@ class TenantMemory(CodeGraphMixin):
             {"skey": skey, "okey": okey, "pred": pred, "sname": subject.strip(), "oname": obj.strip(), "ts": ts,
              "fid": fid, "vf": valid_from or ts, "conf": float(conf), "excl": exclusive, "agent": agent or self.agent})
         fid, support = rows[0][0], rows[0][1]
+        emb = get_embedder()
+        if emb is not None and support == 1:        # new fact: store its vector (reinforcing an existing fact keeps the old one)
+            vec = (await emb.embed([f"{subject} {predicate} {obj}"]))[0]
+            await self._q("MATCH (f:Fact {id:$fid}) SET f.embedding = vecf32($v)", {"fid": fid, "v": vec})
         src = list(sources)
         if src:
             await self._q("MATCH (f:Fact {id:$fid}) UNWIND $src AS eid MATCH (e:Episode {id:eid}) "
@@ -193,9 +198,13 @@ class TenantMemory(CodeGraphMixin):
             superseded = [x[0] for x in r]
         return {"id": fid, "created": support == 1, "support": support, "superseded": superseded}
 
-    async def recall(self, query: str, *, as_of: Optional[int] = None, hops: int = 2, limit: int = 10) -> list[dict]:
+    async def recall(self, query: str, *, as_of: Optional[int] = None, hops: int = 2, limit: int = 10,
+                     mode: str = "hybrid") -> list[dict]:
         """Entity-anchored graph recall. Every result carries its provenance (source episodes) and the graph path
-        that reached it. `as_of` answers 'what did we believe at time T'."""
+        that reached it. `as_of` answers 'what did we believe at time T'. `mode`: 'hybrid' (default: graph recall, plus vector
+        matches fused by reciprocal rank when embeddings are enabled), 'lexical' (graph only) or 'vector' (vector only)."""
+        if mode not in ("hybrid", "lexical", "vector"):
+            raise ValueError("mode must be 'hybrid', 'lexical' or 'vector'")
         toks = tokens(query)
         if not toks:
             return []
@@ -206,7 +215,7 @@ class TenantMemory(CodeGraphMixin):
         ret = "{f}.id, {f}.sname, {f}.pred, {f}.otext, {f}.support, {f}.conf, {f}.valid_from, {f}.valid_to, {f}.cur"
         found: dict[str, dict] = {}
 
-        rows = await self._q(
+        rows = [] if mode == "vector" else await self._q(
             f"""MATCH (en:Entity) WHERE any(t IN $toks WHERE en.key CONTAINS t)
                 WITH en  // FalkorDB: without this WITH the next MATCH silently returns no rows
                 MATCH (en)<-[:SUBJECT|OBJECT]-(f:Fact) WHERE {valid.format(f='f')}
@@ -215,7 +224,21 @@ class TenantMemory(CodeGraphMixin):
             cov = sum(t in r[10] for t in toks) / len(toks)
             found[r[0]] = self._fact_row(r, hop=1, path=f"{r[9]} -> [{r[1]} {r[2]} {r[3]}]", base=1.0 + cov)
 
-        if hops >= 2:
+        emb = get_embedder() if mode != "lexical" else None
+        vfound: dict[str, dict] = {}
+        if emb is not None:     # semantic candidates: nearest fact vectors to the query, valid at as_of
+            qv = (await emb.embed([query]))[0]
+            vrows = await self._q(
+                f"""CALL db.idx.vector.queryNodes('Fact', 'embedding', $k, vecf32($qv)) YIELD node, score
+                    WITH node AS f, score WHERE {valid.format(f='f')}
+                    RETURN {ret.format(f='f')}, score""", {"k": limit * 3, "qv": qv, "asof": asof}, scope="read", checked=True)
+            for r in vrows:
+                sim = 1.0 - r[9]
+                if sim >= 0.45:
+                    vfound[r[0]] = self._fact_row(r, hop=1, path=f"vector match (cosine {sim:.2f}) -> [{r[1]} {r[2]} {r[3]}]",
+                                                  base=sim)
+
+        if hops >= 2 and mode != "vector":
             rows = await self._q(
                 f"""MATCH (en:Entity) WHERE any(t IN $toks WHERE en.key CONTAINS t)
                     WITH en
@@ -230,10 +253,24 @@ class TenantMemory(CodeGraphMixin):
                 path =f"{r[9]} -> [{r[11]} {r[12]} {r[13]}] -> {r[10]} -> [{r[1]} {r[2]} {r[3]}]"
                 found[r[0]] = self._fact_row(r, hop=2, path=path, base=0.4)
 
-        items = list(found.values())
-        for it in items:
-            it["score"] = round(it.pop("_base") * (1 + math.log(it["support"])) * it["conf"], 4)
-        items.sort(key=lambda x: -x["score"])
+        def scored(d: dict) -> list[dict]:
+            out = list(d.values())
+            for it in out:
+                it["score"] = round(it.pop("_base") * (1 + math.log(it["support"])) * it["conf"], 4)
+            return sorted(out, key=lambda x: -x["score"])
+
+        graph_items, vec_items = scored(found), scored(vfound)
+        if graph_items and vec_items:     # hybrid: reciprocal rank fusion of the two ranked lists
+            fused: dict[str, dict] = {}
+            for lst in (graph_items, vec_items):
+                for rank, it in enumerate(lst):
+                    cur = fused.setdefault(it["id"], dict(it, score=0.0))
+                    cur["score"] += 1.0 / (60 + rank)
+            items = sorted(fused.values(), key=lambda x: -x["score"])
+            for it in items:
+                it["score"] = round(it["score"], 5)
+        else:
+            items = graph_items or vec_items
         items = items[:limit]
         if items:
             prov = await self._q(
@@ -252,6 +289,19 @@ class TenantMemory(CodeGraphMixin):
     def _fact_row(r, hop: int, path: str, base: float) -> dict:
         return dict(id=r[0], subject=r[1], predicate=r[2], object=r[3], support=r[4], conf=r[5], valid_from=r[6],
                     valid_to=r[7], current=r[8], hop=hop, path=path, provenance=[], _base=base)
+
+    async def embed_missing(self, limit: int = 200) -> dict:
+        """Backfill vectors for current facts that have none (e.g. after enabling embeddings on an existing graph)."""
+        emb = get_embedder()
+        if emb is None:
+            raise ValueError("embeddings are disabled (set GRAPHMEM_EMBEDDINGS=1 and install fastembed)")
+        rows = await self._q("MATCH (f:Fact) WHERE f.embedding IS NULL AND f.cur = true AND coalesce(f.forgotten,false) = false "
+                             "RETURN f.id, f.sname, f.pred, f.otext LIMIT $n", {"n": limit})
+        if rows:
+            vecs = await emb.embed([f"{r[1]} {r[2]} {r[3]}" for r in rows])
+            for r, v in zip(rows, vecs):
+                await self._q("MATCH (f:Fact {id:$id}) SET f.embedding = vecf32($v)", {"id": r[0], "v": v}, checked=True)
+        return {"embedded": len(rows)}
 
     async def fact_history(self, subject: str, predicate: str) -> list[dict]:
         """Full bi-temporal chain for (subject, predicate): every value ever held, oldest first."""
@@ -522,7 +572,7 @@ class TenantMemory(CodeGraphMixin):
             OPTIONAL MATCH (f)-[:SUBJECT|OBJECT]->(en:Entity)
             WITH f, collect(DISTINCT en.key) AS keys
             SET f.cur=false, f.valid_to=coalesce(f.valid_to,$ts), f.forgotten=true, f.otext='[forgotten]',
-                f.sname='[forgotten]', f.skey='', f.okey=''
+                f.sname='[forgotten]', f.skey='', f.okey='', f.embedding=null
             CREATE (:Tombstone {id:$tid, reason:$reason, at:$ts, by:$agent})-[:TOMBSTONES]->(f)
             RETURN keys
             """, {"fid": fact_id, "ts": now_ms(), "tid": new_id("tomb"), "reason": reason, "agent": self.agent})

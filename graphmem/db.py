@@ -171,6 +171,12 @@ class Db:
             except Exception as e:  # idempotent
                 if "already" not in str(e).lower():
                     raise
+        if name != CTL_GRAPH and os.getenv("GRAPHMEM_EMBEDDINGS", "") in ("1", "true", "yes"):
+            try:
+                await g.query("CREATE VECTOR INDEX FOR (f:Fact) ON (f.embedding) OPTIONS {dimension:384, similarityFunction:'cosine'}")
+            except Exception as e:
+                if "already" not in str(e).lower():
+                    raise
         if name != CTL_GRAPH:   # full-text index for search_text (DDL form; the procedure form is rejected by FalkorDB 6.x)
             try:
                 await g.query("CREATE FULLTEXT INDEX FOR (e:Episode) ON (e.content)")

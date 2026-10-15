@@ -17,7 +17,7 @@ OPS = {
     # episodic
     "add_episode": "write", "ingest": "write", "history": "read", "sessions": "read", "search_episodes": "read", "search_text": "read",
     # semantic
-    "assert_fact": "write", "recall": "read", "fact_history": "read", "forget_fact": "write",
+    "assert_fact": "write", "recall": "read", "fact_history": "read", "embed_missing": "write", "forget_fact": "write",
     # procedural
     "add_skill": "write", "record_run": "write", "best_skills": "read", "skill_runs": "read",
     # coordination
