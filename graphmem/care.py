@@ -54,6 +54,7 @@ class CareMixin:
             """
             MERGE (p:Person {id:$p}) ON CREATE SET p.role='patient'
             MERGE (dr:Drug {name:$d})
+            MERGE (au:Person {id:$by}) ON CREATE SET au.role='carer'
             CREATE (x:Dose {id:$id, drug:$d, dose_text:$dt, freq_text:$ft, valid_from:$ts, cur:false, action:$a, status:$st,
                             source_type:$src, quote:$q, verified:$v, by:$by, at:$ts})
             CREATE (x)-[:FOR]->(p) CREATE (x)-[:OF]->(dr)
