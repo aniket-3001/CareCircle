@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Async } from '../components/Async';
 import { Flags } from '../components/Flags';
 import { Hero } from '../components/Hero';
+import { MedActions } from '../components/MedActions';
 import { PageHead } from '../components/PageHead';
 import { Pill } from '../components/Pill';
 import { Scale } from '../components/Scale';
@@ -69,9 +70,12 @@ export function TodayScreen(): React.JSX.Element {
                             </div>
                             {r.quote && <div className="item__sub">“{r.quote}”</div>}
                           </div>
-                          <button type="button" className="btn btn--ghost btn--sm" onClick={() => app.go('graph')}>
-                            In graph
-                          </button>
+                          <div className="row no-print">
+                            <button type="button" className="btn btn--ghost btn--sm" onClick={() => app.go('graph')}>
+                              In graph
+                            </button>
+                            <MedActions r={r} />
+                          </div>
                         </motion.div>
                       );
                     })}

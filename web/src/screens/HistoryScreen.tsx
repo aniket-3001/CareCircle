@@ -1,4 +1,4 @@
-import { Download, ShieldCheck, Trash2 } from 'lucide-react';
+import { Download, Printer, ShieldCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Async } from '../components/Async';
 import { Hero } from '../components/Hero';
@@ -6,6 +6,7 @@ import { PageHead } from '../components/PageHead';
 import { Pill } from '../components/Pill';
 import { Sheet } from '../components/Sheet';
 import { useToast } from '../components/Toast';
+import { Flags } from '../components/Flags';
 import { nameOf, plural, title, when } from '../lib/format';
 import { useApp, useLoad } from '../state';
 
@@ -86,6 +87,7 @@ export function HistoryScreen(): React.JSX.Element {
             <p className="muted">Take the regimen with you, or remove it. Removing leaves only a receipt: a hash of what was removed, who did it and when.</p>
             <div className="row row--wrap">
               <button type="button" className="btn btn--soft" onClick={() => void exportFhir()}><Download size={18} aria-hidden="true" /> Export as FHIR (JSON)</button>
+              <button type="button" className="btn btn--soft" onClick={() => window.print()}><Printer size={18} aria-hidden="true" /> Print a summary</button>
               <button type="button" className="btn btn--soft" style={{ color: '#b0413e' }} onClick={() => setErase(true)}><Trash2 size={18} aria-hidden="true" /> Remove everything about {title(app.session.person)}</button>
             </div>
             <Async state={receipts}>
@@ -125,6 +127,7 @@ export function HistoryScreen(): React.JSX.Element {
         </div>
       </div>
 
+      <PrintSummary />
       <Sheet open={forgetting !== null} title="Remove this entry for good?" onClose={() => setForgetting(null)}>
         <p>Its medicine, dose, quoted line, links and acknowledgements are deleted from the graph and cannot be brought back. A receipt with a hash of what was removed stays.</p>
         <label className="field">Reason (optional)<input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. entered by mistake" /></label>
@@ -135,6 +138,27 @@ export function HistoryScreen(): React.JSX.Element {
         <label className="field">Type “{app.session.person}”<input type="text" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" /></label>
         <button type="button" className="btn btn--danger" disabled={typed.trim().toLowerCase() !== app.session.person.toLowerCase()} onClick={() => void doErase()}>Remove everything</button>
       </Sheet>
+    </div>
+  );
+}
+
+/** Shown only when printing: one page a carer can hand to a pharmacist or doctor. It is the record as it stands, with its sources, and says plainly that it is not advice. */
+function PrintSummary(): React.JSX.Element {
+  const app = useApp();
+  const now = useLoad((a) => a.api.check());
+  return (
+    <div className="print-only" aria-hidden="true">
+      <h1>Medicines on record for {title(app.session.person)}</h1>
+      <p>Prepared {new Date().toLocaleString()} by Care Circle{app.profile ? ` for ${app.profile.name}` : ''}. This is a list of what carers recorded, checked against public interaction data. It is not medical advice and not a prescription.</p>
+      {now.data && (
+        <>
+          <h2>Medicines</h2>
+          <ul>{now.data.regimen.map((r) => <li key={r.id}><b>{title(r.drug)}</b> {r.dose_text} {r.freq_text} (recorded by {nameOf(r.by)}, {r.source})</li>)}</ul>
+          <h2>What the sources list for these medicines</h2>
+          <Flags check={now.data} />
+          <p>{now.data.notice}</p>
+        </>
+      )}
     </div>
   );
 }

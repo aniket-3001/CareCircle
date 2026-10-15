@@ -18,7 +18,7 @@ export function CircleScreen(): React.JSX.Element {
   const toast = useToast();
   const t = app.now();
   const div = useLoad((a) => a.api.divergence(a.now()), [app.warp]);
-  const nudges = useLoad((a) => a.api.nudges(a.now()), [app.warp]);
+  const nudges = useLoad((a) => a.api.reminders(a.now()), [app.warp]);
 
   async function ack(dose: string): Promise<void> {
     try {
@@ -45,7 +45,7 @@ export function CircleScreen(): React.JSX.Element {
                     <motion.section key={c} className="person" style={{ ['--chip' as string]: lv.solid }} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} aria-label={`${nameOf(c)}: ${plural(v.unacknowledged.length, 'unseen change')}`}>
                       <div className="person-top">
                         <div>
-                          <h3>{nameOf(c)}{c === app.session.as ? ' (you)' : ''}</h3>
+                          <h3>{nameOf(c)}{c === app.me ? ' (you)' : ''}</h3>
                           <div className="person-num">
                             <strong className="tnum">{v.unacknowledged.length}</strong>
                             <span>{v.unacknowledged.length === 1 ? 'change not seen' : 'changes not seen'}</span>
@@ -64,7 +64,7 @@ export function CircleScreen(): React.JSX.Element {
                                 <div className="item__title">{title(u.drug)} {u.action === 'stop' ? 'stopped' : 'changed'}</div>
                                 <div className="item__sub">{ago(t - u.age_hours * 3_600_000, t)}</div>
                               </div>
-                              {c === app.session.as && <button type="button" className="btn btn--sm" onClick={() => void ack(u.dose)}>I have seen this</button>}
+                              {c === app.me && <button type="button" className="btn btn--sm" onClick={() => void ack(u.dose)}>I have seen this</button>}
                             </div>
                           ))}
                         </div>
@@ -80,11 +80,13 @@ export function CircleScreen(): React.JSX.Element {
           <Doses />
         </div>
         <div className="col">
-          <section className="card" aria-labelledby="warp-title">
-            <div className="row"><Clock size={20} strokeWidth={1.75} aria-hidden="true" /><h2 id="warp-title">Time warp</h2></div>
-            <p className="muted">Pretend it is later, to see reminders appear without waiting. Showing {app.warp === 0 ? 'now' : `now + ${app.warp} hours (${when(t)})`}.</p>
-            <Segmented name="warp" label="Hours to add to now" value={app.warp} onChange={app.setWarp} options={[{ value: 0, label: 'Now' }, { value: 6, label: '+6 h' }, { value: 13, label: '+13 h' }, { value: 24, label: '+1 day' }]} />
-          </section>
+          {app.isDemo && (
+            <section className="card" aria-labelledby="warp-title">
+              <div className="row"><Clock size={20} strokeWidth={1.75} aria-hidden="true" /><h2 id="warp-title">Time warp (demo only)</h2></div>
+              <p className="muted">Pretend it is later, to see reminders appear without waiting. Showing {app.warp === 0 ? 'now' : `now + ${app.warp} hours (${when(t)})`}. Real circles are always read as of now.</p>
+              <Segmented name="warp" label="Hours to add to now" value={app.warp} onChange={app.setWarp} options={[{ value: 0, label: 'Now' }, { value: 6, label: '+6 h' }, { value: 13, label: '+13 h' }, { value: 24, label: '+1 day' }]} />
+            </section>
+          )}
           <Async state={nudges}>
             {(n) => (
               <section className="card" aria-labelledby="nudge-title">
@@ -97,7 +99,7 @@ export function CircleScreen(): React.JSX.Element {
                       <div key={`${x.kind}${x.notify}${x.drug}`} className="item">
                         <div>
                           <div className="item__title">{x.message.text}</div>
-                          <div className="item__sub">to {nameOf(x.notify)} · {x.kind === 'escalate' ? 'escalation' : 'reminder'} · produced once</div>
+                          <div className="item__sub">to {nameOf(x.notify)} · {x.kind === 'escalate' ? 'escalation' : 'reminder'} · {x.delivered ? 'already sent to the chat' : 'sent once, to the linked chat'}</div>
                         </div>
                       </div>
                     ))}
@@ -147,7 +149,7 @@ function Doses(): React.JSX.Element {
               <input type="text" value={slot} onChange={(e) => setSlot(e.target.value)} />
             </label>
             <div className="row">
-              <button type="button" className="btn" disabled={!r.length} onClick={() => void give(drug || r[0]?.drug || '')}>Record as {nameOf(app.session.as)}</button>
+              <button type="button" className="btn" disabled={!r.length} onClick={() => void give(drug || r[0]?.drug || '')}>Record as {nameOf(app.me)}</button>
             </div>
           </div>
         )}
