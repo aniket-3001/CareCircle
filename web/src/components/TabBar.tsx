@@ -1,7 +1,9 @@
 import { CirclePlus, History, ListChecks, Share2, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 
-export type TabId = 'today' | 'add' | 'circle' | 'graph' | 'history';
+import type { TabId } from '../state';
+
+export type { TabId };
 
 const TABS = [
   { id: 'today', label: 'Today', Icon: ListChecks },
@@ -9,7 +11,7 @@ const TABS = [
   { id: 'circle', label: 'Circle', Icon: Users },
   { id: 'graph', label: 'Graph', Icon: Share2 },
   { id: 'history', label: 'History', Icon: History },
-] as const;
+] as const satisfies readonly { id: TabId; label: string; Icon: unknown }[];
 
 /** The five places to go, in a floating pill at the bottom of the screen; the highlight slides between them. */
 export function TabBar({ current, onSelect }: { current: TabId; onSelect: (t: TabId) => void }): React.JSX.Element {

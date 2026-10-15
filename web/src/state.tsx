@@ -1,22 +1,38 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { apiFor, type Api } from './api/client';
-import type { Session } from './api/types';
+import { accountApi, apiFor, type AccountApi, type Api } from './api/client';
+import type { CircleInfo, Profile, Session } from './api/types';
+
+export type TabId = 'today' | 'add' | 'circle' | 'graph' | 'history' | 'account';
 
 export interface AppState {
   session: Session;
+  /** The acting carer's agent id (an account's id, or the demo carer's), as the server records it. */
+  me: string;
   api: Api;
+  /** Account calls (profile, circles, invites). Null in the anonymous demo, which has no account. */
+  acct: AccountApi | null;
+  /** The signed-in person's profile, read from the server. Null in the anonymous demo. */
+  profile: Profile | null;
+  /** The circle that is open (name, role, members), read from the server. */
+  circle: CircleInfo | null;
+  /** Reload the profile and circles after a change. */
+  refreshProfile: () => Promise<void>;
+  selectCircle: (id: string) => void;
   /** Bumps after every change so screens reload. */
   rev: number;
   bump: () => void;
-  /** Hours added to "now" by the time-warp control, so reminders can be shown without waiting. */
+  /** Hours added to "now" by the time-warp control. Only offered in demo circles: a real record is always read as of now. */
   warp: number;
   setWarp: (h: number) => void;
+  isDemo: boolean;
   now: () => number;
-  go: (tab: 'today' | 'add' | 'circle' | 'graph' | 'history') => void;
+  go: (tab: TabId) => void;
   /** Forget this browser's session and return to the welcome screen. */
   leave: () => void;
-  /** Switch which carer is acting. */
+  /** Switch which carer is acting (anonymous demo only). */
   actAs: (agent: string) => void;
+  /** Open the helper assistant. */
+  askAssistant: (question?: string) => void;
 }
 
 export const AppCtx = createContext<AppState | null>(null);
@@ -27,6 +43,7 @@ export const useApp = (): AppState => {
 };
 
 export const makeApi = apiFor;
+export const makeAccountApi = accountApi;
 
 export interface Loaded<T> {
   data: T | undefined;
@@ -40,7 +57,7 @@ export function useLoad<T>(fn: (app: AppState) => Promise<T>, deps: unknown[] = 
   const [st, setSt] = useState<Loaded<T>>({ data: undefined, error: undefined, loading: true });
   const seq = useRef(0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const run = useCallback(fn, [app.rev, app.session.as, ...deps]);
+  const run = useCallback(fn, [app.rev, app.session.as, app.session.circle, ...deps]);
   useEffect(() => {
     const id = ++seq.current;
     setSt((s) => ({ ...s, loading: true }));

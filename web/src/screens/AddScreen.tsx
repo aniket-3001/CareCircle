@@ -140,7 +140,7 @@ export function AddScreen(): React.JSX.Element {
   );
 }
 
-function ProposalCard({ p, kind, sourceText, onDone }: { p: Proposal; kind: 'photo' | 'voice' | 'document' | 'typed'; sourceText: string; onDone: () => void }): React.JSX.Element {
+export function ProposalCard({ p, kind, sourceText, onDone }: { p: Proposal; kind: 'photo' | 'voice' | 'document' | 'typed'; sourceText: string; onDone: () => void }): React.JSX.Element {
   const app = useApp();
   const toast = useToast();
   const [drug, setDrug] = useState(p.drug_candidates[0]?.name ?? '');
