@@ -26,7 +26,7 @@ EMERGENCY_LINE = "If this is an emergency, call your local emergency number now 
 REFUSAL = ("I can't advise on taking, stopping, skipping or changing any medicine, or say whether something is safe: that is for a prescriber or pharmacist who "
            "knows the person. I can show what is on record, what the sources list for these medicines, and who has not yet seen a change.")
 HELP = ("I can tell you what is on record, who has not seen a change, what the sources flag and why, what changed recently, and which doses were recorded as given. "
-        "Say \"add warfarin 5 mg once daily\" and I will prepare an entry for you to confirm. I never give medical advice.")
+        "Say \"add warfarin 5 mg once daily\" and I will prepare an entry for you to confirm. This is a record, not medical advice.")
 
 EMERGENCY = re.compile(r"\b(emergency|overdos\w*|chest pain|can'?t breathe|cannot breathe|unconscious|collaps\w*|seizure|poison\w*|ambulance|suicid\w*)\b", re.I)
 ADVICE_Q = re.compile(
@@ -42,7 +42,8 @@ DOSES = re.compile(r"\b(given|gave|dose[sd]? (given|today|recorded)|who gave|slo
 REGIMEN = re.compile(r"\b(what (is|does|medicines?|meds?|drugs?)|which (medicines?|meds?|drugs?)|regimen|medicines?|medications?|meds|list|current|on record|takes?|taking)\b", re.I)
 HELPQ = re.compile(r"\b(help|what can you|how do (i|you)|who are you|what do you do|features?|how does (this|it) work)\b", re.I)
 ADD = re.compile(r"^\s*(please\s+)?(add|start|record|put|log|enter|include)\b\s*(a |an |the )?(medicine|medication|entry|drug)?\s*[:,-]?\s*", re.I)
-REASSURING = re.compile(r"\b(safe|safely|fine to|no risk|harmless|nothing to worry|no need to worry|healthy|recommend\w*|advis\w*|should|must)\b", re.I)
+REASSURING = re.compile(r"\b(safe|safely|fine to|no risk|harmless|nothing to worry|no need to worry|healthy|recommend\w*|advis\w*|should)\b", re.I)
+IMPERATIVE = re.compile(r"(^|[.!?]\s+)(take|stop|skip|give|double|halve|increase|decrease|reduce|avoid|continue|start|try|use|switch|swap|combine|mix)\b", re.I)
 URL = re.compile(r"https?://|www\.|```|\]\(|<[a-z/][^>]*>", re.I)
 
 
@@ -192,7 +193,7 @@ def _unmask(text: str, names: list[tuple[str, str]]) -> str:
 
 
 def usable(text: str, facts_text: str, question: str) -> bool:
-    if not text or len(text) > MAX_A or URL.search(text) or REASSURING.search(text) or scan_advice(text):
+    if not text or len(text) > MAX_A or URL.search(text) or REASSURING.search(text) or IMPERATIVE.search(text) or scan_advice(text):
         return False
     allowed = {float(n.replace(",", "")) for n in NUM.findall(facts_text + " " + question)}
     return all(float(n.replace(",", "")) in allowed for n in NUM.findall(text))
