@@ -1,0 +1,39 @@
+# Production-style stack: only Caddy (HTTPS) is exposed; FalkorDB and the app stay on the internal network.
+# Usage: DOMAIN=1-2-3-4.sslip.io GRAPHMEM_ADMIN_KEY=... docker compose -f deploy/docker-compose.prod.yml up -d --build
+# On AWS the app uses the instance role for Bedrock, so no keys are passed.
+services:
+  falkordb:
+    image: falkordb/falkordb:latest
+    environment:
+      REDIS_ARGS: "--appendonly yes --appendfsync everysec"
+    volumes: ["falkor-data:/var/lib/falkordb/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  api:
+    build: ..
+    environment:
+      GRAPHMEM_ADMIN_KEY: ${GRAPHMEM_ADMIN_KEY:?set GRAPHMEM_ADMIN_KEY}
+      FALKORDB_HOST: falkordb
+      CC_DEMO: ${CC_DEMO:-1}
+      CC_MODEL: ${CC_MODEL:-us.amazon.nova-pro-v1:0}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+    volumes: ["ref-data:/app/data/ref"]
+    depends_on:
+      falkordb: {condition: service_healthy}
+    restart: unless-stopped
+  caddy:
+    image: caddy:2
+    command: caddy reverse-proxy --from ${DOMAIN:?set DOMAIN} --to api:8000
+    ports: ["80:80", "443:443"]
+    volumes: ["caddy-data:/data"]
+    depends_on: [api]
+    restart: unless-stopped
+volumes:
+  falkor-data:
+  ref-data:
+  caddy-data:
