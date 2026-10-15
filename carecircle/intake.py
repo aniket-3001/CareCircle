@@ -93,18 +93,18 @@ def rule_proposals(text: str, checker) -> list[dict]:
         cands = checker.candidates(line, 3)
         if not cands or cands[0]["score"] < 0.8:                  # line must actually contain a drug name
             continue
-        quote, dose = line, DOSE_RE.search(line)
-        for nxt in lines[i + 1:i + 3]:                            # labels put the strength on a later line ("AcipHex" / "20mg"); the quote spans the lines between so it stays contiguous
-            if dose:
+        dose, freq, last = DOSE_RE.search(line), FREQ_RE.search(line), i
+        for k in range(i + 1, min(i + 4, len(lines))):            # labels spread a drug over lines: name / strength / "twice daily"
+            if dose and freq:
                 break
-            c2 = checker.candidates(nxt, 1)
+            c2 = checker.candidates(lines[k], 1)
             if c2 and c2[0]["score"] >= 0.8 and c2[0]["name"] != cands[0]["name"]:   # the next line names another drug: stop
                 break
-            quote = f"{quote} {nxt}"
-            dose = DOSE_RE.search(nxt)
-        if not dose:
-            quote = line                                          # nothing found ahead: quote only the drug line
-        freq = FREQ_RE.search(quote)
+            d2 = None if dose else DOSE_RE.search(lines[k])
+            f2 = None if freq else FREQ_RE.search(lines[k])
+            if d2 or f2:
+                dose, freq, last = dose or d2, freq or f2, k
+        quote = " ".join(lines[i:last + 1])                       # contiguous lines, so the quote still occurs in the source text
         key = (cands[0]["name"], dose.group(0).lower() if dose else "")
         if key in seen:
             continue
