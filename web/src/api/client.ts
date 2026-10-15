@@ -1,4 +1,4 @@
-import type { DrugInfo, Recalls, SoleKnowers,
+import type { DrugInfo, Reading, Trend, Recalls, SoleKnowers,
   Account, AuthConfig, CareGraph, ChatMessage, CheckResult, Divergence, FhirBundle, GiveRecord, GiveResult, Hubs, IntakeResult, Invite, Member, Reminder, People,
   Profile, Receipt, RegimenEntry, Session, TimelineEvent, CircleInfo,
 } from './types';
@@ -35,6 +35,10 @@ export function apiFor(s: Session) {
     drugInfo: (drug: string) => op<DrugInfo>('care_drug_info', { drug }),
     recalls: () => op<Recalls>('care_recalls', { person: p }),
     soleKnowers: () => op<SoleKnowers>('care_sole_knowers', { person: p }),
+    measure: (kind: string, value: number, unit: string, at?: number) => op<Reading>('care_measure', { person: p, kind, value, unit, ...(at ? { at } : {}) }),
+    measures: (kind = '') => op<Reading[]>('care_measures', { person: p, kind, limit: 200 }),
+    forgetMeasure: (id: string) => op<{ removed: string }>('care_forget_measure', { measure_id: id }),
+    trend: (kind: string, drug = '', now = Date.now()) => op<Trend>('care_trend', { person: p, kind, drug, now }),
     people: () => op<People>('care_people'),
     divergence: (now: number) => op<Divergence>('care_divergence', { person: p, now }),
     reminders: (now: number) => op<Reminder[]>('care_reminders', { person: p, now }),

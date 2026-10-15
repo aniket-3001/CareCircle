@@ -278,3 +278,9 @@ export interface DrugInfo {
 export interface Recall { drug: string; number: string; class: string; firm: string; reason: string; product: string; reported: string; source: string }
 export interface Recalls { checked: string[]; available: boolean; recalls: Recall[]; note: string }
 export interface SoleKnowers { carers: string[]; sole: { dose: string; drug: string; only: string; since: number }[]; keystone: string | null; keystone_count: number }
+
+export interface Reading { id: string; kind: string; label: string; value: number; unit: string; at: number; by: string; note: string }
+export interface Trend {
+  kind: string; label: string; units: string[]; series: Reading[]; drug: string; window_days: number; note: string;
+  changes: { dose: string; at: number; action: string; text: string; before: { n: number; mean: number | null }; after: { n: number; mean: number | null } }[];
+}

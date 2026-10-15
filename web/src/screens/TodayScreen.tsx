@@ -7,6 +7,7 @@ import { DrugInfo } from '../components/DrugInfo';
 import { MedActions } from '../components/MedActions';
 import { PageHead } from '../components/PageHead';
 import { Pill } from '../components/Pill';
+import { Readings } from '../components/Readings';
 import { Recalls } from '../components/Recalls';
 import { Scale } from '../components/Scale';
 import { ago, nameOf, plural, title } from '../lib/format';
@@ -90,6 +91,7 @@ export function TodayScreen(): React.JSX.Element {
             </div>
             <div className="col">
               <Scale check={c} />
+              <Readings />
               <Recalls />
               <section className="card" aria-labelledby="sources-title">
                 <h2 id="sources-title">{t('Where the flags come from')}</h2>
