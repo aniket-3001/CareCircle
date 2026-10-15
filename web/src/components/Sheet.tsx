@@ -4,6 +4,20 @@ import { useEffect, useRef, type ReactNode } from 'react';
 /** A sheet on the native <dialog> element (focus trap, Escape to close and the backdrop come from the browser). */
 export function Sheet({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: ReactNode }): React.JSX.Element {
   const ref = useRef<HTMLDialogElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  // An open sheet owns one history entry, so the browser's Back button closes it instead of leaving the site.
+  useEffect(() => {
+    if (!open) return;
+    let popped = false;
+    window.history.pushState({ ccSheet: true }, '');
+    const onPop = () => { popped = true; close.current(); };
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      if (!popped && (window.history.state as { ccSheet?: boolean } | null)?.ccSheet) window.history.back();
+    };
+  }, [open]);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
