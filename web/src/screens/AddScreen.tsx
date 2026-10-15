@@ -154,7 +154,7 @@ export function ProposalCard({ p, kind, sourceText, onDone }: { p: Proposal; kin
     try {
       const r = await app.api.record({ drug, dose_text: dose, freq_text: freq, source_type: kind, quote: p.quote, source_text: sourceText || p.quote });
       await app.api.confirm(r.id);
-      toast(`Saved ${title(drug)}. The other carers will be asked to acknowledge it.`);
+      toast(`Saved ${title(drug)}. ${r.warning ? `${r.warning} ` : ''}The other carers will be asked to acknowledge it.`);
       app.bump();
       onDone();
       app.go('today');

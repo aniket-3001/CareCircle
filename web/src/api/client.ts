@@ -53,7 +53,7 @@ export function apiFor(s: Session) {
     reminders: (now: number) => op<Reminder[]>('care_reminders', { person: p, now }),
     ack: (dose_id: string) => op<{ id: string }>('care_ack', { dose_id }),
     record: (args: { drug: string; action?: 'set' | 'stop'; dose_text: string; freq_text: string; source_type: string; quote: string; source_text: string }) =>
-      op<{ id: string; status: string }>('care_record', { person: p, confirm: false, ...args }),
+      op<{ id: string; status: string; warning?: string }>('care_record', { person: p, confirm: false, ...args }),
     confirm: (dose_id: string) => op<{ id: string }>('care_confirm', { dose_id }),
     give: (drug: string, slot: string) => op<GiveResult>('care_give', { person: p, drug, slot }),
     gives: () => op<GiveRecord[]>('care_gives', { person: p }),

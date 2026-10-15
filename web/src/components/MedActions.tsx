@@ -22,7 +22,7 @@ export function MedActions({ r }: { r: RegimenEntry }): React.JSX.Element {
     try {
       const rec = await app.api.record({ drug: r.drug, action, dose_text: action === 'stop' ? r.dose_text : dose, freq_text: action === 'stop' ? r.freq_text : freq, source_type: 'typed', quote: '', source_text: '' });
       await app.api.confirm(rec.id);
-      toast(action === 'stop' ? `${title(r.drug)} recorded as stopped. The other carers will be asked to acknowledge it.` : `${title(r.drug)} updated. The other carers will be asked to acknowledge it.`);
+      toast(rec.warning ? `${title(r.drug)} updated. ${rec.warning}` : action === 'stop' ? `${title(r.drug)} recorded as stopped. The other carers will be asked to acknowledge it.` : `${title(r.drug)} updated. The other carers will be asked to acknowledge it.`);
       setMode(null);
       app.bump();
     } catch (e) {
