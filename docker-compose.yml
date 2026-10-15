@@ -19,9 +19,18 @@ services:
       GRAPHMEM_ADMIN_KEY: ${GRAPHMEM_ADMIN_KEY:?set GRAPHMEM_ADMIN_KEY}
       FALKORDB_HOST: falkordb
       GRAPHMEM_RO_PASSWORD: ${GRAPHMEM_RO_PASSWORD:-}   # set to run read operations as a GRAPH.RO_QUERY-only database user
+      CC_DEMO: ${CC_DEMO:-1}                            # public "Start a demo circle" button (synthetic data only)
+      CC_MODEL: ${CC_MODEL:-us.amazon.nova-pro-v1:0}    # Bedrock model for reading labels; CC_LLM=0 disables it (rules only)
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}      # optional: run the Telegram bot too
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+    volumes: ["ref-data:/app/data/ref"]              # reference data cache: downloaded once, reused on rebuilds
     ports: ["${API_PORT:-8000}:8000"]
     depends_on:
       falkordb: {condition: service_healthy}
     restart: unless-stopped
 volumes:
   falkor-data:
+  ref-data:
