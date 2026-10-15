@@ -1,5 +1,5 @@
 import { forceCollide, forceLink, forceManyBody, forceRadial, forceSimulation, type Simulation, type SimulationLinkDatum, type SimulationNodeDatum } from 'd3-force';
-import { Maximize2, Minus, Pause, Play, Plus } from 'lucide-react';
+import { Expand, Scan, Minimize2, Minus, Pause, Play, Plus } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { GraphEdge, GraphNode } from '../api/types';
 import { KIND, clip, edgeClass, glyphFor, isFlagged, isMajor, majorDrugs, type Visible } from './model';
@@ -43,6 +43,18 @@ export function KnowledgeGraph({ visible, selection, onSelect, replayKey }: Prop
   const stretch = useRef(1); // the layout is computed on a circle and stretched sideways on wide cards, so nodes keep their size
   const select = useRef(onSelect);
   select.current = onSelect;
+
+  // ---- full screen (the browser's Fullscreen API on the graph card; Esc leaves)
+  const [full, setFull] = useState(false);
+  useEffect(() => {
+    const f = () => setFull(document.fullscreenElement === wrap.current);
+    document.addEventListener('fullscreenchange', f);
+    return () => document.removeEventListener('fullscreenchange', f);
+  }, []);
+  const toggleFull = () => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void wrap.current?.requestFullscreen?.().catch(() => undefined);
+  };
 
   // ---- size
   useEffect(() => {
@@ -297,7 +309,8 @@ export function KnowledgeGraph({ visible, selection, onSelect, replayKey }: Prop
       <div className="kg__ctl">
         <button type="button" aria-label="Zoom in" onClick={() => zoomBy(1.25)}><Plus size={18} aria-hidden="true" /></button>
         <button type="button" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.25)}><Minus size={18} aria-hidden="true" /></button>
-        <button type="button" aria-label="Fit to view" onClick={() => fit(true)}><Maximize2 size={17} aria-hidden="true" /></button>
+        <button type="button" aria-label="Fit to view" onClick={() => fit(true)}><Scan size={17} aria-hidden="true" /></button>
+        <button type="button" aria-label={full ? 'Exit full screen' : 'Full screen'} aria-pressed={full} onClick={toggleFull}>{full ? <Minimize2 size={17} aria-hidden="true" /> : <Expand size={17} aria-hidden="true" />}</button>
         <button type="button" aria-label="Pause motion" aria-pressed={still} onClick={() => setStill((s) => !s)}>{still ? <Play size={17} aria-hidden="true" /> : <Pause size={17} aria-hidden="true" />}</button>
       </div>
       <div className="kg__legend" aria-hidden="true">

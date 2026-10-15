@@ -53,3 +53,7 @@
 .neighbours button:hover { background: var(--blue-soft); }
 .dot { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--nc, var(--blue)); }
 @media (prefers-reduced-motion: reduce) { .kg__draw { stroke-dashoffset: 0; } .kg__flow, .kg__halo { animation: none; } }
+
+/* full screen: the graph fills the display */
+.kg:fullscreen { border-radius: 0; width: 100vw; height: 100vh; }
+.kg:fullscreen .kg__svg { height: 100vh; }
