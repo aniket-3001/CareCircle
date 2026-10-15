@@ -47,6 +47,7 @@ class Checker:
             seen_paths.add((x, rel, enz, y))
             mech.append({"kind": "enzyme_path", "path": f"{x} -{rel}({strength})-> {enz} <-SUBSTRATE_OF- {y}",
                          "meaning": f"{x} may {kind} {y} via {enz}", "weight": w, "also_in_ddinter": key in pairs,
+                         "x": x, "y": y, "enzyme": enz, "relation": rel, "strength": strength,
                          "source": f"FDA CYP index table; substrate: {src}"})
             weights.append(w) if key not in pairs else None
         return {"checked": d, "not_in_reference": sorted(set(d) - known), "direct": direct, "unrated": unrated,

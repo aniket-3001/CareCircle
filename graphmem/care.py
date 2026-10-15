@@ -28,6 +28,13 @@ SOURCES = ("typed", "photo", "voice", "document")
 H = 3_600_000
 
 
+def _get_algos() -> Algos:
+    global _algos
+    if _algos is None:
+        _algos = Algos(os.getenv("FALKORDB_HOST", "localhost"), int(os.getenv("FALKORDB_PORT", "6379")))
+    return _algos
+
+
 def checker() -> Checker:
     global _checker
     if _checker is None:
@@ -203,9 +210,7 @@ class CareMixin:
     async def care_hubs(self, person: str) -> dict:
         """Graph-algorithm views: which medicines sit in most hazards within this regimen, and the PageRank hubs of the reference graph
         (each with the Cypher that ran)."""
-        global _algos
-        if _algos is None:
-            _algos = Algos(os.getenv("FALKORDB_HOST", "localhost"), int(os.getenv("FALKORDB_PORT", "6379")))
+        algos = _get_algos()
         reg = await self.care_regimen(person)
-        return {"regimen_hubs": await asyncio.to_thread(_algos.regimen_hubs, [r["drug"] for r in reg]),
-                "global_hubs": await asyncio.to_thread(_algos.hub_drugs, 10)}
+        return {"regimen_hubs": await asyncio.to_thread(algos.regimen_hubs, [r["drug"] for r in reg]),
+                "global_hubs": await asyncio.to_thread(algos.hub_drugs, 10)}

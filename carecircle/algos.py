@@ -29,6 +29,15 @@ class Algos:
         r["rows"] = [{"drug": a, "score": round(b, 5)} for a, b in r["rows"]]
         return r
 
+    def drug_profile(self, drugs: list[str]) -> dict:
+        """Interaction counts per drug by listed severity (DDInter), for the metadata shown on a graph node."""
+        rows = self.g.ro_query("UNWIND $d AS n MATCH (:Drug {name:n})-[r:INTERACTS]-() RETURN n, r.level, count(r)", {"d": drugs}).result_set
+        out = {d: {"levels": {}, "total": 0} for d in drugs}
+        for n, lvl, c in rows:
+            out[n]["levels"][str(lvl).lower()] = c
+            out[n]["total"] += c
+        return out
+
     def clusters(self, n: int = 5) -> dict:
         r = self._run(Q_WCC, {"n": n})
         r["rows"] = [{"component": a, "size": b, "sample": c} for a, b, c in r["rows"]]
