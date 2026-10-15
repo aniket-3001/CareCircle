@@ -93,6 +93,14 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
     limiter = RateLimiter(rate_per_minute if rate_per_minute is not None else int(os.getenv("GRAPHMEM_RATE_PER_MIN", "600")))
     bad_auth = RateLimiter(30)                # unauthenticated attempts per client IP per minute
 
+    @app.on_event("startup")
+    async def _telegram():                    # optional front door: set TELEGRAM_BOT_TOKEN to poll Telegram in this process
+        token = os.getenv("TELEGRAM_BOT_TOKEN")
+        if token:
+            import asyncio
+            from carecircle import telegram
+            app.state.tg = asyncio.create_task(telegram.poll(gm, token))
+
     async def agent_id(request: Request, authorization: Optional[str] = Header(None)) -> str:
         ip = request.client.host if request.client else "?"
         who = await gm.authenticate(_bearer(authorization))
