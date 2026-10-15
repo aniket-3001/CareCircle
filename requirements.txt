@@ -9,6 +9,7 @@ pillow
 numpy
 rapidocr-onnxruntime
 faster-whisper
+av>=14,<19            # av 19 dropped an option faster-whisper 1.2 passes: voice notes failed with a TypeError
 pypdf
 python-docx
 # tests

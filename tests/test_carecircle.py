@@ -248,3 +248,24 @@ async def test_a_carer_who_only_records_still_gets_reminders(gm):
     await c["meena"].care_record("asha", "fluconazole", at=old)
     due = await c["ravi"].care_nudges("asha")
     assert [(n["kind"], n["notify"]) for n in due if n["drug"] == "fluconazole"] == [("remind", "ravi")]
+
+
+def test_speech_decodes_a_telegram_style_opus_voice_note():
+    """Regression: a voice note (Ogg/Opus, as Telegram sends it) must decode and transcribe without raising."""
+    import io, math, struct, wave
+    import av
+    buf = io.BytesIO()
+    w = wave.open(buf, "wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
+    w.writeframes(b"".join(struct.pack("<h", int(6000 * math.sin(i / 15))) for i in range(24000))); w.close()
+    buf.seek(0)
+    out = io.BytesIO()
+    src, dst = av.open(buf), av.open(out, "w", format="ogg")
+    st = dst.add_stream("libopus", rate=48000); st.layout = "mono"
+    rs = av.AudioResampler(format="s16", layout="mono", rate=48000)
+    for fr in src.decode(audio=0):
+        for f in rs.resample(fr):
+            for p in st.encode(f): dst.mux(p)
+    for p in st.encode(None): dst.mux(p)
+    dst.close()
+    src = intake.read_source(out.getvalue(), "voice/file_3.oga", "audio/ogg")
+    assert src["status"] in ("ok", "empty") and src["kind"] != "unknown"      # a tone has no words: 'empty' is fine, a crash is not
