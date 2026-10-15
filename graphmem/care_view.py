@@ -216,6 +216,8 @@ class CareViewMixin:
         for (drug, slot, by, at) in await self._q("MATCH (g:Give {person:$p}) RETURN g.drug, g.slot, g.by, g.at", {"p": p}, scope="read"):
             out.append({"at": at, "kind": "give", "who": who(by), "text": f"{who(by)} recorded {_title(drug)} as given for the {slot} slot.",
                         "quote": "", "when": iso(at), "ago": ago(at, t)})
+        for (kindm, val, unit, at, by) in await self._q("MATCH (m:Measurement)-[:FOR]->(:Person {id:$p}) RETURN m.kind, m.value, m.unit, m.at, m.by", {"p": p}, scope="read"):
+            out.append({"at": at, "kind": "measure", "who": who(by), "text": f"{who(by)} recorded {kindm.replace('_', ' ')} {val:g} {unit}.", "quote": "", "when": iso(at), "ago": ago(at, t)})
         for (rid, kind, at, by) in await self._q("MATCH (r:Receipt) RETURN r.id, r.kind, r.at, r.by", scope="read"):
             out.append({"at": at, "kind": "forget", "who": who(by), "text": f"{who(by)} removed {'an entry' if kind == 'dose' else 'all records of a person'} for good (receipt {rid}).",
                         "quote": "", "when": iso(at), "ago": ago(at, t)})
@@ -252,6 +254,7 @@ class CareViewMixin:
         gives = (await self._q("MATCH (g:Give {person:$p}) RETURN count(g)", {"p": p}))[0][0]
         digest = hashlib.sha256(json.dumps([p, sorted(ids)]).encode()).hexdigest()
         await self._q("MATCH (g:Give {person:$p}) DELETE g", {"p": p})
+        await self._q("MATCH (m:Measurement)-[:FOR]->(:Person {id:$p}) DETACH DELETE m", {"p": p})
         if ids:
             await self._q("UNWIND $ids AS i MATCH (n:Nudge) WHERE n.key CONTAINS i DELETE n", {"ids": ids})
             await self._q("MATCH (x:Dose)-[:FOR]->(:Person {id:$p}) DETACH DELETE x", {"p": p})
