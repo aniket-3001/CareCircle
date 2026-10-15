@@ -21,6 +21,8 @@ services:
       CC_DEMO: ${CC_DEMO:-1}
       CC_DEMO_MAX: ${CC_DEMO_MAX:-300}                  # oldest demo circle is deleted beyond this many
       CC_MODEL: ${CC_MODEL:-us.amazon.nova-pro-v1:0}
+      CC_COGNITO_POOL_ID: ${CC_COGNITO_POOL_ID:-}        # set both to sign people in with Amazon Cognito (email codes); empty = built-in email and password
+      CC_COGNITO_CLIENT_ID: ${CC_COGNITO_CLIENT_ID:-}
       AWS_REGION: ${AWS_REGION:-us-east-1}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     volumes: ["ref-data:/app/data/ref"]

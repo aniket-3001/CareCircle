@@ -21,6 +21,8 @@ services:
       GRAPHMEM_RO_PASSWORD: ${GRAPHMEM_RO_PASSWORD:-}   # set to run read operations as a GRAPH.RO_QUERY-only database user
       CC_DEMO: ${CC_DEMO:-1}                            # public "Start a demo circle" button (synthetic data only)
       CC_MODEL: ${CC_MODEL:-us.amazon.nova-pro-v1:0}    # Bedrock model for reading labels; CC_LLM=0 disables it (rules only)
+      CC_COGNITO_POOL_ID: ${CC_COGNITO_POOL_ID:-}        # set both to sign people in with Amazon Cognito (email codes); empty = built-in email and password
+      CC_COGNITO_CLIENT_ID: ${CC_COGNITO_CLIENT_ID:-}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}      # optional: run the Telegram bot too
       AWS_REGION: ${AWS_REGION:-us-east-1}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
