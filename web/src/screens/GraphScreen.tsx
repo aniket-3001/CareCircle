@@ -1,6 +1,7 @@
 import { RotateCcw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Async } from '../components/Async';
+import { AskGraph } from '../components/AskGraph';
 import { PageHead } from '../components/PageHead';
 import { Pill } from '../components/Pill';
 import { Inspector } from '../graph/Inspector';
@@ -58,7 +59,7 @@ export function GraphScreen(): React.JSX.Element {
         <Async state={hubs}>
           {(h) => (
             <div className="layout layout--even" style={{ marginTop: 0 }}>
-              <section className="card" aria-labelledby="rh-title">
+              <section className="card" aria-labelledby="rh-title" style={{ alignContent: 'start' }}>
                 <h2 id="rh-title">{tr('Most hazard-connected in this regimen')}</h2>
                 <p className="muted small">{tr('Degree and summed weight inside the moderate and major interaction subgraph of the medicines on record.')}</p>
                 {h.regimen_hubs.rows.length === 0 ? (
@@ -75,7 +76,7 @@ export function GraphScreen(): React.JSX.Element {
                 )}
                 <code className="code">{h.regimen_hubs.cypher}</code>
               </section>
-              <section className="card" aria-labelledby="gh-title">
+              <section className="card" aria-labelledby="gh-title" style={{ alignContent: 'start' }}>
                 <h2 id="gh-title">{tr('Hub medicines across the reference graph')}</h2>
                 <p className="muted small">{tr('PageRank over moderate and major interaction pairs: the medicines that sit in the most hazards.')}</p>
                 <div className="rows">
@@ -93,6 +94,7 @@ export function GraphScreen(): React.JSX.Element {
             </div>
           )}
         </Async>
+        <AskGraph />
       </div>
     </div>
   );

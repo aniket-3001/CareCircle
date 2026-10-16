@@ -75,6 +75,17 @@ with sync_playwright() as p:
     pg.get_by_label("Pause motion").click()
     pg.get_by_text("Replay animation").click()
 
+    # the graph algorithms, asked of this circle's own graph (computed by FalkorDB on the server, Cypher shown)
+    expect(pg.locator("[data-testid=ag-influence] .item").first).to_be_visible(timeout=15000)
+    expect(pg.locator("[data-testid=ag-influence]")).to_contain_text("Person")
+    expect(pg.locator("[data-testid=ag-groups] .item").first).to_contain_text("Dose")
+    expect(pg.locator("[data-testid=ask-graph]")).to_contain_text("algo.WCC")
+    expect(pg.locator("[data-testid=ag-find]")).to_be_disabled()
+    pg.select_option("[data-testid=ag-from]", index=1)
+    pg.select_option("[data-testid=ag-to]", index=2)
+    pg.click("[data-testid=ag-find]")
+    expect(pg.locator("[data-testid=ag-result], [data-testid=ag-none]").first).to_be_visible(timeout=15000)
+
     # circle: who has not seen the change; time warp shows a reminder
     tab(pg, "Circle")
     expect(pg.get_by_text("Who has seen what")).to_be_visible()

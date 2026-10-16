@@ -148,6 +148,12 @@ export interface Hubs {
   global_hubs: { cypher: string; rows: HubRow[] };
 }
 
+/** The graph-algorithm operations on a circle's own graph (graphmem/graph_algos.py). A node is named by its label and ref. */
+export interface GNode { label: string; ref: string; title: string }
+export interface GInfluence { metric: string; label: string | null; rows: (GNode & { score: number })[]; cypher: string }
+export interface GCommunities { method: string; groups: { group: number; size: number; kinds: Record<string, number>; sample: GNode[] }[]; nodes_in_graph: number; cypher: string }
+export interface GPath { found: boolean; reason?: string; length?: number; path: GNode[]; relationships?: string[]; cypher?: string }
+
 export type Meta = [string, string][];
 
 export type NodeKind = 'patient' | 'carer' | 'dose' | 'dose_old' | 'drug' | 'drug_old' | 'enzyme';

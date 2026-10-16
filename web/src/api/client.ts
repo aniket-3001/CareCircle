@@ -1,5 +1,5 @@
 import type { Counts, Followup, FollowupSuggestion, Handover, AllergyCheck, Appointment, CareProfile, Visit, DrugInfo, Reading, Trend, Recalls, SoleKnowers,
-  Account, AuthConfig, CareGraph, ChatMessage, CheckResult, Divergence, FhirBundle, GiveRecord, GiveResult, Hubs, IntakeResult, Invite, Member, Reminder, People,
+  Account, AuthConfig, CareGraph, ChatMessage, CheckResult, Divergence, FhirBundle, GiveRecord, GiveResult, Hubs, GInfluence, GCommunities, GPath, IntakeResult, Invite, Member, Reminder, People,
   Profile, Receipt, RegimenEntry, Session, TimelineEvent, CircleInfo,
 } from './types';
 
@@ -75,6 +75,10 @@ export function apiFor(s: Session) {
     handover: (text: string) => op<{ id: string }>('care_handover', { person: p, text }),
     gives: () => op<GiveRecord[]>('care_gives', { person: p }),
     hubs: () => op<Hubs>('care_hubs', { person: p }),
+    influence: (metric: 'pagerank' | 'betweenness', top = 8) => op<GInfluence>('graph_influence', { metric, top }),
+    communities: (method: 'wcc' | 'labelpropagation', top = 5) => op<GCommunities>('graph_communities', { method, top }),
+    path: (source: string, target: string, sourceLabel: string, targetLabel: string) =>
+      op<GPath>('graph_path', { source, target, source_label: sourceLabel, target_label: targetLabel }),
     graph: (now: number, include_history: boolean) => op<CareGraph>('care_graph', { person: p, include_history, now }),
     timeline: (now: number) => op<TimelineEvent[]>('care_timeline', { person: p, now, limit: 300 }),
     forget: (dose_id: string, reason: string) => op<{ receipt: string; forgotten: boolean; sha256: string }>('care_forget', { dose_id, reason }),
