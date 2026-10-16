@@ -382,6 +382,34 @@ def u11(w, b, r):
     ctx.close()
 
 
+@scenario("U12", "A combination brand is read as all its ingredients, and an unknown medicine is kept, marked as not checked")
+def u12(w, b, r):
+    errs = []
+    ctx, pg = new_page(b, errs=errs)
+    email = f"u12-{rid()}@scenario.test"
+    ui_signup(pg, "Combo", email)
+    ui_circle(pg, "Mum's medicines", "Mum")
+    expect(pg.get_by_text("Nothing on record yet")).to_be_visible()
+    tab(pg, "Add")
+    pg.get_by_placeholder("e.g. Clarithromycin 500 mg twice daily for 7 days").fill("Telma-AM 40 mg once daily" + chr(10) + "Becosules 1 daily")
+    pg.get_by_role("button", name="Read it").click()
+    expect(pg.get_by_test_id("proposal")).to_have_count(3, timeout=20000)
+    r.check(pg.get_by_test_id("combination-note").count() == 2, "both ingredients say they come from one combination product")
+    r.check("telmisartan + amlodipine" in pg.get_by_test_id("combination-note").first.inner_text().lower(), "and name every ingredient", pg.get_by_test_id("combination-note").first.inner_text())
+    r.check(pg.get_by_test_id("unchecked-note").count() == 1, "the medicine the data does not know says it will not be checked")
+    for _ in range(3):
+        pg.get_by_role("button", name="Confirm and save").first.click()
+        pg.wait_for_timeout(900)
+    u = api_user(w, email)
+    c = circle_of(u)
+    reg = {x["drug"] for x in u.ok(c, "care_regimen", person="mum")}
+    r.check({"telmisartan", "amlodipine", "becosules"} <= reg, "all three are on the record, none dropped", reg)
+    chk = u.ok(c, "care_check", person="mum")
+    r.check("becosules" in chk["not_in_reference"] and chk["judgement"]["state"] == "partial", "and the verdict says one of them was not checked", chk["judgement"])
+    r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
+    ctx.close()
+
+
 def main():
     w = World()
     total = failed = 0

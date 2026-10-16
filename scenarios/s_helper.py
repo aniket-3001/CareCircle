@@ -109,7 +109,9 @@ def x5(w: World, r):
     a = ask(priya, c, "add")
     r.check(not a.get("proposals"), "'add' alone proposes nothing", a)
     a = ask(priya, c, "add zzzznotamedicine 5 mg daily")
-    r.check(a["source"] in ("rules", "refusal") and (len(a.get("proposals") or []) <= 1), "an unknown name does not crash and is at most one proposal to be checked by a person", a)
+    props = a.get("proposals") or []
+    r.check(a["source"] in ("rules", "refusal", "proposal") and len(props) <= 1 and all(p["drug_candidates"][0].get("unchecked") for p in props),
+            "an unknown name does not crash: it is at most one proposal, marked as not checked, for a person to confirm", a)
     a = ask(priya, c, "add warfarin 5000 mg daily")
     if a.get("proposals"):
         r.check(bool(a["proposals"][0].get("warning") or a["proposals"][0].get("note") or "mg" in str(a["proposals"][0])), "an absurd dose is still only a proposal for a person to look at", a["proposals"])
