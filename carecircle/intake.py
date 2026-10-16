@@ -19,7 +19,7 @@ from typing import Optional
 from .verify import quote_in_source
 
 DOSE_RE = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?)\s?(mcg|µg|mg|ml|iu|units?|g)", re.I)   # OCR glues words: "Sodium5mgtablets"
-FREQ_RE = re.compile(r"\b((?:once|twice|thrice) (?:a day|daily|per day|weekly)|once|twice|thrice|daily|every \d+ ?(?:hours?|hrs?)|\d+ times (?:a|per) day|at bedtime|bedtime|morning|evening|"
+FREQ_RE = re.compile(r"\b((?:once|twice|thrice) (?:a day|daily|per day|weekly)|once|twice|thrice|daily|every \d+ ?(?:hours?|hrs?)|\d+ times (?:a|per) day|at bedtime|bedtime|(?:at|in the|every) (?:night|morning|evening|afternoon)|night|morning|evening|"
                      r"with (?:food|meals)|before (?:food|meals)|after (?:food|meals)|as needed|prn|od|bd|bid|tid|qid)\b", re.I)
 MAX_BYTES = 12 * 1024 * 1024
 _whisper = None
@@ -93,10 +93,43 @@ def _asr_text(data: bytes, filename: str, language: Optional[str]) -> str:
 
 
 # ---------------------------------------------------------------- proposals
+_JOINERS = re.compile(r",|\s+and\s+|\s*&\s*|\s*\+\s*|\s+plus\s+|\s+then\s+", re.I)
+
+
+def _split_medicines(line: str, checker) -> list[str]:
+    """'metformin 500 mg twice daily and atorvastatin 20 mg at night' is two medicines. Split a line at its joiners (comma, and, &, +, plus) only when
+    at least two different medicines are named in it, and keep each medicine's own dose and timing words with it. Every piece is a contiguous slice of
+    the original line, so the quote still occurs in the source exactly. A line with one medicine ('1 tablet morning and evening') is never cut."""
+    cuts, last = [], 0
+    for m in _JOINERS.finditer(line):
+        cuts.append((last, m.start()))
+        last = m.end()
+    cuts.append((last, len(line)))
+    parts = [(a, b) for a, b in cuts if line[a:b].strip()]
+    if len(parts) < 2:
+        return [line]
+    groups: list[list[tuple[int, int]]] = []
+    names: list[str] = []
+    for a, b in parts:
+        c = checker.candidates(line[a:b], 1)
+        named = c[0]["name"] if c and c[0]["score"] >= 0.8 else None
+        if named and (not names or named != names[-1]):
+            groups.append([(a, b)])
+            names.append(named)
+        elif groups:
+            groups[-1].append((a, b))                      # a dose or timing fragment belongs to the medicine before it
+        else:
+            groups.append([(a, b)])
+            names.append("")
+    if len({n for n in names if n}) < 2:
+        return [line]
+    return [line[g[0][0]:g[-1][1]].strip() for g in groups]
+
+
 def rule_proposals(text: str, checker) -> list[dict]:
     """One proposal per line that names a known drug. Dose/frequency are copied as written, never interpreted."""
     out, seen = [], set()
-    lines = [l.strip() for l in re.split(r"[\n;]|(?<=[.!?])\s", text) if l.strip()]
+    lines = [part for l in re.split(r"[\n;]|(?<=[.!?])\s", text) if l.strip() for part in _split_medicines(l.strip(), checker)]
     for i, line in enumerate(lines):
         cands = checker.candidates(line, 3)
         if not cands or cands[0]["score"] < 0.8:                  # line must actually contain a drug name
