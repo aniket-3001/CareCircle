@@ -58,6 +58,7 @@ export interface CognitoClient {
   readonly confirmForgotPassword: (email: string, code: string, password: string) => Promise<void>;
   readonly signOut: (accessToken: string) => Promise<void>;
   readonly deleteUser: (accessToken: string) => Promise<void>;
+  readonly changePassword: (accessToken: string, previous: string, proposed: string) => Promise<void>;
 }
 
 export function cognito(
@@ -167,6 +168,9 @@ export function cognito(
     },
     async deleteUser(accessToken: string): Promise<void> {
       await call('DeleteUser', { AccessToken: accessToken });
+    },
+    async changePassword(accessToken: string, previous: string, proposed: string): Promise<void> {
+      await call('ChangePassword', { AccessToken: accessToken, PreviousPassword: previous, ProposedPassword: proposed });
     },
   };
 }

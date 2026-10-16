@@ -1,6 +1,7 @@
 import { Bot, Check, ChevronDown, Copy, LogOut, ShieldAlert, Trash2, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import type { CircleInfo, Invite, Member } from '../api/types';
+import { PasswordInput } from '../components/PasswordInput';
 import { Async } from '../components/Async';
 import { CircleForms } from '../components/CircleForms';
 import { PageHead } from '../components/PageHead';
@@ -111,7 +112,7 @@ export function AccountScreen(): React.JSX.Element {
             )}
           </section>
 
-          {p.provider === 'local' && <PasswordCard />}
+          {!p.demo && <PasswordCard />}
 
           <section className="card" aria-labelledby="sess-title">
             <h2 id="sess-title">{tr('Session')}</h2>
@@ -214,12 +215,38 @@ function PasswordCard(): React.JSX.Element {
   const toast = useToast();
   const [old, setOld] = useState('');
   const [next, setNext] = useState('');
+  const [busy, setBusy] = useState(false);
+  const acc = app.session.account;
+
+  async function change(): Promise<void> {
+    setBusy(true);
+    try {
+      if (acc?.provider === 'cognito' && acc.tokens) {                          // Cognito holds this password: change it there with a fresh access token
+        const { cognito } = await import('../lib/cognito');
+        const cfg = await fetch('/v1/auth/config').then((r) => r.json() as Promise<{ cognito: { region: string; userPoolId: string; clientId: string } | null }>);
+        if (!cfg.cognito) throw new Error('Password change is not available right now.');
+        const c = cognito(cfg.cognito);
+        const t = await c.refresh(acc.tokens.refreshToken).catch(() => acc.tokens!);
+        await c.changePassword(t.accessToken, old, next);
+        toast('Password changed.');
+      } else {
+        await app.acct!.changePassword(old, next);
+        toast('Password changed. Other devices must sign in again.');
+      }
+      setOld(''); setNext('');
+    } catch (er) {
+      toast(er instanceof Error ? er.message : 'Could not change the password');
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <form className="card" aria-labelledby="pw-title" onSubmit={(e) => { e.preventDefault(); void app.acct!.changePassword(old, next).then(() => { toast('Password changed. Other devices must sign in again.'); setOld(''); setNext(''); }, (er) => toast(er.message)); }}>
+    <form className="card" aria-labelledby="pw-title" data-testid="password-card" onSubmit={(e) => { e.preventDefault(); void change(); }}>
       <h2 id="pw-title">{tr('Change password')}</h2>
-      <label className="field">{tr('Current password')}<input type="password" value={old} onChange={(e) => setOld(e.target.value)} autoComplete="current-password" /></label>
-      <label className="field">{tr('New password')}<input type="password" value={next} onChange={(e) => setNext(e.target.value)} autoComplete="new-password" /></label>
-      <div className="row"><button type="submit" className="btn btn--soft btn--sm" disabled={!old || next.length < 8}>{tr('Change password')}</button></div>
+      <label className="field">{tr('Current password')}<PasswordInput value={old} onChange={setOld} autoComplete="current-password" required /></label>
+      <label className="field">{tr('New password')}<PasswordInput value={next} onChange={setNext} autoComplete="new-password" required /></label>
+      <p className="muted small">{tr('At least 8 characters.')}</p>
+      <div className="row"><button type="submit" className="btn btn--soft btn--sm" disabled={busy || !old || next.length < 8}>{tr('Change password')}</button></div>
     </form>
   );
 }
