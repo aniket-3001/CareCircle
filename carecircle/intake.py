@@ -16,6 +16,7 @@ import os
 import re
 from typing import Optional
 
+from . import brands
 from .verify import field_in_quote, quote_in_source
 
 DOSE_RE = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?)(?:[\s.:]?(?:mcg|µg|mg|ml|iu|units?)|\s?g)", re.I)   # OCR glues words: "Sodium5mgtablets"
@@ -126,26 +127,80 @@ def _split_medicines(line: str, checker) -> list[str]:
     return [line[g[0][0]:g[-1][1]].strip() for g in groups]
 
 
+_NOT_A_MEDICINE_LINE = re.compile(r"^(take|taken|store|keep|qty|quantity|refills?|rx|dr|doctor|patient|name|date|pharmacy|tablets?|capsules?|use|apply|"
+                                  r"dispense|discard|expiry|exp|mfg|batch|lot|total|price|mrp|phone|tel|address|signature)\b", re.I)
+
+
+def _names_a_medicine(line: str, checker) -> bool:
+    c = checker.candidates(line, 1)
+    return bool(brands.find(line)) or bool(c and c[0]["score"] >= 0.8)
+
+
+def _ingredient_candidate(name: str, checker) -> dict:
+    """An ingredient of a combination as a candidate: known to the reference graph (so it can be checked) or not (recorded, but not checked)."""
+    if name in checker.known_names():
+        return {"name": name, "score": 1.0, "via": brands.SOURCE}
+    return {"name": name, "score": 0.0, "unchecked": True, "via": brands.SOURCE}
+
+
 def rule_proposals(text: str, checker) -> list[dict]:
-    """One proposal per line that names a known drug. Dose/frequency are copied as written, never interpreted."""
+    """One proposal per medicine named. Dose/frequency are copied as written, never interpreted.
+
+    A combination brand (Telma-AM) becomes one proposal for EACH of its ingredients, so none of them disappears from the interaction checks; the strength
+    printed beside a combination belongs to the product, so it is shown on the proposals as `combination_strength` and not copied onto an ingredient.
+    A line that looks like a medicine (a name and a dose or a frequency) but names nothing the reference data knows is NOT dropped: it becomes a proposal
+    marked `unchecked`, which a person can record as a medicine that is not checked against anything."""
     out, seen = [], set()
     lines = [part for l in re.split(r"[\n;]|(?<=[.!?])\s", text) if l.strip() for part in _split_medicines(l.strip(), checker)]
+    covered: set[int] = set()
     for i, line in enumerate(lines):
+        found = brands.find(line)
+        if found:
+            dose, freq, last = DOSE_RE.search(line), FREQ_RE.search(line), i
+            for k in range(i + 1, min(i + 4, len(lines))):
+                if dose and freq:
+                    break
+                if _names_a_medicine(lines[k], checker):
+                    break
+                d2 = None if dose else DOSE_RE.search(lines[k])
+                f2 = None if freq else FREQ_RE.search(lines[k])
+                if d2 or f2:
+                    dose, freq, last = dose or d2, freq or f2, k
+            quote = " ".join(lines[i:last + 1])[:200]
+            covered.update(range(i, last + 1))
+            for brand, ingredients, _s, _e in found:
+                for ing in ingredients:
+                    key = (ing, brand)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    out.append({"drug_candidates": [_ingredient_candidate(ing, checker)], "dose_text": "", "freq_text": freq.group(0) if freq else "",
+                                "quote": quote, "method": "brand list", "combination": brand, "combination_ingredients": ingredients,
+                                "combination_strength": dose.group(0) if dose else ""})
+            continue
         cands = checker.candidates(line, 3)
         if not cands or cands[0]["score"] < 0.8:                  # line must actually contain a drug name
+            word = re.match(r"\s*([A-Za-z][A-Za-z\-]{3,30})\b", line)
+            looks_like_one = DOSE_RE.search(line) or re.match(r"\s*[A-Za-z][A-Za-z\-]*[ \-]+\d", line)       # "Name 500 mg" or "Name 1 daily": a name, then a number
+            if (i not in covered and word and looks_like_one and not _NOT_A_MEDICINE_LINE.match(line)
+                    and not checker.candidates(word.group(1), 1)):
+                out.append({"drug_candidates": [{"name": word.group(1).lower(), "score": 0.0, "unchecked": True, "via": "read from the text; not in our reference data"}],
+                            "dose_text": (DOSE_RE.search(line).group(0) if DOSE_RE.search(line) else ""),
+                            "freq_text": (FREQ_RE.search(line).group(0) if FREQ_RE.search(line) else ""), "quote": line[:200], "method": "rules"})
             continue
         dose, freq, last = DOSE_RE.search(line), FREQ_RE.search(line), i
         for k in range(i + 1, min(i + 4, len(lines))):            # labels spread a drug over lines: name / strength / "twice daily"
             if dose and freq:
                 break
             c2 = checker.candidates(lines[k], 1)
-            if c2 and c2[0]["score"] >= 0.8 and c2[0]["name"] != cands[0]["name"]:   # the next line names another drug: stop
+            if brands.find(lines[k]) or (c2 and c2[0]["score"] >= 0.8 and c2[0]["name"] != cands[0]["name"]):   # the next line names another drug: stop
                 break
             d2 = None if dose else DOSE_RE.search(lines[k])
             f2 = None if freq else FREQ_RE.search(lines[k])
             if d2 or f2:
                 dose, freq, last = dose or d2, freq or f2, k
         quote = " ".join(lines[i:last + 1])                       # contiguous lines, so the quote still occurs in the source text
+        covered.update(range(i, last + 1))
         key = (cands[0]["name"], dose.group(0).lower() if dose else "")
         if key in seen:
             continue
