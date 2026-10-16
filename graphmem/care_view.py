@@ -195,6 +195,27 @@ class CareViewMixin:
                 "notice": check["notice"]}
 
     # ------------------------------------------------------------------ timeline
+    async def care_history_digest(self, person: str, upto: int = 0) -> dict:
+        """A fingerprint of what was written about a person: each entry's fixed fields are chained (hash of the one before + this one), oldest first.
+        Write the head hash down (or print it with the doctor's sheet); later, `upto` = that count recomputes the same prefix, and a different hash means an
+        earlier entry was changed or removed after the fact. It does not say an entry is true, only that it is unchanged. Marking an entry as a mistake,
+        stopping a medicine and a later entry do not change the earlier chain (status and end dates are not part of it)."""
+        rows = await self._q(
+            """MATCH (x:Dose)-[:FOR]->(:Person {id:$p})
+               RETURN x.id, x.drug, coalesce(x.product, ''), x.dose_text, x.freq_text, x.action, x.valid_from, x.by, x.quote, coalesce(x.created_at, x.valid_from)
+               ORDER BY coalesce(x.created_at, x.valid_from), x.id""", {"p": norm(person)}, scope="read")
+        if upto < 0:
+            raise ValueError("upto must be zero or more")
+        chain, h = [], hashlib.sha256(b"carecircle-history-v1").hexdigest()
+        for i, r in enumerate(rows, 1):
+            if upto and i > upto:
+                break
+            h = hashlib.sha256((h + json.dumps(list(r), ensure_ascii=False, separators=(",", ":"))).encode("utf-8")).hexdigest()
+            chain.append(h)
+        return {"entries": len(chain), "of": len(rows), "head": chain[-1] if chain else "",
+                "checkpoints": [{"n": n, "hash": chain[n - 1]} for n in (1, 5, 10, 25, 50, 100, 250, 500) if n <= len(chain)],
+                "note": "Detects a change to an earlier entry's medicine, strength, frequency, time, writer or quoted line. It does not show an entry is correct."}
+
     async def care_timeline(self, person: str, limit: int = 100, now: Optional[int] = None) -> list[dict]:
         """Everything that happened for this person, newest first, as plain sentences."""
         t = now_ms() if now is None else now
