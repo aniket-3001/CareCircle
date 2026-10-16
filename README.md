@@ -191,9 +191,24 @@ Each flag and each hub list shown in the app carries the query or path that prod
 **Algorithms as agent tools.** The four `graph_*` rows above (plus `graph_schema`, which lists what a graph holds) are ordinary read-only operations, so an agent calls them over HTTP or MCP
 (`graph_path`, `graph_influence`, `graph_communities`, `graph_neighbourhood`) instead of writing traversals. They run on the caller's own tenant graph through `GRAPH.RO_QUERY`, need read scope
 only, take labels as parameters checked against the labels that exist, clamp every size and hop count, and return the Cypher they ran. The Graph tab's "Ask the graph" cards use the same operations.
-Limits: they run on one tenant graph at a time, and on a graph with few links PageRank and betweenness say little (a medicine record has few). Timing on a 2,200-node graph was 5 to 30 ms per call (one run, one machine). FalkorDB features used: multiple graphs (one per circle),
-indexes, unique constraints, variable-length paths, `FOREACH`, `UNWIND` bulk loads, `algo.pageRank`, `algo.betweenness`, `algo.WCC`, `algo.labelPropagation`, `shortestPath`, read-only queries (`GRAPH.RO_QUERY`),
-`GRAPH.COPY` (memory forks), full-text and vector indexes (optional recall), append-only persistence.
+Limits: they run on one tenant graph at a time, and on a graph with few links PageRank and betweenness say little (a medicine record has few). Timing on a 2,200-node graph was 5 to 30 ms per call (one run, one machine). ### FalkorDB features used, where, and what checks them
+
+| Feature | Where | Checked by |
+|---|---|---|
+| One graph per tenant (multigraph): `mem__<circle>` | `graphmem/db.py graph_name`, `graphmem/policy.py` | `tests/test_track02.py` (separate memory per tenant), `tests/test_adversarial.py` |
+| Indexes, unique constraints | `graphmem/db.py`, `graphmem/schema.py` (versioned migrations) | `tests/test_requirements.py` (database enforces unique keys), `tests/test_schema.py` |
+| Variable-length paths | `graphmem/memory.py` (`SUPERSEDES*1..10`, `INFERRED_FROM*1..8`: is a plan's input out of date) | `tests/test_plan.py` |
+| `MERGE`, `FOREACH`, `UNWIND` | `graphmem/care.py` (atomic dose claim, supersede on confirm), `graphmem/memory.py` (ordered, gap-free events) | `tests/test_track02.py` (claim race, sequence numbers), `tests/test_rebuild.py` |
+| `algo.pageRank`, `algo.WCC` on the public reference graph | `carecircle/algos.py` (op `care_hubs`) | `tests/test_care_hubs.py` |
+| `algo.pageRank`, `algo.betweenness`, `algo.WCC`, `algo.labelPropagation` on a tenant's own graph | `graphmem/graph_algos.py` (ops `graph_influence`, `graph_communities`) | `tests/test_graph_algos.py` |
+| Read-only queries (`GRAPH.RO_QUERY`), ACL read-only database user | `graphmem/db.py ro_graph` | `tests/test_requirements.py` (read scope runs as a read-only user), `tests/test_graph_algos.py` |
+| `GRAPH.COPY` (memory forks) | `graphmem/branch.py` | `tests/test_branch.py` |
+| Full-text index; vector index (optional) | `graphmem/memory.py` (`search_text`, `recall`), `graphmem/embed.py` | `tests/test_track02.py`, `tests/test_semantic.py` |
+| Query timeout and memory caps (`GRAPH.CONFIG`) | `graphmem/db.py` (`QUERY_LIMITS`) | `tests/test_limits.py` |
+| Append-only persistence, snapshots | `deploy/docker-compose.prod.yml`, `deploy/backup.sh` | `scripts/check_persistence.py`, `scripts/restore_drill.py` |
+| FalkorDB Browser | `docs/EXPLORE.md`, `scripts/seed_explore.py` | `tests/test_explore_queries.py` (runs every query in the guide) |
+
+**Connected knowledge.** A circle is private and small; the public interaction data (DDInter, 1,833 medicines, 224,449 pairs) is large and shared. They are two graphs joined by medicine name at query time (`carecircle/checks.py`), so a family's record is checked against public knowledge without either being copied into the other, and a flag always names the edge and source it came from.
 
 ## Safety by design
 - **No advice.** A scanner (`carecircle/safety.py`) rejects outgoing text that tells someone to take, stop, skip or change a dose. Messages are
