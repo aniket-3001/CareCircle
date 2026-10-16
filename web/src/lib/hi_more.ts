@@ -146,4 +146,8 @@ export const HI_MORE: Record<string, string> = {
   'records are not linked to anything here, so these rankings are shallow.': 'रिकॉर्ड यहाँ किसी से जुड़े नहीं हैं, इसलिए ये रैंकिंग उथली हैं।',
   'Computed exactly by this server from the links stored in FalkorDB.': 'यह सर्वर FalkorDB में रखी कड़ियों से इसे सटीक रूप से निकालता है।',
   'These rankings describe how the records are connected in this graph. They say nothing about which medicine matters medically.': 'ये रैंकिंग बताती हैं कि इस ग्राफ़ में रिकॉर्ड आपस में कैसे जुड़े हैं। ये यह नहीं बताती कि चिकित्सकीय रूप से कौन-सी दवा ज़्यादा ज़रूरी है।',
+  'ABCD-2345': 'ABCD-2345',
+  'Delete my account…': 'मेरा खाता हटाएँ…',
+  'Inspect the graph: rankings, groups, paths and the Cypher behind them (for developers and judges)': 'ग्राफ़ देखें: रैंकिंग, समूह, रास्ते और उनके पीछे की Cypher (डेवलपरों और जजों के लिए)',
+  'These are how the stored records are connected. They are tools for looking at the graph, not advice, and they say nothing about which medicine matters medically.': 'ये बताते हैं कि रखे गए रिकॉर्ड आपस में कैसे जुड़े हैं। ये ग्राफ़ को देखने के औज़ार हैं, सलाह नहीं, और ये नहीं बताते कि कौन-सी दवा चिकित्सा की दृष्टि से ज़्यादा मायने रखती है।',
 };
