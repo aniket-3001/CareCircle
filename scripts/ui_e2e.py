@@ -84,6 +84,7 @@ with sync_playwright() as p:
     expect(pg.locator("[data-testid=ag-computed]")).to_be_visible(timeout=15000)
     expect(pg.locator("[data-testid=ag-influence] .item").first).to_be_visible()
     pg.get_by_label("PageRank").check(force=True)
+    expect(pg.locator("[data-testid=ag-caption]")).to_contain_text("nothing about which medicine matters medically")
     expect(pg.locator("[data-testid=ag-find]")).to_be_disabled()
     pg.select_option("[data-testid=ag-from]", index=1)
     pg.select_option("[data-testid=ag-to]", index=2)

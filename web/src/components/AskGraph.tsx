@@ -49,6 +49,7 @@ export function AskGraph(): React.JSX.Element {
       <section className="card" aria-labelledby="ag-infl" style={{ alignContent: 'start' }}>
         <h2 id="ag-infl">{tr('What the record hangs on')}</h2>
         <p className="muted small">{tr('PageRank: records that many others point to. Reach: records from which the rest of the graph can be reached fastest, following the links. Bridges: records that many shortest routes between other records pass through.')}</p>
+        <p className="muted small" data-testid="ag-caption">{tr('These rankings describe how the records are connected in this graph. They say nothing about which medicine matters medically.')}</p>
         <Segmented name="ag-metric" label={tr('Measure')} value={metric} onChange={setMetric}
           options={[{ value: 'pagerank', label: 'PageRank' }, { value: 'harmonic', label: tr('Reach') }, { value: 'betweenness', label: tr('Bridges') }]} />
         <Async state={influence}>

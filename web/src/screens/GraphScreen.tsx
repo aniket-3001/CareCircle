@@ -78,7 +78,7 @@ export function GraphScreen(): React.JSX.Element {
               </section>
               <section className="card" aria-labelledby="gh-title" style={{ alignContent: 'start' }}>
                 <h2 id="gh-title">{tr('Hub medicines across the reference graph')}</h2>
-                <p className="muted small">{tr('PageRank over moderate and major interaction pairs: the medicines that sit in the most hazards.')}</p>
+                <p className="muted small">{tr('PageRank over moderate and major interaction pairs: the medicines that sit in the most hazards.')} {tr('These rankings describe how the records are connected in this graph. They say nothing about which medicine matters medically.')}</p>
                 <div className="rows">
                   {h.global_hubs.rows.map((r, i) => (
                     <div key={r.drug} className="item">

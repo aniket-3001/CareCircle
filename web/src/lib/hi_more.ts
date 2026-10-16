@@ -126,4 +126,5 @@ export const HI_MORE: Record<string, string> = {
   'of': 'में से',
   'records are not linked to anything here, so these rankings are shallow.': 'रिकॉर्ड यहाँ किसी से जुड़े नहीं हैं, इसलिए ये रैंकिंग उथली हैं।',
   'Computed exactly by this server from the links stored in FalkorDB.': 'यह सर्वर FalkorDB में रखी कड़ियों से इसे सटीक रूप से निकालता है।',
+  'These rankings describe how the records are connected in this graph. They say nothing about which medicine matters medically.': 'ये रैंकिंग बताती हैं कि इस ग्राफ़ में रिकॉर्ड आपस में कैसे जुड़े हैं। ये यह नहीं बताती कि चिकित्सकीय रूप से कौन-सी दवा ज़्यादा ज़रूरी है।',
 };
