@@ -5,7 +5,7 @@
 @property --level {
   syntax: '<color>';
   inherits: true;
-  initial-value: #a9d67e;
+  initial-value: #dbe3ec;
 }
 @property --on-level {
   syntax: '<color>';
@@ -29,7 +29,7 @@
   --gutter: 16px;
 
   /* severity of a flag, from the AQI levels */
-  --sev-none: #a9d67e;
+  --sev-none: #dbe3ec;
   --sev-minor: #f7d65c;
   --sev-moderate: #f7b56b;
   --sev-major: #f39595;

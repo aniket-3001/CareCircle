@@ -17,7 +17,7 @@ export interface Level {
 
 /** The AQI levels in IQAir's softer colours, reused as the severity of what the record says. Text on them is ink, never white. */
 export const SEVERITY = {
-  none: { name: 'No flag', solid: '#a9d67e', onSolid: INK, soft: '#eef7e3', face: 'happy' },
+  none: { name: 'No flag', solid: '#dbe3ec', onSolid: INK, soft: '#eef2f7', face: 'neutral' },      // grey, not green and not smiling: no flag is not a statement of safety
   minor: { name: 'Minor', solid: '#f7d65c', onSolid: INK, soft: '#fdf6d9', face: 'neutral' },
   moderate: { name: 'Moderate', solid: '#f7b56b', onSolid: INK, soft: '#fdebd6', face: 'concerned' },
   major: { name: 'Major', solid: '#f39595', onSolid: INK, soft: '#fde4e4', face: 'concerned' },
