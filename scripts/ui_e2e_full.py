@@ -190,6 +190,10 @@ with sync_playwright() as p:
     # ---- history: look back, FHIR, forget with receipt
     tab(pg, "History")
     expect(pg.get_by_text("Everything that happened")).to_be_visible(timeout=15000)
+    pg.get_by_test_id("history-search").fill("zzzz-no-such-thing")             # search the history
+    expect(pg.get_by_test_id("history-none")).to_be_visible(timeout=10000)
+    pg.get_by_test_id("history-search").fill("")
+    expect(pg.get_by_test_id("history-none")).to_have_count(0)
     with pg.expect_download(timeout=15000):
         pg.get_by_role("button", name="Export as FHIR (JSON)").click()
     pg.get_by_role("button", name="Remove for good").first.click()
