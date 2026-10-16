@@ -90,7 +90,7 @@ class CareMixin:
 
     async def care_record(self, person: str, drug: str, action: str = "set", dose_text: str = "", freq_text: str = "",
                           source_type: str = "typed", quote: str = "", source_text: str = "", confirm: bool = True,
-                          at: Optional[int] = None, edited: str = "", source_ref: str = "") -> dict:
+                          at: Optional[int] = None, edited: str = "", source_ref: str = "", product: str = "") -> dict:
         """A change to what `person` takes. action 'set' (start/change) or 'stop'. The previous current entry is closed and linked
         by SUPERSEDES. If `quote` is given it must occur in the text it was read from, else the entry stays UNVERIFIED and PENDING until someone
         confirms it with care_confirm; pending entries never reach the regimen or the checks. For a photo, voice note or document the text is the one
@@ -111,8 +111,9 @@ class CareMixin:
             raise ValueError("a medicine name is 1 to 80 characters")
         dose_text, freq_text = fit(dose_text, 80, "the dose"), fit(freq_text, 80, "how often")
         person = await self._known_person(person)
-        cur = await self._q("MATCH (o:Dose {cur:true, drug:$d})-[:FOR]->(:Person {id:$p}) RETURN o.id, o.dose_text, o.freq_text, o.valid_from LIMIT 1",
-                            {"d": d, "p": norm(person)}, scope="read")
+        product = norm(product)[:80]                       # the product the medicine came as ("telma-am"); empty when it was typed as the medicine itself
+        cur = await self._q("MATCH (o:Dose {cur:true, drug:$d})-[:FOR]->(:Person {id:$p}) WHERE coalesce(o.product, '') = $pr "
+                            "RETURN o.id, o.dose_text, o.freq_text, o.valid_from LIMIT 1", {"d": d, "p": norm(person), "pr": product}, scope="read")
         if action == "stop" and not cur:
             raise KeyError(f"{d} is not on the record, so there is nothing to stop")
         same = lambda x, y: " ".join((x or "").lower().split()) == " ".join((y or "").lower().split())      # noqa: E731
@@ -122,21 +123,22 @@ class CareMixin:
         warning = None
         if action == "set" and dose_text:
             from carecircle import dose as dosemod
-            prev = await self._q("MATCH (o:Dose {cur:true, drug:$d})-[:FOR]->(:Person {id:$p}) RETURN o.dose_text LIMIT 1", {"d": d, "p": norm(person)}, scope="read")
+            prev = await self._q("MATCH (o:Dose {cur:true, drug:$d})-[:FOR]->(:Person {id:$p}) WHERE coalesce(o.product, '') = $pr RETURN o.dose_text LIMIT 1",
+                                 {"d": d, "p": norm(person), "pr": product}, scope="read")
             warning = dosemod.slip(prev[0][0], dose_text) if prev and prev[0][0] else None
         rows = await self._q(
             """
             MERGE (p:Person {id:$p}) ON CREATE SET p.role='patient'
             MERGE (dr:Drug {name:$d})
             MERGE (au:Person {id:$by}) ON CREATE SET au.role='carer'
-            CREATE (x:Dose {id:$id, drug:$d, dose_text:$dt, freq_text:$ft, valid_from:$ts, cur:false, action:$a, status:$st,
+            CREATE (x:Dose {id:$id, drug:$d, product:$pr, dose_text:$dt, freq_text:$ft, valid_from:$ts, cur:false, action:$a, status:$st,
                             source_type:$src, quote:$q, verified:$v, by:$by, at:$ts, created_at:$now, edited:$ed})
             CREATE (x)-[:FOR]->(p) CREATE (x)-[:OF]->(dr)
             WITH x OPTIONAL MATCH (s:Source {id:$sref}) FOREACH (_ IN CASE WHEN s IS NULL THEN [] ELSE [1] END | CREATE (x)-[:READ_FROM]->(s))
             RETURN x.id""",
             {"p": norm(person), "d": d, "id": did, "dt": dose_text, "ft": freq_text, "ts": ts, "now": now_ms(), "a": action, "st": status,
              "src": source_type, "q": quote[:200], "v": verified, "by": norm(self.agent), "ed": ",".join(sorted({x for x in edited.split(",") if x in ("drug", "dose", "freq")})),
-             "sref": stored["id"] if stored else ""})
+             "sref": stored["id"] if stored else "", "pr": product})
         if status == "confirmed":
             await self._care_activate(did)
             if action == "set" and cur and cur[0][2] and same(cur[0][2], freq_text):          # the same written frequency: keep the times a person already confirmed
@@ -168,34 +170,35 @@ class CareMixin:
 
     async def _care_activate(self, did: str) -> None:
         """A confirmed entry has joined the record: lay out that medicine's whole timeline again."""
-        rows = await self._q("MATCH (x:Dose {id:$id})-[:FOR]->(p:Person) RETURN p.id, x.drug", {"id": did}, checked=True)
+        rows = await self._q("MATCH (x:Dose {id:$id})-[:FOR]->(p:Person) RETURN p.id, x.drug, coalesce(x.product, '')", {"id": did}, checked=True)
         if rows:
-            await self._care_rechain(rows[0][0], rows[0][1])
+            await self._care_rechain(rows[0][0], rows[0][1], rows[0][2])
 
-    async def _care_rechain(self, person: str, drug: str) -> None:
+    async def _care_rechain(self, person: str, drug: str, product: str = "") -> None:
         """Lay out every confirmed entry for one person and medicine in date order, as one timeline: each entry ends where the next begins, only the
         last 'set' is current, a 'stop' ends the medicine, and each entry replaces the one before it (SUPERSEDES). Because the order comes from the
         entries' own dates, an older prescription typed in late slots into the history instead of overriding the current one, and forgetting an entry
         simply closes the gap, so the entry before it is current again. Each statement recomputes from what is stored, so racing writers converge."""
         order = "ORDER BY x.valid_from, coalesce(x.created_at, x.valid_from), x.id"
         await self._q(
-            f"""MATCH (x:Dose {{drug:$d, status:'confirmed'}})-[:FOR]->(:Person {{id:$p}})
+            f"""MATCH (x:Dose {{drug:$d, status:'confirmed'}})-[:FOR]->(:Person {{id:$p}}) WHERE coalesce(x.product, '') = $pr
                 WITH x {order}
                 WITH collect(x) AS es
                 UNWIND range(0, size(es) - 1) AS i
                 WITH es[i] AS x, CASE WHEN i + 1 < size(es) THEN es[i + 1] ELSE null END AS nxt
                 SET x.cur = (nxt IS NULL AND x.action = 'set'),
                     x.valid_to = CASE WHEN x.action = 'stop' THEN x.valid_from WHEN nxt IS NULL THEN null ELSE nxt.valid_from END""",
-            {"p": person, "d": drug}, checked=True)
-        await self._q("MATCH (x:Dose {drug:$d})-[:FOR]->(:Person {id:$p}) MATCH (x)-[r:SUPERSEDES]->(:Dose) DELETE r", {"p": person, "d": drug}, checked=True)
+            {"p": person, "d": drug, "pr": product}, checked=True)
+        await self._q("MATCH (x:Dose {drug:$d})-[:FOR]->(:Person {id:$p}) WHERE coalesce(x.product, '') = $pr MATCH (x)-[r:SUPERSEDES]->(:Dose) DELETE r",
+                      {"p": person, "d": drug, "pr": product}, checked=True)
         await self._q(
-            f"""MATCH (x:Dose {{drug:$d, status:'confirmed'}})-[:FOR]->(:Person {{id:$p}})
+            f"""MATCH (x:Dose {{drug:$d, status:'confirmed'}})-[:FOR]->(:Person {{id:$p}}) WHERE coalesce(x.product, '') = $pr
                 WITH x {order}
                 WITH collect(x) AS es
                 UNWIND range(1, size(es) - 1) AS i
                 WITH es[i] AS n, es[i - 1] AS o
                 CREATE (n)-[:SUPERSEDES]->(o)""",
-            {"p": person, "d": drug}, checked=True)
+            {"p": person, "d": drug, "pr": product}, checked=True)
 
     async def care_confirm(self, dose_id: str) -> dict:
         """A person confirms a pending entry (after looking at the quote beside the source). Makes it current."""
@@ -216,15 +219,40 @@ class CareMixin:
             """MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p})
                WHERE x.action='set' AND x.valid_from <= $t AND (x.valid_to IS NULL OR x.valid_to > $t)
                  AND (x.ends_on IS NULL OR x.ends_on = '' OR x.ends_on >= $today)
-               RETURN x.id, x.drug, x.dose_text, x.freq_text, x.valid_from, x.source_type, x.quote, x.by, x.slots, x.as_needed, x.ends_on ORDER BY x.drug""",
+               RETURN x.id, x.drug, x.dose_text, x.freq_text, x.valid_from, x.source_type, x.quote, x.by, x.slots, x.as_needed, x.ends_on, coalesce(x.product, '')
+               ORDER BY x.drug, x.product""",
             {"p": norm(person), "t": t, "today": today}, scope="read")
         return [dict(id=r[0], drug=r[1], dose_text=r[2], freq_text=r[3], since=r[4], source=r[5], quote=r[6], by=r[7],
-                     slots=list(r[8] or []), as_needed=bool(r[9]), ends_on=r[10] or None) for r in rows]
+                     slots=list(r[8] or []), as_needed=bool(r[9]), ends_on=r[10] or None, product=r[11]) for r in rows]
+
+    @staticmethod
+    def _duplicates(reg: list[dict]) -> list[dict]:
+        """An ingredient that is on record on more than one entry, because it came as different products (a combination brand and a plain entry, or two brands).
+        The entries are kept apart on purpose (one per product), so this is where a second source of the same ingredient shows up."""
+        by: dict[str, list[dict]] = {}
+        for r in reg:
+            by.setdefault(r["drug"], []).append(r)
+        out = []
+        for drug, rows in sorted(by.items()):
+            if len(rows) < 2:
+                continue
+            names = [(r.get("product") or "entered as the medicine itself") for r in rows]
+            title = drug[:1].upper() + drug[1:]
+            out.append({"kind": "duplicate", "ingredient": drug,
+                        "entries": [{"id": r["id"], "product": r.get("product") or "", "dose_text": r["dose_text"], "freq_text": r["freq_text"], "by": r["by"]} for r in rows],
+                        "meaning": f"{title} is on record {len(rows)} times: {'; '.join(names)}. It may be the same medicine from two sources.",
+                        "source": "the entries on record (not a reference table)"})
+        return out
+
+    async def care_duplicates(self, person: str, as_of: Optional[int] = None) -> list[dict]:
+        """Ingredients recorded on more than one current entry (the same medicine reaching the person through two products)."""
+        return self._duplicates(await self.care_regimen(person, as_of))
 
     async def care_check(self, person: str, as_of: Optional[int] = None) -> dict:
         """Interaction flags for the regimen at `as_of`, from the shared reference graph (sources attached; never 'safe')."""
         reg = await self.care_regimen(person, as_of)
         res = await asyncio.to_thread(checker().check, [r["drug"] for r in reg])
+        res["duplicates"] = self._duplicates(reg)
         res["regimen"] = reg
         res["judgement"] = judgement(res)
         return res
@@ -253,7 +281,7 @@ class CareMixin:
         t = now_ms() if now is None else now
         carers = [r[0] for r in await self._q("MATCH (c:Person {role:'carer'}) RETURN c.id ORDER BY c.id", scope="read")]
         changes = await self._q("MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p}) "
-                                "RETURN x.id, x.drug, x.action, x.at, x.by ORDER BY x.valid_from, coalesce(x.created_at, x.valid_from), x.id", {"p": norm(person)}, scope="read", checked=True)
+                                "RETURN x.id, x.drug, x.action, x.at, x.by, coalesce(x.product, '') ORDER BY x.valid_from, coalesce(x.created_at, x.valid_from), x.id", {"p": norm(person)}, scope="read", checked=True)
         flags = await self.care_check(person)
         heavy: dict[str, float] = {}
         for f in flags["direct"]:
@@ -266,9 +294,9 @@ class CareMixin:
         for c in carers:
             acked = {r[0] for r in await self._q("MATCH (:Person {id:$c})-[:ACKED]->(x:Dose) RETURN x.id", {"c": c}, scope="read", checked=True)}
             latest: dict[str, tuple] = {}
-            for row in changes:                                                      # ordered by time: the last row per medicine is where it stands now
-                latest[row[1]] = row
-            miss = [(i, d, a, at) for i, d, a, at, by in latest.values() if i not in acked and norm(by) != c]
+            for row in changes:                                                      # ordered by time: the last row per medicine and product is where it stands now
+                latest[(row[1], row[5])] = row
+            miss = [(i, d, a, at) for i, d, a, at, by, _p in latest.values() if i not in acked and norm(by) != c]
             ws = [heavy.get(d, 0.3) for _, d, _, _ in miss]
             ages = [(t - at) / H for *_, at in miss]
             out[c] = {"unacknowledged": [{"dose": i, "drug": d, "action": a, "age_hours": round((t - at) / H, 1)} for i, d, a, at in miss],

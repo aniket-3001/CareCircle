@@ -66,6 +66,10 @@ def judgement(check: dict) -> dict:
         reasons.append(f"{len(check['unrated'])} pair(s) listed by the source without a severity")
     if check["direct"] or check["enzyme_paths"]:
         return {"state": "flags", "reasons": reasons, "statement": "Possible interactions found: discuss with a prescriber or pharmacist."}
+    if check.get("duplicates"):
+        names = ", ".join(d["ingredient"] for d in check["duplicates"])
+        return {"state": "flags", "reasons": reasons + [f"the same ingredient is on record more than once: {names}"],
+                "statement": "A possible duplicate was found: discuss with a prescriber or pharmacist."}
     if reasons:
         return {"state": "partial", "reasons": reasons, "statement": "Not enough information to judge everything. Ask a pharmacist."}
     return {"state": "no_known_conflict", "reasons": [],
