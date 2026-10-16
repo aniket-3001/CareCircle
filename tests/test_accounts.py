@@ -354,3 +354,58 @@ async def test_one_telegram_chat_per_account_the_newest_replaces_the_old(client,
     await bot.handle({"message": {"chat": {"id": 42}, "text": f"/link {code}"}})               # linking the same chat again changes nothing
     assert (await client.get("/v1/account", headers=auth(token))).json()["telegram"] == [{"chat": 42, "circle": c1}]
     assert (await client.request("DELETE", "/v1/account/telegram", headers=auth(token))).status_code == 200      # leave nothing linked behind
+
+
+async def test_a_demo_circle_whose_build_was_interrupted_is_rebuilt_on_the_next_start(gm, monkeypatch):
+    """If the process dies (or the build fails) halfway through seeding the shared demo circle, the next start must notice the circle is incomplete and
+    rebuild it. It used to be marked as seeded before its history was built, so a half-built circle stayed half-built until someone pressed reset."""
+    from carecircle import demo, demo_history
+    accs = accmod.Accounts(gm)
+    real_build = demo_history.build
+
+    async def dies_halfway(ravi, meena, person, now):
+        await ravi.care_record(person, "metformin", dose_text="500 mg", freq_text="twice daily", source_type="typed")          # something was written
+        raise RuntimeError("the process was killed here")
+
+    try:
+        monkeypatch.setattr(demo_history, "build", dies_halfway)
+        await gm.db.drop_tenant(accmod.SHARED_CIRCLE)
+        await accs._q("MATCH (t:Tenant {id:$c}) DETACH DELETE t", {"c": accmod.SHARED_CIRCLE})
+        with pytest.raises(RuntimeError, match="killed"):
+            await demo.seed_shared(gm, accs)
+        monkeypatch.setattr(demo_history, "build", real_build)
+        await demo.seed_shared(gm, accs)                                              # the next start
+        ravi = gm.open(accs and (await accs.by_email(accmod.DEMO_ACCOUNTS[0][0]))["agent"], accmod.SHARED_CIRCLE)
+        reg = await ravi.care_regimen("asha")
+        assert len(reg) == 10 and {"warfarin", "levothyroxine"} <= {x["drug"] for x in reg}            # the whole story, not the one entry the dead build left
+    finally:
+        monkeypatch.setattr(demo_history, "build", real_build)
+        await gm.db.drop_tenant(accmod.SHARED_CIRCLE)                                    # leave nothing behind, as the sibling test does
+        ctl = await gm._ctl()
+        await ctl.query("MATCH (t:Tenant {id:$c}) DETACH DELETE t", {"c": accmod.SHARED_CIRCLE})
+        for email, _ in accmod.DEMO_ACCOUNTS:
+            await ctl.query("MATCH (a:Account {email:$e}) OPTIONAL MATCH (a)<-[:OF]-(s:Session) DETACH DELETE s, a", {"e": email})
+            await ctl.query("MATCH (g:Agent) WHERE g.id STARTS WITH $p DETACH DELETE g", {"p": email.split("@")[0].split(".")[0] + "-"})
+
+
+async def test_the_demo_circle_is_built_on_an_empty_graph_even_if_an_old_one_was_left_behind(gm):
+    """The circle's graph can outlive its record in the control graph (a half-cleaned database, a restore). Seeding must not write the story on top of
+    the old data: a medicine already stopped there made the new story's own `stop` fail."""
+    from carecircle import demo
+    accs = accmod.Accounts(gm)
+    try:
+        await gm.db.drop_tenant(accmod.SHARED_CIRCLE)
+        ctl = await gm._ctl()
+        await ctl.query("MATCH (t:Tenant {id:$c}) DETACH DELETE t", {"c": accmod.SHARED_CIRCLE})
+        await demo.seed_shared(gm, accs)
+        await ctl.query("MATCH (t:Tenant {id:$c}) DETACH DELETE t", {"c": accmod.SHARED_CIRCLE})          # the record goes, the graph stays
+        await demo.seed_shared(gm, accs)
+        ravi = gm.open((await accs.by_email(accmod.DEMO_ACCOUNTS[0][0]))["agent"], accmod.SHARED_CIRCLE)
+        assert len(await ravi.care_regimen("asha")) == 10
+    finally:
+        await gm.db.drop_tenant(accmod.SHARED_CIRCLE)
+        ctl = await gm._ctl()
+        await ctl.query("MATCH (t:Tenant {id:$c}) DETACH DELETE t", {"c": accmod.SHARED_CIRCLE})
+        for email, _ in accmod.DEMO_ACCOUNTS:
+            await ctl.query("MATCH (a:Account {email:$e}) OPTIONAL MATCH (a)<-[:OF]-(s:Session) DETACH DELETE s, a", {"e": email})
+            await ctl.query("MATCH (g:Agent) WHERE g.id STARTS WITH $p DETACH DELETE g", {"p": email.split("@")[0].split(".")[0] + "-"})

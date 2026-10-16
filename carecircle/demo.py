@@ -65,15 +65,19 @@ async def seed_shared(gm, acc) -> None:
         await gm.db.drop_tenant(SHARED_CIRCLE)                      # an older story: rebuild with the current one
         await acc._q("MATCH (t:Tenant {id:$c}) DETACH DELETE t", {"c": SHARED_CIRCLE})
     from graphmem.db import now_ms
+    await gm.db.drop_tenant(SHARED_CIRCLE)                          # the story is written on an empty graph, never on whatever an earlier run left
     await gm.create_tenant(SHARED_CIRCLE)
     for i, a in enumerate(agents):
         await gm.grant(a, SHARED_CIRCLE, ("read", "write", "admin") if i == 0 else ("read", "write"))
         await acc._q("MATCH (a:Account {agent:$ag}), (t:Tenant {id:$c}) CREATE (a)-[:MEMBER {role:$r, at:$t}]->(t)",
                      {"ag": a, "c": SHARED_CIRCLE, "r": "owner" if i == 0 else "carer", "t": now_ms()})
-    await acc._q("MATCH (t:Tenant {id:$c}) SET t.name=\"Asha's circle (demo)\", t.person=$p, t.owner=$o, t.demo=true, t.seed=$v", {"v": SEED_VERSION, "c": SHARED_CIRCLE, "p": PERSON, "o": agents[0]})
+    await acc._q("MATCH (t:Tenant {id:$c}) SET t.name=\"Asha's circle (demo)\", t.person=$p, t.owner=$o, t.demo=true", {"c": SHARED_CIRCLE, "p": PERSON, "o": agents[0]})
     ravi, meena = gm.open(agents[0], SHARED_CIRCLE), gm.open(agents[1], SHARED_CIRCLE)
     from .demo_history import build
     await build(ravi, meena, PERSON, now_ms())
+    # Marked complete only now. A start that dies (or fails) inside `build` leaves no mark, so the next start sees an unfinished circle and rebuilds it,
+    # instead of trusting a half-built one forever.
+    await acc._q("MATCH (t:Tenant {id:$c}) SET t.seed=$v", {"c": SHARED_CIRCLE, "v": SEED_VERSION})
 
 
 async def reset_shared(gm, acc) -> None:
