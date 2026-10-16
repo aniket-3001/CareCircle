@@ -1,6 +1,8 @@
 const HOUR = 3_600_000;
 
-export const title = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+/** 'vitamin d' -> 'Vitamin D', 'vitamin b12' -> 'Vitamin B12': the first letter is capitalised, and so is a lone letter (with digits) that names a vitamin. */
+export const title = (s: string): string =>
+  s ? (s.charAt(0).toUpperCase() + s.slice(1)).replace(/(?<=\bvitamin )[a-z]\d*\b/gi, (m) => m.toUpperCase()) : s;
 
 /** 'ravi-455d702e' -> 'Ravi' (demo agents carry a circle suffix). */
 export const nameOf = (agent: string): string => title((agent || '').split('-')[0] ?? '');

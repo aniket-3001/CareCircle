@@ -19,4 +19,11 @@ describe('format', () => {
     expect(plural(2, 'change')).toBe('2 changes');
     expect(pct(0.904)).toBe('90%');
   });
+  it('writes vitamin letters as capitals', () => {
+    expect(title('vitamin d')).toBe('Vitamin D');
+    expect(title('vitamin b12')).toBe('Vitamin B12');
+    expect(title('vitamin d3 with calcium')).toBe('Vitamin D3 with calcium');
+    expect(title('vitamins')).toBe('Vitamins');
+    expect(title('')).toBe('');
+  });
 });
