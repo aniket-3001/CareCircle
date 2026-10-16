@@ -137,6 +137,13 @@ with sync_playwright() as p:
     pg.locator("dialog[open]").get_by_label("Circle name").fill("Mum's medicines")
     expect(pg.get_by_test_id("delete-circle-go")).to_be_enabled()
     pg.locator("dialog[open] .icon-btn[aria-label=Close]").click()
+    pg.get_by_test_id("display").get_by_label("Larger").dispatch_event("click")       # text size is a per-device setting that sticks
+    assert pg.evaluate("document.documentElement.dataset.text") == "larger"
+    pg.reload()
+    assert pg.evaluate("document.documentElement.dataset.text") == "larger"
+    pg.get_by_test_id("open-account").click()
+    pg.get_by_test_id("display").get_by_label("Normal").dispatch_event("click")
+    assert pg.evaluate("document.documentElement.dataset.text") == "normal"
     pg.get_by_test_id("signout-all").click()                                    # signs out every device, this one included
     expect(pg.get_by_test_id("open-signin")).to_be_visible(timeout=15000)
     pg.get_by_test_id("open-signin").click()
