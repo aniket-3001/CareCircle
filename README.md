@@ -179,7 +179,7 @@ indexes, unique constraints, variable-length paths, `FOREACH`, `UNWIND` bulk loa
 | Dose given once per slot | one conditional `MERGE` | tests, B3 |
 | Readings next to medicine changes | circle graph (`Measurement`, `Dose`) | tests, browser walk-through |
 | Appointments, conditions, allergy cross-check | circle graph | tests, browser walk-through |
-| Recalls, label text, name lookup | RxNorm and openFDA, name only, cached in `cc_ref` | tests with the network faked; **live calls are not covered by CI** |
+| Recalls, label text, name lookup | RxNorm and openFDA, name only, cached in `cc_ref` | tests with the network faked; **CI stays offline; `CC_LIVE=1 pytest tests/test_live_sources.py` calls the real services (passed 2026-10-16)** |
 | Helper (English and Hindi) | rules over the circle's facts; guarded model fallback (English only) | tests incl. advice refusals |
 | Schema upgrades | versioned migrations per circle graph | tests |
 
