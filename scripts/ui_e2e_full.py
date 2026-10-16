@@ -1,6 +1,7 @@
 """Every feature of a real account, driven in Chrome: sign up, create a circle (empty), add medicines by typing, edit and stop one, flags and their
 sources, who-has-seen-what with a second carer, doses given (once per slot), the graph (layers, inspector, zoom, full screen), history (look back,
 forget with receipt, FHIR), the helper in English and Hindi, the Hindi UI, account pages. Usage: PORT=8000 python scripts/ui_e2e_full.py"""
+import datetime as _dt
 import os
 import time
 from playwright.sync_api import expect, sync_playwright
@@ -109,7 +110,7 @@ with sync_playwright() as p:
     pg.locator("[aria-labelledby=dose-title] select").select_option(label="Metformin")
     pg.locator("[aria-labelledby=dose-title] input[type=checkbox]").click()
     expect(pg.locator("[aria-labelledby=dose-title] input[type=checkbox]")).to_be_checked(timeout=15000)
-    pg.locator("[aria-labelledby=dose-title] input[type=text]").fill("2030-01-01 08:00")
+    pg.locator("[aria-labelledby=dose-title] input[type=text]").fill(_dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d") + " 21:00")
     pg.get_by_role("button", name="Record as Kavya").click()
     expect(pg.get_by_text("waiting for a second carer")).to_be_visible(timeout=15000)
     p2.reload()
