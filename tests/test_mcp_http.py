@@ -260,3 +260,38 @@ async def test_arguments_may_be_a_json_string_or_the_object_itself(stack, gm):
     raw = await c.post("/mcp", headers=h, json=rpc("tools/call", {"name": "call", "arguments": {"tenant": t, "op": "graph_path", "args_json": [1, 2]}}))   # wrong shape
     res = raw.json()["result"]
     assert res["isError"] is True and "args_json" in res["content"][0]["text"]                                  # refused by the tool's own schema, with the argument named
+
+
+@with_stack
+async def test_the_graph_algorithms_are_first_class_tools_with_typed_arguments(stack, gm):
+    app, c = stack
+    t = tid(gm, "mh-graph")
+    w = await agent(c, "tt-mh-gw", t)
+    r = await agent(c, "tt-mh-gr", t, ("read",))
+    await tool(c, w, "call", {"tenant": t, "op": "assert_fact", "args_json": {"subject": "ann", "predicate": "likes", "obj": "tea"}})
+    await tool(c, w, "call", {"tenant": t, "op": "assert_fact", "args_json": {"subject": "tea", "predicate": "grown_in", "obj": "assam"}})
+    listed = {x["name"]: x for x in (await c.post("/mcp", headers=r, json=rpc("tools/list"))).json()["result"]["tools"]}
+    for name in ("graph_schema", "graph_path", "graph_influence", "graph_communities", "graph_neighbourhood"):
+        assert name in listed and listed[name]["description"], name
+    props = listed["graph_path"]["inputSchema"]["properties"]
+    assert set(props) >= {"tenant", "source", "target", "max_hops", "source_label", "target_label"}
+    assert set(listed["graph_path"]["inputSchema"]["required"]) == {"tenant", "source", "target"}        # the rest are optional, and typed
+    assert props["max_hops"]["type"] == "integer" and listed["graph_influence"]["inputSchema"]["properties"]["top"]["type"] == "integer"
+
+    path, err = await tool(c, r, "graph_path", {"tenant": t, "source": "ann", "target": "assam"})            # a read-only key, optional arguments left out
+    assert not err and path["found"] and path["length"] == 4 and path["path"][0]["ref"] == "ann"
+    assert (await tool(c, r, "graph_schema", {"tenant": t}))[0]["nodes"]
+    pr, _ = await tool(c, r, "graph_influence", {"tenant": t})
+    assert pr["metric"] == "pagerank" and pr["rows"]
+    bt, _ = await tool(c, r, "graph_influence", {"tenant": t, "metric": "betweenness", "label": "Entity", "top": 2})
+    assert bt["metric"] == "betweenness" and bt["label"] == "Entity" and len(bt["rows"]) == 2
+    assert (await tool(c, r, "graph_communities", {"tenant": t, "method": "labelpropagation"}))[0]["groups"]
+    near, _ = await tool(c, r, "graph_neighbourhood", {"tenant": t, "ref": "tea", "depth": 1})
+    assert {n["label"] for n in near["nodes"]} == {"Fact"} and len(near["nodes"]) == 2                          # a fact sits between two entities
+    nb, _ = await tool(c, r, "graph_neighbourhood", {"tenant": t, "ref": "tea", "depth": 2})
+    assert {n["ref"] for n in nb["nodes"] if n["label"] == "Entity"} == {"ann", "assam"}
+    bad, _ = await tool(c, r, "graph_influence", {"tenant": t, "metric": "degree"})                          # a refusal is data for the model, not a crash
+    assert "error" in bad and "betweenness" in bad["error"]
+    stranger = await agent(c, "tt-mh-gx")
+    denied, _ = await tool(c, stranger, "graph_schema", {"tenant": t})
+    assert list(denied) == ["error"] and denied["error"].startswith("PermissionDenied")

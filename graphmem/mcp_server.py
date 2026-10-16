@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from typing import Callable, Union
+from typing import Callable, Optional, Union
 
 from mcp.server.mcpserver import MCPServer
 
@@ -119,6 +119,40 @@ def build(gm: GraphMem, agent: Union[str, Callable[[], str]]) -> MCPServer:
     async def recall(tenant: str, query: str, hops: int = 2) -> str:
         """Graph recall: matching facts, each with its source episodes and the path that reached it."""
         return json.dumps(await ops.invoke(gm, me(), tenant, "recall", {"query": query, "hops": hops}), default=str)
+
+    # Graph algorithms as first-class tools, so a model sees each one with its own typed arguments instead of finding them behind `call`.
+    async def graph(tenant: str, op: str, **args) -> str:
+        try:
+            clean = {k: v for k, v in args.items() if v not in (None, "")}
+            return json.dumps(await ops.invoke(gm, me(), tenant, op, clean), default=str)
+        except Exception as e:
+            return json.dumps({"error": f"{type(e).__name__}: {e}"})
+
+    @server.tool()
+    async def graph_schema(tenant: str) -> str:
+        """What a tenant's graph holds: node labels and relationship types with counts. Start here to learn the data model."""
+        return await graph(tenant, "graph_schema")
+
+    @server.tool()
+    async def graph_path(tenant: str, source: str, target: str, max_hops: int = 8, source_label: Optional[str] = None,
+                         target_label: Optional[str] = None) -> str:
+        """Shortest path between two records (named by id, key or name), ignoring link direction: the records on it and the relationship between each pair."""
+        return await graph(tenant, "graph_path", source=source, target=target, max_hops=max_hops, source_label=source_label, target_label=target_label)
+
+    @server.tool()
+    async def graph_influence(tenant: str, metric: str = "pagerank", label: Optional[str] = None, top: int = 10) -> str:
+        """The most influential records. metric: 'pagerank' (many records point here), 'harmonic' (reaches the rest of the graph fastest) or 'betweenness' (many shortest paths pass through)."""
+        return await graph(tenant, "graph_influence", metric=metric, label=label, top=top)
+
+    @server.tool()
+    async def graph_communities(tenant: str, method: str = "wcc", label: Optional[str] = None, top: int = 10) -> str:
+        """Groups of records that belong together. method: 'wcc' (separate connected parts) or 'labelpropagation' (communities within them)."""
+        return await graph(tenant, "graph_communities", method=method, label=label, top=top)
+
+    @server.tool()
+    async def graph_neighbourhood(tenant: str, ref: str, depth: int = 2, label: Optional[str] = None, limit: int = 50) -> str:
+        """Everything within `depth` hops of one record (named by id, key or name), nearest first."""
+        return await graph(tenant, "graph_neighbourhood", ref=ref, depth=depth, label=label, limit=limit)
 
     return server
 
