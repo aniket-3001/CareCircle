@@ -86,7 +86,7 @@ s, v = op(ravi, "graph_path", source=P, target="metformin")
 check(s == 200 and v["found"] and v["path"][0]["ref"] == P and v["path"][-1]["ref"] == "metformin", "the shortest path from the person to a medicine is found", v)
 s, v = op(ravi, "graph_influence", metric="pagerank", top=3)
 check(s == 200 and v["rows"] and "algo.pageRank" in v["cypher"], "PageRank runs on the circle's own graph", v)
-s, v = op(ravi, "graph_communities", method="wcc")
+s, v = op(ravi, "graph_communities", method="wcc", top=500)
 check(s == 200 and v["groups"] and sum(g["size"] for g in v["groups"]) == v["nodes_in_graph"], "connected groups cover every record once", v)
 check(op(ravi, "graph_influence", metric="degree")[0] == 422, "a bad metric is a clean 422")
 mcp = {"Accept": "application/json, text/event-stream"}
