@@ -13,6 +13,7 @@ av>=14,<19            # av 19 dropped an option faster-whisper 1.2 passes: voice
 pypdf
 PyJWT[crypto]
 python-docx
+tzdata               # time zone names (Asia/Kolkata) on systems that have no zone database, such as Windows and slim containers
 # tests
 pytest
 pytest-asyncio
