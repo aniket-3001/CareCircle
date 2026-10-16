@@ -116,6 +116,9 @@ export function accountApi(token: string) {
     telegramCode: () => send<{ code: string; minutes: number }>('POST', '/v1/account/telegram-code', token),
     telegramUnlink: () => send<{ ok: boolean }>('DELETE', '/v1/account/telegram', token),
     resetDemo: () => send<{ ok: boolean }>('POST', '/v1/demo/reset', token),
+    signOutAll: () => send<{ signed_out: number }>('POST', '/v1/account/signout-all', token),
+    exportAll: () => get<Record<string, unknown>>('/v1/account/export', token),
+    deleteCircle: (id: string, confirm: string) => send<{ deleted_circle: boolean }>('DELETE', `/v1/circles/${encodeURIComponent(id)}`, token, { confirm }),
   };
 }
 export type AccountApi = ReturnType<typeof accountApi>;

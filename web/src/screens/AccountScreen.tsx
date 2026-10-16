@@ -1,4 +1,4 @@
-import { Bot, Check, ChevronDown, Copy, LogOut, ShieldAlert, Trash2, UserRound } from 'lucide-react';
+import { Bot, Check, ChevronDown, Copy, Download, LogOut, ShieldAlert, Trash2, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import type { CircleInfo, Invite, Member } from '../api/types';
 import { PasswordInput } from '../components/PasswordInput';
@@ -46,6 +46,17 @@ export function AccountScreen(): React.JSX.Element {
     }
   }
 
+  /** Everything held for this account, as one JSON file the person keeps. */
+  async function downloadAll(): Promise<void> {
+    try {
+      const doc = await acct.exportAll();
+      const url = URL.createObjectURL(new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = `care-circle-my-data-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { toast(e instanceof Error ? e.message : 'Could not prepare the download'); }
+  }
   async function deleteAccount(): Promise<void> {
     try {
       await acct.deleteAccount(confirm);
@@ -118,6 +129,8 @@ export function AccountScreen(): React.JSX.Element {
             <h2 id="sess-title">{tr('Session')}</h2>
             <div className="row row--wrap">
               <button type="button" className="btn btn--soft" onClick={() => void app.signOut()}><LogOut size={18} aria-hidden="true" /> {tr('Sign out')}</button>
+              {!p.demo && <button type="button" className="btn btn--soft" onClick={() => void acct.signOutAll().then(() => app.signOut(), (e) => toast(e.message))} data-testid="signout-all">{tr('Sign out of all devices')}</button>}
+              {!p.demo && <button type="button" className="btn btn--soft" onClick={() => void downloadAll()} data-testid="download-all"><Download size={18} aria-hidden="true" /> {tr('Download all my data')}</button>}
               {p.demo && <button type="button" className="btn btn--soft" onClick={() => void acct.resetDemo().then(() => { app.bump(); toast('The demo circle is back to its starting point.'); }, (e) => toast(e.message))}>{tr('Reset demo data')}</button>}
               {p.demo && <p className="muted small" style={{ flexBasis: '100%' }}>{tr('Reset demo data puts the shared demo circle (Asha) back to its starting medicines and history. Real circles are never affected.')}</p>}
             </div>
@@ -149,6 +162,8 @@ function CircleRow({ c }: { c: CircleInfo }): React.JSX.Element {
   const [invite, setInvite] = useState<Invite | null>(null);
   const [name, setName] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [typed, setTyped] = useState('');
   const acct = app.acct!;
   const owner = c.role === 'owner';
 
@@ -180,8 +195,14 @@ function CircleRow({ c }: { c: CircleInfo }): React.JSX.Element {
             </>
           )}
           <button type="button" className="btn btn--ghost btn--sm" style={{ justifySelf: 'start', color: 'var(--danger)' }} onClick={() => setLeaving(true)}>{tr('Leave this circle')}</button>
+          {owner && <button type="button" className="btn btn--ghost btn--sm" style={{ justifySelf: 'start', color: 'var(--danger)' }} onClick={() => setDeleting(true)} data-testid="delete-circle">{tr('Delete this circle…')}</button>}
         </div>
       )}
+      <Sheet open={deleting} title={`Delete ${c.name}?`} onClose={() => { setDeleting(false); setTyped(''); }}>
+        <p>{tr('This removes the circle for every carer in it, with every medicine, reading, note and conversation. It cannot be undone. Type the circle name to confirm.')}</p>
+        <label className="field">{tr('Circle name')}<input type="text" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" /></label>
+        <button type="button" className="btn btn--danger" disabled={typed.trim().toLowerCase() !== c.name.trim().toLowerCase()} onClick={() => void acct.deleteCircle(c.id, typed).then(async () => { setDeleting(false); setTyped(''); await app.refreshProfile(); toast('The circle is deleted.'); }, (e) => toast(e.message))} data-testid="delete-circle-go">{tr('Delete the circle')}</button>
+      </Sheet>
       <Sheet open={leaving} title={`Leave ${c.name}?`} onClose={() => setLeaving(false)}>
         <p>{c.members === 1 ? 'You are the only carer, so leaving deletes the circle and everything recorded in it.' : owner ? 'You are the owner. Ownership passes to the carer who has been here longest.' : 'You will no longer see this circle. What you recorded stays for the other carers; your conversation with the helper is deleted.'}</p>
         <button type="button" className="btn btn--danger" onClick={() => void acct.leave(c.id).then(async () => { setLeaving(false); await app.refreshProfile(); toast('You left the circle.'); }, (e) => toast(e.message))}>{tr('Leave')}</button>
