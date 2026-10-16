@@ -211,5 +211,6 @@ proposed fields; it never decides interactions or doses.
 ## Layout
 `carecircle/` product logic (reference graph, checks, risk math, safety, intake, Telegram, algorithms, demo) · `graphmem/` the multi-tenant graph
 memory engine (tenants, grants, HTTP API, MCP server, forks, spaces) · `web/` the React app · `deploy/` production compose, S3 backup and restore guide · `tests/` · `bench/` · `scripts/` · `docs/ARCHITECTURE.md`.
+Track 02 (agent memory and coordination), each point of the brief with where it is built and how it is tested and measured: [`docs/TRACK02.md`](docs/TRACK02.md) (`tests/test_track02.py`, `bench/track02_stress.py`).
 API: every operation is callable over HTTP (`POST /v1/tenants/{circle}/{op}`); the full table is in [`docs/API.md`](docs/API.md) and a running server serves Swagger at `/docs`.
 MCP: `claude mcp add carecircle -e GRAPHMEM_API_KEY=gm_... -- python -m graphmem.mcp_server` exposes every operation (`call(tenant, "care_check", ...)`).
