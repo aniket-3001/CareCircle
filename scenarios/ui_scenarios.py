@@ -297,7 +297,7 @@ def u8(w, b, r):
         tab(pg, t)
         pg.wait_for_timeout(500)
         nameless = pg.evaluate("""() => [...document.querySelectorAll('button, a[href], input, select, textarea, [role=button]')]
-            .filter(e => !e.closest('[hidden]') && e.offsetParent !== null)
+            .filter(e => !e.closest('[hidden]') && e.offsetParent !== null && e.checkVisibility())
             .filter(e => !(e.getAttribute('aria-label') || e.getAttribute('aria-labelledby') || (e.innerText || '').trim() || e.getAttribute('title') || (e.labels && e.labels.length) || e.getAttribute('placeholder') || e.type === 'hidden'))
             .map(e => e.outerHTML.slice(0, 80))""")
         r.check(nameless == [], f"{t}: every visible control has an accessible name", nameless[:2])

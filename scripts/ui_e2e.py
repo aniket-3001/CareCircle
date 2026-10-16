@@ -75,7 +75,9 @@ with sync_playwright() as p:
     pg.get_by_label("Pause motion").click()
     pg.get_by_text("Replay animation").click()
 
-    # the graph algorithms, asked of this circle's own graph (computed by FalkorDB on the server, Cypher shown)
+    # the graph algorithms, asked of this circle's own graph (computed by FalkorDB on the server, Cypher shown): behind "Inspect", closed until opened
+    expect(pg.get_by_test_id("ag-influence")).not_to_be_visible()
+    pg.get_by_test_id("inspect").locator("summary").first.click()
     expect(pg.locator("[data-testid=ag-influence] .item").first).to_be_visible(timeout=15000)
     expect(pg.locator("[data-testid=ag-influence]")).to_contain_text("Person")
     expect(pg.locator("[data-testid=ag-groups] .item").first).to_contain_text("Dose")

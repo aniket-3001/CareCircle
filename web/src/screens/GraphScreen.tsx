@@ -56,6 +56,9 @@ export function GraphScreen(): React.JSX.Element {
             </>
           )}
         </Async>
+        <details className="inspect" data-testid="inspect">
+          <summary>{tr('Inspect the graph: rankings, groups, paths and the Cypher behind them (for developers and judges)')}</summary>
+          <p className="muted small">{tr('These are how the stored records are connected. They are tools for looking at the graph, not advice, and they say nothing about which medicine matters medically.')}</p>
         <Async state={hubs}>
           {(h) => (
             <div className="layout layout--even" style={{ marginTop: 0 }}>
@@ -95,6 +98,7 @@ export function GraphScreen(): React.JSX.Element {
           )}
         </Async>
         <AskGraph />
+        </details>
       </div>
     </div>
   );
