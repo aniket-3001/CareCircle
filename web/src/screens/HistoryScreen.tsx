@@ -4,7 +4,9 @@ import { Async } from '../components/Async';
 import { Hero } from '../components/Hero';
 import { PageHead } from '../components/PageHead';
 import { Pill } from '../components/Pill';
+import { Segmented } from '../components/Segmented';
 import { Sheet } from '../components/Sheet';
+import type { TimelineEvent } from '../api/types';
 import { useToast } from '../components/Toast';
 import { Flags } from '../components/Flags';
 import { nameOf, plural, title, when } from '../lib/format';
@@ -15,6 +17,8 @@ export function HistoryScreen(): React.JSX.Element {
   const app = useApp();
   const toast = useToast();
   const tl = useLoad((a) => a.api.timeline(a.now()));
+  const [q, setQ] = useState('');
+  const [kind, setKind] = useState<'all' | 'record' | 'ack' | 'give'>('all');
   const receipts = useLoad((a) => a.api.receipts());
   const [asOf, setAsOf] = useState<number | null>(null);
   const [forgetting, setForgetting] = useState<string | null>(null);
@@ -38,6 +42,12 @@ export function HistoryScreen(): React.JSX.Element {
       toast(e instanceof Error ? e.message : 'Could not remove it');
     }
   }
+
+  const shown = (events: TimelineEvent[]): TimelineEvent[] => {
+    const needle = q.trim().toLowerCase();
+    return events.filter((e) => (kind === 'all' || (kind === 'record' ? e.kind === 'record' || e.kind === 'stop' : e.kind === kind))
+      && (!needle || `${e.text} ${e.who} ${e.quote}`.toLowerCase().includes(needle)));
+  };
 
   async function exportFhir(): Promise<void> {
     const b = await app.api.fhir();
@@ -109,8 +119,17 @@ export function HistoryScreen(): React.JSX.Element {
               <section className="card" aria-labelledby="tl-title">
                 <h2 id="tl-title">{tr('Everything that happened')}</h2>
                 {events.length === 0 ? <p className="muted">{tr('Nothing recorded yet.')}</p> : (
+                  <>
+                  <div className="stack">
+                    <label className="field"><span className="sr-only">{tr('Search the history')}</span>
+                      <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr('Search the history, e.g. warfarin or Meena')} data-testid="history-search" />
+                    </label>
+                    <Segmented<'all' | 'record' | 'ack' | 'give'> name="hkind" label={tr('Kind')} value={kind} onChange={setKind}
+                      options={[{ value: 'all', label: tr('All') }, { value: 'record', label: tr('Changes') }, { value: 'ack', label: tr('Seen') }, { value: 'give', label: tr('Given') }]} />
+                  </div>
+                  {shown(events).length === 0 && <p className="muted" data-testid="history-none">{tr('Nothing matches.')}</p>}
                   <ol className="timeline">
-                    {events.map((e, i) => (
+                    {shown(events).map((e, i) => (
                       <li key={`${e.at}-${i}`} data-kind={e.kind}>
                         <div>{e.text}</div>
                         {e.quote && <div className="item__sub">“{e.quote}”</div>}
@@ -121,6 +140,7 @@ export function HistoryScreen(): React.JSX.Element {
                       </li>
                     ))}
                   </ol>
+                  </>
                 )}
               </section>
             )}

@@ -71,7 +71,7 @@ export function apiFor(s: Session) {
     gives: () => op<GiveRecord[]>('care_gives', { person: p }),
     hubs: () => op<Hubs>('care_hubs', { person: p }),
     graph: (now: number, include_history: boolean) => op<CareGraph>('care_graph', { person: p, include_history, now }),
-    timeline: (now: number) => op<TimelineEvent[]>('care_timeline', { person: p, now, limit: 60 }),
+    timeline: (now: number) => op<TimelineEvent[]>('care_timeline', { person: p, now, limit: 300 }),
     forget: (dose_id: string, reason: string) => op<{ receipt: string; forgotten: boolean; sha256: string }>('care_forget', { dose_id, reason }),
     forgetPerson: (confirm: string) => op<{ receipt: string; forgotten: boolean; removed_entries: number }>('care_forget_person', { person: p, confirm }),
     receipts: () => op<Receipt[]>('care_receipts'),

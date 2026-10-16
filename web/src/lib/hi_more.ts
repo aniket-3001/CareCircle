@@ -24,6 +24,7 @@ export const HI_MORE: Record<string, string> = {
   'Yes: make one circle for each person. The circle picker at the top of the page switches between them.': 'हाँ: हर व्यक्ति के लिए एक सर्कल बनाएँ। पन्ने के ऊपर का सर्कल चुनने वाला बटन उनके बीच बदलता है।',
   'Does it tell me what to take?': 'क्या यह बताता है कि क्या लेना है?',
   'No. It records what people wrote and cross-checks it. For what to take, stop or change, ask the prescriber or pharmacist. In an emergency call your local emergency number.': 'नहीं। यह लोगों का लिखा रिकॉर्ड करता और जाँचता है। क्या लेना, रोकना या बदलना है, यह डॉक्टर या फ़ार्मासिस्ट से पूछें। आपात स्थिति में अपना स्थानीय आपात नंबर लगाएँ।',
+  'Search the history': 'इतिहास में खोजें', 'Search the history, e.g. warfarin or Meena': 'इतिहास में खोजें, जैसे वारफ़रिन या मीना', 'Kind': 'प्रकार', 'All': 'सभी', 'Changes': 'बदलाव', 'Seen': 'देखा', 'Given': 'दी गई', 'Nothing matches.': 'कुछ नहीं मिला।',
   // Follow-ups
   'Follow-ups': 'अगले कदम', 'Things to ask or tell, drawn from the record. You choose which to keep.': 'पूछने या बताने की बातें, रिकॉर्ड से। कौन-सी रखनी हैं, आप चुनें।', 'Suggest from the record': 'रिकॉर्ड से सुझाव लें', 'Nothing new to suggest.': 'सुझाने को कुछ नया नहीं।', 'Add the ticked ones': 'चुनी हुई जोड़ें', 'Done by': 'पूरा किया', 'Added by': 'जोड़ा', 'The record has changed since: look again first': 'तब से रिकॉर्ड बदला है: पहले फिर देख लें', 'Dismiss': 'हटाएँ', 'Done': 'हो गया', 'Cancel': 'रद्द करें',
   // Add
