@@ -348,3 +348,63 @@ async def test_5d_deleting_a_tenant_removes_all_of_its_memory_and_only_its_memor
     await gm.db.drop_tenant(ta)
     assert ta not in await gm.db.list_tenant_graphs() and tb in await gm.db.list_tenant_graphs()
     assert [e["content"] for e in await call(client, b, tb, "history", session="s")] == ["yours"]
+
+
+# ============================================================ misuse is refused cleanly (found by probing, now pinned)
+async def test_6a_a_task_cannot_be_handed_to_an_agent_that_cannot_work_on_it(client, gm):
+    t = tid(gm, "ho")
+    (a, b) = await team(client, gm, t, ["alice", "bob"])
+    outsider = await make_agent(client, gm, "t2-eve")                                                    # exists, but has no grant on this tenant
+    ro = await make_agent(client, gm, "t2-ro", t, ("read",))                                             # can read, cannot write
+    task = await call(client, a, t, "create_task", title="job")
+    assert await call(client, a, t, "claim_task", task_id=task) is True
+    for who in ("t2-eve", "t2-ro"):
+        r = await client.post(f"/v1/tenants/{t}/handoff", json={"task_id": task, "to_agent": who}, headers=a)
+        assert r.status_code in (400, 422) and "cannot be handed" in r.text                                # refused with a reason, not silently stranded
+    assert (await call(client, a, t, "get_task", task_id=task))["owner"] == "t2-alice"                  # still alice's: nothing moved
+    assert await call(client, a, t, "handoff", task_id=task, to_agent="t2-bob") is True                  # a real teammate still works
+    assert await call(client, b, t, "accept", task_id=task) is True
+    assert outsider and ro
+
+
+async def test_6b_task_state_machine_rejects_out_of_order_moves(client, gm):
+    t = tid(gm, "sm")
+    (a, b) = await team(client, gm, t, ["alice", "bob"])
+    task = await call(client, a, t, "create_task", title="job")
+    assert await call(client, a, t, "complete", task_id=task) is False                                  # cannot finish what nobody claimed
+    assert await call(client, a, t, "accept", task_id=task) is False
+    await call(client, a, t, "claim_task", task_id=task)
+    await call(client, a, t, "handoff", task_id=task, to_agent="t2-bob")
+    assert await call(client, a, t, "complete", task_id=task) is False                                  # alice no longer owns it
+    assert await call(client, b, t, "accept", task_id=task) is True
+    assert await call(client, b, t, "accept", task_id=task) is False                                    # accepting twice does nothing
+    assert await call(client, b, t, "complete", task_id=task, result="ok") is True
+    assert await call(client, b, t, "complete", task_id=task) is False                                  # finishing twice does nothing
+    assert await call(client, a, t, "claim_task", task_id=task) is False                                # a finished task cannot be taken again
+    r = await client.post(f"/v1/tenants/{t}/resume", json={"task_id": "tsk_nope"}, headers=a)
+    assert r.status_code == 404
+
+
+async def test_6c_bad_input_is_a_clear_400_never_a_stored_blank_or_a_500(client, gm):
+    t = tid(gm, "bad")
+    (a,) = await team(client, gm, t, ["alice"])
+
+    async def refused(op, **args):
+        r = await client.post(f"/v1/tenants/{t}/{op}", json=args, headers=a)
+        assert r.status_code in (400, 422), (op, args, r.status_code, r.text[:100])
+
+    await refused("add_episode", session="s", role="user", content="")                                   # an empty message
+    await refused("add_episode", session="s", role="user", content="   \n ")
+    await refused("add_episode", session="s", role="user", content="x" * 100_001)                       # over the size cap
+    await refused("add_episode", session="", role="user", content="hi")
+    await refused("add_episode", session="s", role="Drop Table", content="hi")                          # a role is a short label
+    await refused("assert_fact", subject="", predicate="p", obj="o")
+    await refused("assert_fact", subject="s", predicate=" ", obj="o")
+    await refused("assert_fact", subject="s", predicate="p", obj="o" * 501)
+    for bad in (-5, 0, 10**9, "ten", True, 2.5):
+        await refused("history", session="s", limit=bad)                                                  # a bad limit never reaches the database
+    assert await call(client, a, t, "history", session="s") == []                                        # and none of the above left anything behind
+    ok = await call(client, a, t, "add_episode", session="s", role="user", content="héllo 🌍\nline \"q\" 'q' \ {} ; MATCH (n) DETACH DELETE n")
+    assert [e["content"] for e in await call(client, a, t, "history", session="s")] == ["héllo 🌍\nline \"q\" 'q' \ {} ; MATCH (n) DETACH DELETE n"] and ok["seq"] == 1
+    big = await call(client, a, t, "add_episode", session="s", role="tool", content="y" * 100_000)         # exactly at the cap is fine
+    assert big["seq"] == 2
