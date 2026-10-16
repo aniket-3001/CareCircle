@@ -219,7 +219,14 @@ export function App(): React.JSX.Element {
             </section>
             <section>
               <h3>{t('Your data')}</h3>
-              <p>Everything in an account (profile, circles, medicines, who has seen what, the helper conversation) is stored on the server, in a graph database, and you can export or delete it. Only a sign-in token is kept in this browser.</p>
+              <p>Everything in an account (profile, circles, medicines, who has seen what, the helper conversation) is stored on the server, in a graph database. Only a sign-in token and your theme and language choice are kept in this browser.</p>
+              <ul className="steps">
+                <li><span><b>Who can see a circle:</b> only the people you invite into it. Each circle is its own graph, apart from accounts and from the public reference data.</span></li>
+                <li><span><b>What leaves the server:</b> only a medicine name, to look up its label, recalls or ingredients on RxNorm and openFDA (US public services). Never a person's name, a dose or anything about who takes it. Text read from a photo or voice note may be sent to an Amazon Bedrock model to be tidied into entries, and you confirm every entry.</span></li>
+                <li><span><b>Notifications:</b> if you turn on browser notifications, your browser's push address is stored so we can reach it. Linking Telegram stores your chat id. Both can be turned off in Account.</span></li>
+                <li><span><b>Export and deletion:</b> History exports the record as FHIR JSON and can remove one entry or everything about a person, with a receipt. Delete my account removes the account, and any circle you were the last member of. Server backups are kept for up to 14 days, so deleted data can remain in a backup until it expires.</span></li>
+                <li><span><b>Not for emergencies:</b> this is a record, not a medical service. It does not monitor anyone.</span></li>
+              </ul>
             </section>
             <section>
               <h3>{t('Where the data comes from')}</h3>
