@@ -223,12 +223,12 @@ Limits: they run on one tenant graph at a time, and on a graph with few links Pa
   *pending* and never reaches the regimen or the checks until a person confirms it. Every proposal needs a person's confirmation.
 - **Unknown stays unknown.** 26% of DDInter pairs have severity "Unknown": shown as *unrated*.
 
-## Measured (single runs on one laptop; `docs/BENCHMARKS.md`)
+## Measured (one laptop; B-series and load test repeated 7 times each, see `docs/BENCHMARKS.md`)
 - **Enzyme-path rule vs DDInter:** of 38 pairs flagged through FDA substrates, 31 are also in DDInter, all moderate/major; the rule recovers 61 of 145 moderate/major pairs between the same drug sets (42%): precise but narrow, so it supplements the direct lookup.
 - **Carer staleness (graph query vs independent oracle):** exact in 40/40 generated circles; "last change only" baseline 4/40.
 - **Double-dose guard:** one winner in 100/100 rounds of 10 concurrent claims.
 
-- **Interaction check latency:** 8 ms median, 10 ms at the 95th percentile, for a 10-medicine regimen (direct pairs, enzyme paths and combined weight in three reads), warm, one process (`bench/care_bench.py`, B5).
+- **Interaction check latency:** 16 ms median (range 12-18 over 7 runs) and 20 ms at the 95th percentile (range 16-24), for a 10-medicine regimen (direct pairs, enzyme paths and combined weight in three reads), warm, one process, FalkorDB 4.22.1 (`bench/care_bench.py`, B5). The exact results (B1-B3) were identical in all 7 runs.
 - **Intake on real input:** 5 real bottle photos and 1 spoken note (browser microphone to Whisper): drug found in 6/6, with one wrong extra candidate; see `docs/BENCHMARKS.md` (B4).
 
 ## What runs, and how it is checked
@@ -251,7 +251,7 @@ FalkorDB is snapshotted to a private S3 bucket every 6 hours, CloudWatch alarms 
 FalkorDB itself has no query time or memory limit, so the app sets one on first connect (15 s default, 60 s ceiling, 1 GiB per query; tunable with `GRAPHMEM_QUERY_TIMEOUT_MS`, `GRAPHMEM_QUERY_TIMEOUT_MAX_MS`, `GRAPHMEM_QUERY_MEM_BYTES`, `0` = off). A query that hits a cap is stopped, a write inside it is rolled back, and the caller gets a 503 that says to ask for less. `GET /admin/db` (admin key) shows the caps in force, graph counts, memory and the slowest queries with every string value removed.
 One graph per circle costs memory: on the development database, 481 graphs use about 1.1 MB each on average (shared reference graph included, so a rough guide). Plan roughly 1 GB per thousand circles and watch `/admin/db`.
 
-FalkorDB is **pinned by digest** (4.22.1) in `docker-compose.yml`, `deploy/docker-compose.prod.yml` and the CI workflow, and `tests/test_pinned_database.py` fails if those differ or if the database a test run talks to is another version. `latest` is a moving tag: it was 4.22.1 on the server and 6.0.2 on a laptop, and three bugs hid in that gap. To upgrade, change the digest in all three files and `PINNED_VERSION` in that test together, after running the suite on the new image.
+FalkorDB is **pinned by digest** (4.22.1) in `docker-compose.yml`, `deploy/docker-compose.prod.yml` and the CI workflow, and `tests/test_pinned_database.py` fails if those differ or if the database a test run talks to is another version. `latest` is a moving tag: it was 4.22.1 on the server and 6.0.2 on a laptop, and three bugs hid in that gap. 4.22.1 is the newest release of the 4.x line (15 Oct 2026); 6.x is a different engine (Rust) for which FalkorDB documents no supported upgrade from 4.x yet, so moving is a deliberate migration, not a version bump. To upgrade, change the digest in all three files and `PINNED_VERSION` in that test together, after running the suite on the new image.
 
 ## Limits, stated plainly
 - Interaction severity weights (minor .1, moderate .3, major .7; enzyme strong .7, moderate .3; staleness half-life 72 h) are **assumptions**, not clinical values.

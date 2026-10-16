@@ -1,6 +1,6 @@
 # Benchmarks (Care Circle)
 
-Single runs on one laptop (Windows, Docker Desktop, FalkorDB 6.0.2), seeded, no LLM. Reproduce: `PYTHONPATH=. python bench/care_bench.py`.
+One laptop (Windows, Docker Desktop, 12 logical CPUs, FalkorDB 4.22.1), seeded, no LLM. The first set of numbers below came from single runs on FalkorDB 6.0.2; the section "Repeated runs" at the end repeats B1-B5 and the load test 7 times on the pinned 4.22.1 and reports median and range. Reproduce: `PYTHONPATH=. python bench/care_bench.py`, or `PYTHONPATH=. python bench/repeat.py care_bench --runs 7`.
 Data: DDInter 2.0 (CC BY-NC-SA 4.0, non-commercial) and FDA's CYP index table (index drugs only; the page says it is not exhaustive).
 
 ## B1 Enzyme-path rule vs DDInter (two independent public sources)
@@ -50,3 +50,22 @@ OCR/ASR accuracy at scale or on home-quality photos and varied accents, interact
 - Counts that come from the data or the design must be identical (`exact`); counts of things done right must not fall (`higher`); a latency may rise by 25% plus a 2 ms noise floor (`lower`), and is judged only when both runs ran on the same machine.
 - Exit 1 means something got worse. In CI the gate runs on every push with the B1 numbers skipped (they depend on the downloaded reference data) and latency skipped automatically (a different machine from the baseline).
 - Checked by breaking the code on purpose: letting a carer count their own entry as unseen turned B2 from 40/40 to 0/40 and the gate exited 1.
+
+## Repeated runs (7 each, FalkorDB 4.22.1, one laptop)
+
+`bench/repeat.py` runs a benchmark several times one after another and reports median, min and max. It exits 1 if any run failed its own checks or an exact result differed between runs (`tests/test_bench_repeat.py`).
+
+**B1-B5 (`bench/repeat.py care_bench --runs 7`).** Every exact result was identical in all 7 runs: B1 counts (FDA: 38 path pairs, 31 also in DDInter, 31 moderate or major; recall 61 of 145), B2 40/40 against the oracle (baseline 4/40), B3 one winner in 100/100 rounds. Interaction check, 10 medicines, warm: p50 median 16.3 ms (11.9-17.5), p95 median 20.3 ms (15.7-23.8).
+
+**Load test (`bench/repeat.py track02_stress --runs 7`, in-process, default scale of 30 agents and 30 tenants).** All audits passed in all 7 runs, zero request errors.
+
+| Phase | Requests per second, median (min-max) | p95 latency, median (min-max) |
+|---|---|---|
+| A write storm, 30 agents on one session | 406 (309-435) | add_episode 115 ms (90-166) |
+| B mixed, 20 writers + 10 readers | 266 (221-293) | add_episode 117 ms (99-162); recall 182 ms (161-255) |
+| C claim race | 405 (322-452) | claim_task 157 ms (136-200) |
+| D 30 tenants at once | 319 (305-399) | add_episode 118 ms (100-178) |
+| E one request per event | 304 events/s (255-423) | |
+| E batches of 20 | 5,299 events/s (3,862-6,146) | |
+
+Read the ranges, not only the medians: throughput moved by up to 30% between identical runs on this laptop (a shared machine with Docker Desktop), so differences smaller than that are noise. These are laptop figures, not capacity planning for the live server.

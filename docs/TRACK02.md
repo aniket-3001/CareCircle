@@ -28,7 +28,7 @@ Production runs FalkorDB with an append-only file synced every second, on a name
 
 ## Load test results
 
-`bench/track02_stress.py`, four phases, each followed by an audit of what the database actually holds. All figures are for one run; the audits are pass/fail.
+`bench/track02_stress.py`, four phases, each followed by an audit of what the database actually holds. The table of scales below is from earlier single runs, taken before the database was pinned; for the pinned 4.22.1, seven repeated runs with median and range are in `docs/BENCHMARKS.md` ("Repeated runs"). The audits are pass/fail.
 
 | Phase | What happens | Audit |
 |---|---|---|
