@@ -197,7 +197,7 @@ Limits: they run on one tenant graph at a time, and on a graph with few links Pa
 |---|---|---|
 | One graph per tenant (multigraph): `mem__<circle>` | `graphmem/db.py graph_name`, `graphmem/policy.py` | `tests/test_track02.py` (separate memory per tenant), `tests/test_adversarial.py` |
 | Indexes, unique constraints | `graphmem/db.py`, `graphmem/schema.py` (versioned migrations) | `tests/test_requirements.py` (database enforces unique keys), `tests/test_schema.py` |
-| Variable-length paths | `graphmem/memory.py` (`SUPERSEDES*1..10`, `INFERRED_FROM*1..8`: is a plan's input out of date) | `tests/test_plan.py` |
+| Variable-length paths | `graphmem/memory.py` (`SUPERSEDES*1..10`, `INFERRED_FROM*1..8`: is a plan's input out of date) | `tests/test_requirements.py`, `tests/test_track02.py` (a plan whose input changed is reported stale) |
 | `MERGE`, `FOREACH`, `UNWIND` | `graphmem/care.py` (atomic dose claim, supersede on confirm), `graphmem/memory.py` (ordered, gap-free events) | `tests/test_track02.py` (claim race, sequence numbers), `tests/test_rebuild.py` |
 | `algo.pageRank`, `algo.WCC` on the public reference graph | `carecircle/algos.py` (op `care_hubs`) | `tests/test_care_hubs.py` |
 | `algo.pageRank`, `algo.betweenness`, `algo.WCC`, `algo.labelPropagation` on a tenant's own graph | `graphmem/graph_algos.py` (ops `graph_influence`, `graph_communities`) | `tests/test_graph_algos.py` |
