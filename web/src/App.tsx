@@ -1,6 +1,6 @@
 import { Info, LogOut, Moon, ShieldCheck, Sun } from 'lucide-react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import type { Profile, Session } from './api/types';
 import { Assistant } from './components/Assistant';
 import { Fabs } from './components/Fabs';
@@ -14,15 +14,17 @@ import { nameOf } from './lib/format';
 import { setLang, useLang, useT } from './lib/i18n';
 import { loadSession, saveSession } from './lib/session';
 import { setTheme, useTheme } from './lib/theme';
-import { AccountScreen } from './screens/AccountScreen';
-import { AddScreen } from './screens/AddScreen';
-import { CircleScreen } from './screens/CircleScreen';
-import { GraphScreen } from './screens/GraphScreen';
-import { HistoryScreen } from './screens/HistoryScreen';
 import { Onboarding } from './screens/Onboarding';
 import { TodayScreen } from './screens/TodayScreen';
 import { Welcome } from './screens/Welcome';
 import { AppCtx, makeAccountApi, makeApi, type AppState, type TabId } from './state';
+
+// The screens a person opens less often load when first opened, so the first screen arrives sooner on a slow connection.
+const AccountScreen = lazy(() => import('./screens/AccountScreen').then((m) => ({ default: m.AccountScreen })));
+const AddScreen = lazy(() => import('./screens/AddScreen').then((m) => ({ default: m.AddScreen })));
+const CircleScreen = lazy(() => import('./screens/CircleScreen').then((m) => ({ default: m.CircleScreen })));
+const GraphScreen = lazy(() => import('./screens/GraphScreen').then((m) => ({ default: m.GraphScreen })));
+const HistoryScreen = lazy(() => import('./screens/HistoryScreen').then((m) => ({ default: m.HistoryScreen })));
 
 const TABS: TabId[] = ['today', 'add', 'circle', 'graph', 'history', 'account'];
 const fromHash = (): TabId => {
@@ -136,14 +138,14 @@ export function App(): React.JSX.Element {
   let screen: React.ReactNode = null;
   if (state && ready) {
     screen = needsCircle && tab !== 'account' ? <Onboarding /> : (
-      <>
+      <Suspense fallback={<Skeleton />}>
         {tab === 'today' && <TodayScreen />}
         {tab === 'add' && <AddScreen />}
         {tab === 'circle' && <CircleScreen />}
         {tab === 'graph' && <GraphScreen />}
         {tab === 'history' && <HistoryScreen />}
         {tab === 'account' && <AccountScreen />}
-      </>
+      </Suspense>
     );
   }
 
