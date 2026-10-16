@@ -12,6 +12,7 @@ import asyncio
 from typing import Optional
 
 from .db import new_id, norm, now_ms
+from .textcheck import fit
 
 DAY = 86_400_000
 
@@ -44,7 +45,7 @@ class CareFollowupsMixin:
         return out
 
     async def _followup_keys(self, p: str) -> set[str]:
-        rows = await self._q("MATCH (f:Followup {person:$p}) WHERE f.status <> 'dismissed' RETURN f.key", {"p": p}, scope="read")
+        rows = await self._q("MATCH (f:Followup {person:$p}) RETURN f.key", {"p": p}, scope="read")          # dismissed ones too: a person said no, so do not ask again
         return {r[0] for r in rows}
 
     async def care_followup_add(self, person: str, items: list) -> dict:
@@ -54,7 +55,7 @@ class CareFollowupsMixin:
         p = norm(person)
         added = []
         for it in items:
-            key, text = str(it.get("key", ""))[:120], " ".join(str(it.get("text", "")).split())[:200]
+            key, text = fit(it.get("key", ""), 120, "a follow-up key"), fit(it.get("text", ""), 200, "a follow-up")
             if not key or not text:
                 raise ValueError("each follow-up needs a key and text")
             kind = it.get("kind") if it.get("kind") in ("prescriber", "pharmacist", "carer", "other") else "other"
