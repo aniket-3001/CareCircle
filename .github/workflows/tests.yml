@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       falkordb:
-        image: falkordb/falkordb:latest
+        image: falkordb/falkordb@sha256:b0bdcac2cbaff989e77cb0610439b7a9289e86de033ccbbd4368b66fb680ae7a   # FalkorDB 4.22.1, pinned by digest: production, CI and local development run the same database (tests/test_pinned_database.py)
         ports: ["6379:6379"]
     steps:
       - uses: actions/checkout@v4
