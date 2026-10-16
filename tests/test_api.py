@@ -173,3 +173,16 @@ async def test_service_worker_is_served_from_the_root(client, tmp_path, monkeypa
     assert r.status_code in (200, 404)
     if r.status_code == 200:
         assert r.headers["content-type"].startswith("text/javascript") and r.headers["cache-control"] == "no-cache" and "showNotification" in r.text
+
+
+async def test_database_view_is_admin_only_and_shows_no_user_text(client, gm):
+    assert (await client.get("/admin/db")).status_code == 401
+    t = tid(gm, "s")
+    await make_agent(client, gm, "tt-slow", t)
+    await gm.db.client.select_graph(f"mem__{t}").query("CREATE (:Probe {v: $v})", {"v": "my-secret-diagnosis"})
+    r = await client.get("/admin/db?slowest=50", headers=ADMIN)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["graphs"]["total"] >= 1 and body["server"]["memory_bytes"] > 0
+    assert set(body["caps"]) >= {"TIMEOUT_DEFAULT", "TIMEOUT_MAX", "QUERY_MEM_CAPACITY"}
+    assert "my-secret-diagnosis" not in r.text

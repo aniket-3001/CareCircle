@@ -9,6 +9,7 @@
   POST /admin/agents  {agent}              -> create agent, returns its API key once
   POST /admin/grants  {agent,tenant,scopes}
   DELETE /admin/grants/{agent}/{tenant}
+  GET  /admin/db                           -> database caps, graph counts, memory and the slowest queries (read-only)
 Admin endpoints are disabled (503) unless GRAPHMEM_ADMIN_KEY is set.
 """
 from __future__ import annotations
@@ -26,6 +27,7 @@ from pydantic import BaseModel
 
 from . import accounts_api, branch, ops, spaces
 from .db import Db, Overloaded, QueryLimit
+from .dbstats import db_stats
 from .textcheck import Clean
 from .policy import GraphMem, PermissionDenied
 
@@ -264,6 +266,10 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
         except ValueError:
             raise HTTPException(422, "body must be JSON")
         return {"result": await ops.invoke_space(gm, agent, space, op, body)}
+
+    @app.get("/admin/db", dependencies=[Depends(admin)])
+    async def database(slowest: int = 10):
+        return await db_stats(gm.db, slowest)
 
     @app.post("/admin/spaces/members", dependencies=[Depends(admin)])
     async def space_member(b: MemberBody):
