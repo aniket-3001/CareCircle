@@ -1,0 +1,50 @@
+# Track 02, point by point
+
+The brief: *build agents that remember across sessions and share state with each other. Memory should persist, update over time, and be available to every agent that needs it.*
+
+Care Circle is the product built on this. The memory engine under it (`graphmem/`) is generic: any agent can use it over HTTP (`docs/API.md`) or MCP, and Care Circle's carers, helper and Telegram bot are agents of the same kind.
+
+Everything below is checked by `tests/test_track02.py` (18 tests, one section per bullet, driven over the public HTTP API like an outside agent) and `bench/track02_stress.py` (load plus an audit of what was stored). Both run in CI or by hand.
+
+| Brief | What is built | Where | Checked by |
+|---|---|---|---|
+| **Episodic memory** | An immutable, ordered event log per session: `seq`, a `NEXT` edge to the previous event, who said it, when. Full-text search over events. There is no operation that edits an event. | `add_episode`, `history`, `sessions`, `search_text` in `graphmem/memory.py` | `test_1a`, engine tests |
+| **Semantic memory** | Facts (subject, predicate, object) that update over time: an exclusive fact closes the old value and opens the new one; repeating a fact adds support instead of a duplicate; `as_of` answers "what did we believe then"; every fact links to the events it came from and says which agent wrote it; multi-hop recall; forgetting retracts a fact everywhere it was copied. | `assert_fact`, `recall`, `fact_history`, `forget_fact` | `test_1b` |
+| **Procedural memory** | Skills with steps and tags; each run's outcome moves win/run counters atomically; `best_skills` ranks by smoothed success rate, so what works rises. | `add_skill`, `record_run`, `best_skills` | `test_1c` |
+| The three kinds are one graph | A decision links to the facts and skills it used, and those to the events they came from, so "why did the agent do that" is one traversal. | `record_decision`, `explain` | `test_1d` |
+| **Persistent conversation history** | Sessions live in FalkorDB, not in a process: a fresh server and database client read the same history, numbering continues, long histories page backwards. Care Circle's helper chat is stored per carer, survives a restart, and can be cleared. | `history(before_seq)`, `care_chat_*` | `test_2`, `test_2b` |
+| **Shared state between agents** | Agents granted on a tenant read and write the same graph, so what one learns is available to the next, with who wrote it. A fork lets an agent explore on a copy and merge or discard; a space lets tenants publish chosen facts to others. | `recall`, forks (`/v1/tenants/{t}/forks`), spaces | `test_3a`, `test_3c` |
+| **Handoffs** | A task is created, claimed (one owner), handed to a named agent with a note and a plan, accepted only by that agent, resumed with the whole context in one call, and completed. A plan remembers which facts it was derived from, so when one changes the plan is reported out of date. | `create_task`, `claim_task`, `handoff`, `accept`, `resume`, `complete`, `create_plan`, `check_plan` | `test_3b` |
+| **High-concurrency reads and writes** | One conditional write per claim (a single winner however many race); sequence numbers assigned inside the database in one statement; reads run on the read path while writes land; FalkorDB's own unique constraints back it up; a full queue is retried with backoff and then answered 503, never dropped. | `graphmem/db.py` (`RetryingGraph`), the queries in `memory.py` | `test_4a` to `test_4e`, `bench/track02_stress.py` |
+| **Separate memory per user or tenant** | One graph per tenant (`mem__<id>`), per circle in Care Circle. Every call checks the agent's grant and scope; read scope can run as a database user that may only call `GRAPH.RO_QUERY`; keys are stored only as hashes; revocation applies on the next call; deleting a tenant drops its graph. Public reference data is a separate graph that holds nobody's data. | `graphmem/policy.py`, `docs/API.md` | `test_5a` to `test_5d`, `tests/test_adversarial.py` |
+
+## Load test results
+
+`bench/track02_stress.py`, four phases, each followed by an audit of what the database actually holds. All figures are for one run; the audits are pass/fail.
+
+| Phase | What happens | Audit |
+|---|---|---|
+| A write storm | N agents append to **one shared session** and assert facts at once | every event stored, `seq` 1..N with no gap or repeat, no duplicates |
+| B mixed | writers and readers on one tenant together | zero torn reads (every page a reader sees is contiguous); every write stored; one current value per fact |
+| C claim race | K agents claim one task; then one task each | exactly one winner on the contended task; every uncontended claim succeeds |
+| D many tenants | T tenants written at once | no tenant holds anything but its own data |
+
+In-process against a local FalkorDB (no network), laptop, Windows + Docker Desktop:
+
+| Scale | A: req/s | B: req/s | C: req/s | D: req/s | Audits |
+|---|---|---|---|---|---|
+| 30 agents, 30 tenants | 477 | 296 | 531 | 486 | all pass |
+| 150 agents, 50 tenants | 427 | 285 | 532 | 489 | all pass |
+
+Against the **live server** (`https://3-228-70-117.sslip.io`, a t3.large, called from India so about 300 ms of each request is network): 40 agents and 20 tenants, all four audits pass with no request errors. The throwaway tenants and agents were removed afterwards.
+
+Latency under contention (150 agents all writing one session, local): median 130 ms, but the slowest 5 per cent of `add_episode` calls wait about 2 s, because FalkorDB runs one writer at a time per graph and a hot session is one graph. A single engine-level writer sustains about 780 `add_episode` per second into one session. `assert_fact` and reads on the same tenant stay near their median. With a realistic number of agents (30) the p99 is about 140 ms.
+
+`add_episode` cost grows slowly with history (2.5 ms at 500 events, 4 ms at 3,000; measured in-process, sequentially).
+
+## Limits, stated plainly
+
+- One FalkorDB instance, no replica: a hot tenant is bounded by one writer, and a lost disk is recovered from the 6-hourly S3 snapshot, not failed over.
+- The load test is closed-loop (each simulated agent sends its next request when the last returns) and shows saturation behaviour; it is not a model of any real traffic.
+- Vector (paraphrase) recall needs an embedding model; with none configured, recall is lexical plus graph (`tests/test_semantic.py` covers the vector path with a fake embedder).
+- The memory engine holds what agents write. It does not judge whether a fact is true.
