@@ -47,7 +47,7 @@ The cast: **Priya** owns a circle for Mum, **Omar** is a second carer, **Mallory
 | F1 | Follow-ups | Suggested, approved, not repeated, stale when the record moves on, dismissed ones stay dismissed |
 | H1 | Handover notes | Append-only, attributed, kept when a carer leaves, oversized refused |
 | E1 | Erasing a person | Every kind of record gone (checked by counting each kind in the graph), the other person in the circle untouched, receipt keeps nothing |
-| E2 | Exports | FHIR has one statement per medicine; the account export has the circle and no secrets |
+| E2 | Exports | FHIR has one statement per period of a medicine (a stop ends the earlier one, it is not a second one); the account export has the circle and no secrets |
 | X1 | Advice requests | 34 phrasings, English, Hindi and Hinglish: all declined with the pharmacist pointer, none advise, none propose |
 | X2 | Emergencies | Ten phrasings point to emergency services and name 112 and 911 |
 | X3 | Answers about the record | Correct, and still correct after a stop or an acknowledgement |
@@ -89,7 +89,7 @@ Every row was found by a scenario, fixed, and is now pinned by it.
 | Long text (a dose instruction, a handover note, an appointment) was silently cut off | Refused with the limit named: never shortened without telling anyone |
 | A yes/no value was accepted as a weight | Refused |
 | A follow-up someone dismissed was suggested again | Dismissed ones are not suggested again |
-| The FHIR export listed a stopped medicine twice | One statement per medicine |
+| The FHIR export listed a stopped medicine twice (once for the dose, once for the stop) | One statement per period on a medicine: a stop ends the earlier statement |
 | "Add metformin 500 mg and atorvastatin 20 mg" became one merged proposal | One proposal per medicine, each with its exact quote |
 | "Why does she feel dizzy after the tablets?" and "can I crush the tablet?" got a flat "I can't answer" with no pointer | They get the same prescriber-or-pharmacist pointer as other advice requests, in English and Hindi |
 | When a session ended (signed out elsewhere, password changed, expired) the page kept looking signed in with broken sections | Any 401 returns to sign-in with a plain explanation |
