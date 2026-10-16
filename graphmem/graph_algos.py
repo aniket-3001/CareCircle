@@ -1,7 +1,7 @@
 """FalkorDB's graph algorithms as read-only operations on a tenant's own memory graph, so an agent can ask the graph instead of writing traversals.
 
   graph_schema         what is in the graph: labels and relationship types with counts
-  graph_path           shortest path between two nodes (the "how is A connected to B" question)
+  graph_path           shortest path between two nodes (breadth-first, any direction) (the "how is A connected to B" question)
   graph_influence      PageRank or betweenness: which nodes everything else hangs on
   graph_communities    weakly connected components or label propagation: which nodes belong together
   graph_neighbourhood  everything within a few hops of one node
@@ -18,6 +18,8 @@ REF_MAX = 200
 MAX_TOP = 50
 MAX_HOPS = 10
 MAX_NEIGHBOURS = 100
+MAX_VISIT = 20000
+EXPAND = "MATCH (a)-[r]-(b) WHERE id(a) IN $f AND NOT b:Schema RETURN id(a), type(r), id(b) ORDER BY id(a), id(b), type(r)"
 
 # how a node is shown: its label, the value it is referred to by, and a short human title
 SHOW = ("labels({n})[0] AS label, coalesce({n}.id, {n}.key, {n}.name) AS ref, "
@@ -37,6 +39,11 @@ def _ref(v, what: str = "a node reference") -> str:
     if not isinstance(v, str) or not v.strip() or len(v) > REF_MAX:
         raise ValueError(f"{what} is the node's id, key or name (1 to {REF_MAX} characters)")
     return v
+
+
+def _cfg(label: Optional[str]) -> str:
+    """Algorithm configuration: every label, or one (the label travels as the parameter $label; older servers reject a null list, so the map differs)."""
+    return "{}" if label is None else "{nodeLabels: [$label]}"
 
 
 def _node(row) -> dict:
@@ -80,16 +87,35 @@ class GraphAlgoMixin:
         a, b = await self._find(source, sl), await self._find(target, tl)
         if a is None or b is None:
             return {"found": False, "reason": "unknown node: " + ("source" if a is None else "target"), "path": []}
-        if a == b:                                     # FalkorDB answers a node's path to itself with null
+        if a == b:
             n = (await self._q(f"MATCH (x) WHERE id(x) = $a RETURN {SHOW.format(n='x')}", {"a": a}, scope="read"))[0]
-            return {"found": True, "length": 0, "path": [_node(n)], "relationships": []}
-        cypher = (f"MATCH (a) WHERE id(a) = $a MATCH (b) WHERE id(b) = $b WITH shortestPath((a)-[*..{hops}]-(b)) AS p "
-                  f"RETURN length(p), [x IN nodes(p) | {SHOW_MAP.format(n='x')}], [r IN relationships(p) | type(r)]")
-        row = (await self._q(cypher, {"a": a, "b": b}, scope="read"))[0]
-        if row[0] is None:
-            return {"found": False, "reason": f"no connection within {hops} hops", "path": [], "cypher": cypher}
-        nodes, types = row[1], row[2]
-        return {"found": True, "length": row[0], "path": nodes, "relationships": types, "cypher": cypher}
+            return {"found": True, "length": 0, "path": [_node(n)], "relationships": [], "cypher": EXPAND}
+        # Breadth-first, one query per hop, ignoring direction. FalkorDB's own undirected shortestPath exists only in newer versions (4.22 lacks it), and this
+        # gives the same answer on every version. Ties are broken by internal id, so the same question always gets the same path.
+        parent: dict[int, Optional[tuple[int, str]]] = {a: None}
+        frontier = [a]
+        for _ in range(hops):
+            if b in parent or not frontier:
+                break
+            nxt = []
+            for x, rel, y in await self._q(EXPAND, {"f": frontier}, scope="read"):
+                if y not in parent:
+                    parent[y] = (x, rel)
+                    nxt.append(y)
+            if len(parent) > MAX_VISIT:
+                return {"found": False, "reason": f"stopped after {len(parent)} records; ask for fewer hops or name a label", "path": [], "cypher": EXPAND}
+            frontier = nxt
+        if b not in parent:
+            return {"found": False, "reason": f"no connection within {hops} hops", "path": [], "cypher": EXPAND}
+        ids, types, at = [b], [], b
+        while parent[at] is not None:
+            at, rel = parent[at]
+            ids.append(at)
+            types.append(rel)
+        ids.reverse()
+        types.reverse()
+        shown = {r[0]: _node(r[1:]) for r in await self._q(f"MATCH (x) WHERE id(x) IN $ids RETURN id(x), {SHOW.format(n='x')}", {"ids": ids}, scope="read")}
+        return {"found": True, "length": len(types), "path": [shown[i] for i in ids], "relationships": types, "cypher": EXPAND}
 
     async def graph_influence(self, metric: str = "pagerank", label: Optional[str] = None, top: int = 10) -> dict:
         """The most influential nodes: metric 'pagerank' (many well-connected nodes point here) or 'betweenness' (many shortest paths go through here)."""
@@ -98,7 +124,7 @@ class GraphAlgoMixin:
         if metric == "pagerank":
             call = "CALL algo.pageRank($label, null) YIELD node, score"
         elif metric == "betweenness":
-            call = "CALL algo.betweenness({nodeLabels: CASE WHEN $label IS NULL THEN null ELSE [$label] END}) YIELD node, score"
+            call = f"CALL algo.betweenness({_cfg(lab)}) YIELD node, score"
         else:
             raise ValueError("metric is 'pagerank' or 'betweenness'")
         cypher = f"{call} WITH node, score WHERE NOT node:Schema WITH node, score ORDER BY score DESC LIMIT $top RETURN {SHOW.format(n='node')}, score"
@@ -109,7 +135,7 @@ class GraphAlgoMixin:
         """Groups of nodes that belong together: method 'wcc' (connected components) or 'labelpropagation' (communities inside a connected graph)."""
         top = _clamp(top, 1, MAX_TOP, "top")
         lab = await self._label_arg(label)
-        cfg = "{nodeLabels: CASE WHEN $label IS NULL THEN null ELSE [$label] END}"
+        cfg = _cfg(lab)
         if method == "wcc":
             call = f"CALL algo.WCC({cfg}) YIELD node, componentId AS cid"
         elif method == "labelpropagation":

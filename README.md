@@ -144,7 +144,7 @@ cc_ref also has  (:Cached {url, at, body})  public lookups, by medicine name onl
 | Direct interactions in a regimen | `MATCH (x:Drug)-[m:INTERACTS]-(y:Drug) WHERE x.name IN $d AND y.name IN $d` | `carecircle/checks.py` |
 | Enzyme path | `(x)-[:INHIBITS\|INDUCES]->(e:Enzyme)<-[:SUBSTRATE_OF]-(y)` | `carecircle/checks.py` |
 | Hub medicines | `CALL algo.pageRank('Drug','HAZARD')` | `carecircle/algos.py hub_drugs` |
-| Shortest path between two records | `WITH shortestPath((a)-[*..8]-(b)) AS p RETURN nodes(p), relationships(p)` | `graphmem/graph_algos.py graph_path` |
+| Shortest path between two records | breadth-first, one `MATCH (a)-[r]-(b) WHERE id(a) IN $frontier` per hop (FalkorDB 4.22 has no undirected `shortestPath`), deterministic ties | `graphmem/graph_algos.py graph_path` |
 | What the record hangs on | `CALL algo.pageRank($label, null)` or `CALL algo.betweenness({nodeLabels: ...})` on the tenant's own graph | `graph_algos.py graph_influence` |
 | What belongs together | `CALL algo.WCC(...)` or `CALL algo.labelPropagation(...)`, grouped and counted | `graph_algos.py graph_communities` |
 | Everything near one record | level-by-level `MATCH (a)-[r]-(b) WHERE id(a) IN $frontier`, nearest first, capped | `graph_algos.py graph_neighbourhood` |

@@ -232,3 +232,24 @@ async def test_every_operation_works_as_the_read_only_database_user():
     finally:
         await db.drop_tenant(t)
         await (await gm2._ctl()).query("MATCH (n) WHERE n.id IN ['tt-garo-agent', $t] DETACH DELETE n", {"t": t})
+
+
+async def test_equal_length_paths_give_the_same_answer_every_time(gm):
+    t = tid(gm, "ga-tie")
+    await gm.grant("ann", t, ("read", "write"))
+    m = gm.open("ann", t)
+    await m._q("CREATE (s:Entity {key:'s'}), (e:Entity {key:'e'}), (m1:Entity {key:'m1'}), (m2:Entity {key:'m2'}), "
+               "(s)-[:L]->(m1), (m1)-[:L]->(e), (s)-[:L]->(m2), (m2)-[:L]->(e)")
+    seen = {tuple(n["ref"] for n in (await m.graph_path("s", "e"))["path"]) for _ in range(6)}
+    assert len(seen) == 1 and len(next(iter(seen))) == 3
+
+
+async def test_a_search_that_would_visit_too_much_stops_and_says_so(gm, monkeypatch):
+    from graphmem import graph_algos
+    t = tid(gm, "ga-visit")
+    await gm.grant("ann", t, ("read", "write"))
+    m = gm.open("ann", t)
+    await m._q("CREATE (s:Entity {key:'s'}), (e:Entity {key:'e'}) WITH s, e UNWIND range(1, 30) AS i CREATE (s)-[:L]->(:Entity {key:'x' + toString(i)})-[:L]->(:Entity {key:'y' + toString(i)})")
+    monkeypatch.setattr(graph_algos, "MAX_VISIT", 10)
+    r = await m.graph_path("s", "e", max_hops=5)
+    assert r["found"] is False and "stopped after" in r["reason"]
