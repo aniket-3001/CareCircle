@@ -72,3 +72,24 @@ async def test_conditions_profile_and_erase(gm):
     assert (await m.care_profile("asha"))["conditions"] == []
     await m.care_forget_person("asha", confirm="asha")
     assert (await m.care_profile("asha"))["allergies"] == [] and await m.care_appointments("asha") == []
+
+
+async def test_edit_an_appointment_and_reword_conditions_and_allergies(gm):
+    m = await _m(gm, "ed")
+    now = int(time.time() * 1000)
+    a = (await m.care_appoint("asha", "Clinic", now + 3 * D, "Riverside", "meena", "diary"))["id"]
+    await m.care_appointment_edit(a, at=now + 6 * D, place="North clinic")
+    got = next(x for x in await m.care_appointments("asha", now) if x["id"] == a)
+    assert got["place"] == "North clinic" and got["at"] == now + 6 * D and got["title"] == "Clinic" and got["bring"] == "diary"      # only what was sent changed
+    with pytest.raises(ValueError):
+        await m.care_appointment_edit(a, at=now + 99 * 366 * D)
+    with pytest.raises(KeyError):
+        await m.care_appointment_edit("nope", title="x")
+    c = (await m.care_condition_add("asha", "high bp"))["id"]
+    await m.care_profile_edit(c, "high blood pressure")
+    al = (await m.care_allergy_add("asha", "something"))["id"]
+    assert (await m.care_profile_edit(al, "penicillin"))["resolved_to"] in ("penicillin v", "penicillin g", "penicillin", "")
+    prof = await m.care_profile("asha")
+    assert prof["conditions"][0]["name"] == "high blood pressure" and prof["allergies"][0]["text"] == "penicillin"
+    with pytest.raises(ValueError):
+        await m.care_profile_edit(c, "  ")

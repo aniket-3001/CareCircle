@@ -66,6 +66,8 @@ Content-Type: application/json
 | `care_trend` | read | `person`*, `kind`*, `drug`, `window_days`, `now` | The readings of one kind with the dates that `drug`'s entry changed marked on the same timeline. For each change: how many readings and |
 | `care_appoint` | write | `person`*, `title`*, `at`*, `place`, `who`, `bring` |  |
 | `care_appointments` | read | `person`*, `now` | Upcoming first (soonest first), then past ones, newest first. A past planned appointment reads as done: nothing is rewritten. |
+| `care_appointment_edit` | write | `appointment_id`*, `title`, `at`, `place`, `who`, `bring` | Change an appointment's details. Only what is sent changes; who edited it and when is kept. |
+| `care_profile_edit` | write | `item_id`*, `text`* | Reword a condition or an allergy. An allergy is matched to a medicine name again, so the cross-check follows the new wording. |
 | `care_appointment_cancel` | write | `appointment_id`* |  |
 | `care_since_visit` | read | `person`*, `appointment_id`, `now` | What to bring to the doctor: every change to the record since the previous appointment (or the last 30 days), the flags now, what no |
 | `care_condition_add` | write | `person`*, `name`* |  |

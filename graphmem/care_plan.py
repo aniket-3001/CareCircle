@@ -58,6 +58,24 @@ class CarePlanMixin:
             raise KeyError(appointment_id)
         return {"id": appointment_id, "status": "cancelled"}
 
+    async def care_appointment_edit(self, appointment_id: str, title: str = "", at: Optional[int] = None, place: Optional[str] = None,
+                                    who: Optional[str] = None, bring: Optional[str] = None) -> dict:
+        """Change an appointment's details. Only what is sent changes; who edited it and when is kept."""
+        sets, p = ["a.edited_by=$by", "a.edited_at=$now"], {"id": appointment_id, "by": norm(self.agent), "now": now_ms()}
+        if title:
+            sets.append("a.title=$t"); p["t"] = " ".join(title.split())[:80]
+        if at is not None:
+            if at < now_ms() - 366 * 24 * H or at > now_ms() + 5 * 366 * 24 * H:
+                raise ValueError("that date is not within a sensible range")
+            sets.append("a.at=$at"); p["at"] = int(at)
+        for key, val, cut in (("place", place, 100), ("who", who, 40), ("bring", bring, 200)):
+            if val is not None:
+                sets.append(f"a.{key}=${key}"); p[key] = (norm(val) if key == "who" else val)[:cut]
+        rows = await self._q(f"MATCH (a:Appointment {{id:$id}}) SET {', '.join(sets)} RETURN a.id", p)
+        if not rows:
+            raise KeyError(appointment_id)
+        return {"id": appointment_id}
+
     async def care_since_visit(self, person: str, appointment_id: str = "", now: Optional[int] = None) -> dict:
         """What to bring to the doctor: every change to the record since the previous appointment (or the last 30 days), the flags now, what no
         carer has yet seen, readings taken in that time, and the questions the carers wrote down. Assembled from the record; nothing is added."""
@@ -106,6 +124,23 @@ class CarePlanMixin:
         conds = await self._q("MATCH (c:Condition)-[:FOR]->(:Person {id:$p}) RETURN c.id, c.name, c.by ORDER BY c.at", {"p": norm(person)}, scope="read")
         alg = await self._q("MATCH (a:Allergy)-[:FOR]->(:Person {id:$p}) RETURN a.id, a.text, a.drug, a.by ORDER BY a.at", {"p": norm(person)}, scope="read")
         return {"conditions": [dict(id=r[0], name=r[1], by=r[2]) for r in conds], "allergies": [dict(id=r[0], text=r[1], drug=r[2], by=r[3]) for r in alg]}
+
+    async def care_profile_edit(self, item_id: str, text: str) -> dict:
+        """Reword a condition or an allergy. An allergy is matched to a medicine name again, so the cross-check follows the new wording."""
+        text = " ".join(text.split())[:80]
+        if not text:
+            raise ValueError("it needs some text")
+        rows = await self._q("MATCH (n) WHERE (n:Condition OR n:Allergy) AND n.id = $id RETURN labels(n)[0]", {"id": item_id})
+        if not rows:
+            raise KeyError(item_id)
+        if rows[0][0] == "Condition":
+            await self._q("MATCH (n:Condition {id:$id}) SET n.name=$t", {"id": item_id, "t": text})
+            return {"id": item_id, "resolved_to": ""}
+        from .care import checker
+        cands = await asyncio.to_thread(checker().resolve, text, 1)
+        drug = cands[0]["name"] if cands and cands[0]["score"] >= 0.9 else ""
+        await self._q("MATCH (n:Allergy {id:$id}) SET n.text=$t, n.drug=$d", {"id": item_id, "t": text, "d": drug})
+        return {"id": item_id, "resolved_to": drug}
 
     async def care_profile_remove(self, item_id: str) -> dict:
         rows = await self._q("MATCH (n) WHERE (n:Condition OR n:Allergy) AND n.id = $id DETACH DELETE n RETURN 1", {"id": item_id})
