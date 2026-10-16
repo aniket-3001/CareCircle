@@ -17,6 +17,8 @@ services:
     build: ..
     environment:
       GRAPHMEM_ADMIN_KEY: ${GRAPHMEM_ADMIN_KEY:?set GRAPHMEM_ADMIN_KEY}
+      GRAPHMEM_RO_PASSWORD: ${GRAPHMEM_RO_PASSWORD:?set GRAPHMEM_RO_PASSWORD}   # read operations run as a database user that can only call GRAPH.RO_QUERY
+      CC_WHISPER: base                                  # the speech model baked into the image (Dockerfile): no download at the first voice note
       FALKORDB_HOST: falkordb
       CC_DEMO: ${CC_DEMO:-1}
       CC_DEMO_MAX: ${CC_DEMO_MAX:-300}                  # oldest demo circle is deleted beyond this many
