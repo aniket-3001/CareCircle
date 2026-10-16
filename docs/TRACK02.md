@@ -18,6 +18,10 @@ Everything below is checked by `tests/test_track02.py` (18 tests, one section pe
 | **High-concurrency reads and writes** | One conditional write per claim (a single winner however many race); sequence numbers assigned inside the database in one statement; reads run on the read path while writes land; FalkorDB's own unique constraints back it up; a full queue is retried with backoff and then answered 503, never dropped. | `graphmem/db.py` (`RetryingGraph`), the queries in `memory.py` | `test_4a` to `test_4e`, `bench/track02_stress.py` |
 | **Separate memory per user or tenant** | One graph per tenant (`mem__<id>`), per circle in Care Circle. Every call checks the agent's grant and scope; read scope can run as a database user that may only call `GRAPH.RO_QUERY`; keys are stored only as hashes; revocation applies on the next call; deleting a tenant drops its graph. Public reference data is a separate graph that holds nobody's data. | `graphmem/policy.py`, `docs/API.md` | `test_5a` to `test_5d`, `tests/test_adversarial.py` |
 
+## Persistence
+
+Production runs FalkorDB with an append-only file synced every second, on a named volume, with `restart: unless-stopped` (`deploy/docker-compose.prod.yml`), and snapshots to S3 every 6 hours. `scripts/check_persistence.py` proves it: it starts a throwaway FalkorDB with those same settings, writes history, facts, a skill outcome, a claimed task and a care record, restarts the container and reads everything back with a new client (all present, numbering continues), then kills the container hard (SIGKILL) and starts it again (31 of 31 events present; by design at most the last second could be lost).
+
 ## Load test results
 
 `bench/track02_stress.py`, four phases, each followed by an audit of what the database actually holds. All figures are for one run; the audits are pass/fail.
