@@ -139,6 +139,10 @@ class CareMixin:
              "sref": stored["id"] if stored else ""})
         if status == "confirmed":
             await self._care_activate(did)
+            if action == "set" and cur and cur[0][2] and same(cur[0][2], freq_text):          # the same written frequency: keep the times a person already confirmed
+                await self._q("MATCH (o:Dose {id:$o}), (x:Dose {id:$n}) WHERE o.slots IS NOT NULL AND x.slots IS NULL "
+                              "SET x.slots=o.slots, x.as_needed=o.as_needed, x.sched_by=o.sched_by, x.sched_at=o.sched_at, x.ends_on=o.ends_on",
+                              {"o": cur[0][0], "n": did}, checked=True)
         out = {"id": rows[0][0], "status": status, "verified": verified,
                "note": None if verified else ("no stored source for this " + source_type + ": confirm manually before it counts" if source_type != "typed" and not stored
                                               else "quote not found in the source text: confirm manually before it counts")}
@@ -206,12 +210,16 @@ class CareMixin:
     async def care_regimen(self, person: str, as_of: Optional[int] = None) -> list[dict]:
         """What `person` takes now, or at `as_of` (ms): confirmed 'set' entries valid at that time."""
         t = now_ms() if as_of is None else as_of
+        from carecircle import schedule as sched
+        today = sched.local_date(t, await self._tz()).isoformat()
         rows = await self._q(
             """MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p})
                WHERE x.action='set' AND x.valid_from <= $t AND (x.valid_to IS NULL OR x.valid_to > $t)
-               RETURN x.id, x.drug, x.dose_text, x.freq_text, x.valid_from, x.source_type, x.quote, x.by ORDER BY x.drug""",
-            {"p": norm(person), "t": t}, scope="read")
-        return [dict(id=r[0], drug=r[1], dose_text=r[2], freq_text=r[3], since=r[4], source=r[5], quote=r[6], by=r[7]) for r in rows]
+                 AND (x.ends_on IS NULL OR x.ends_on = '' OR x.ends_on >= $today)
+               RETURN x.id, x.drug, x.dose_text, x.freq_text, x.valid_from, x.source_type, x.quote, x.by, x.slots, x.as_needed, x.ends_on ORDER BY x.drug""",
+            {"p": norm(person), "t": t, "today": today}, scope="read")
+        return [dict(id=r[0], drug=r[1], dose_text=r[2], freq_text=r[3], since=r[4], source=r[5], quote=r[6], by=r[7],
+                     slots=list(r[8] or []), as_needed=bool(r[9]), ends_on=r[10] or None) for r in rows]
 
     async def care_check(self, person: str, as_of: Optional[int] = None) -> dict:
         """Interaction flags for the regimen at `as_of`, from the shared reference graph (sources attached; never 'safe')."""
