@@ -446,6 +446,11 @@ def u13(w, b, r):
     r.check(again["given"] is False and again.get("already_given_by"), "a second try on the same slot is refused and names who gave it", again)
     pg.reload()
     expect(pg.get_by_test_id("checklist")).to_be_visible(timeout=20000)
+    pg.get_by_test_id("packs").locator("summary").click()                                  # count the pack: 9 doses at two a day is about 4 days
+    pg.get_by_test_id("pack-input").first.fill("9")
+    pg.get_by_test_id("pack-save").first.click()
+    expect(pg.get_by_test_id("pack-left").first).to_contain_text("9", timeout=15000)
+    r.check("about 4" in pg.get_by_test_id("pack-left").first.inner_text(), "a counted pack says how many days it lasts, as an estimate", pg.get_by_test_id("pack-left").first.inner_text())
     r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
     ctx.close()
 

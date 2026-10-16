@@ -209,3 +209,28 @@ async def test_the_one_click_demo_circle_opens_with_a_checklist_not_an_empty_one
     assert today["unscheduled"] == [] and len(today["items"]) == 5
     assert {"08:00", "20:00"} <= {i["time"] for i in today["items"] if i["drug"] == "metformin"}
     assert [i["time"] for i in today["items"]] == sorted(i["time"] for i in today["items"])
+
+
+async def test_doses_left_run_down_as_doses_are_marked_given_and_a_nearly_empty_pack_is_said_once(gm):
+    t, a, b, ro = await circle(gm)
+    day = date(2026, 10, 17)
+    met = await entry(a, at_ms=at(day, "00:00") - 5 * 24 * H)
+    await a.care_schedule_set(met, ["08:00", "20:00"])
+    await a.care_stock_set(met, 7)                                                   # counted: 7 doses in the pack
+    s0 = (await a.care_stock("asha", at(day, "07:00")))[0]
+    assert (s0["doses_left"], s0["per_day"], s0["days_left"]) == (7, 2, 3)           # 7 doses at 2 a day: about 3 days
+    await a.care_give_slot("asha", met, "08:00", now=at(day, "08:05"))
+    s1 = (await a.care_stock("asha", at(day, "09:00")))[0]
+    assert (s1["doses_left"], s1["days_left"]) == (6, 3)                              # one marked given: 6 left
+    with pytest.raises(PermissionDenied):
+        await ro.care_stock_set(met, 3)
+    for bad in (-1, 10_000, True, "5"):
+        with pytest.raises(ValueError):
+            await a.care_stock_set(met, bad)
+    first = [n for n in await a.care_slot_nudges("asha", now=at(day, "09:00")) if n["kind"] == "stock"]
+    assert len(first) == len({n["notify"] for n in first}) >= 1                 # one per carer, none repeated
+    assert "about 3 days of doses left" in first[0]["message"]["text"]
+    again = [n for n in await a.care_slot_nudges("asha", now=at(day, "09:30")) if n["kind"] == "stock"]
+    assert again == []                                                               # said once per carer for this count
+    await a.care_stock_set(met, 40)                                                  # a new pack was counted
+    assert [n for n in await a.care_slot_nudges("asha", now=at(day, "10:00")) if n["kind"] == "stock"] == []

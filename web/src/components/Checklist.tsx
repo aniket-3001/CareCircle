@@ -1,6 +1,6 @@
 import { CalendarClock, Check, Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { Suggestion, TodayItem, TodayView } from '../api/types';
+import type { StockRow, Suggestion, TodayItem, TodayView } from '../api/types';
 import { useT, tr } from '../lib/i18n';
 import { nameOf, title } from '../lib/format';
 import { useApp, useLoad } from '../state';
@@ -104,9 +104,62 @@ function Checked({ today, error, onGive, busy, onSet, setting, closeSet, t }: {
         </div>
       )}
       {today.as_needed.length > 0 && <p className="muted small">{t('Taken as needed, so no fixed times:')} {today.as_needed.map((a) => title(a.drug)).join(', ')}.</p>}
+      <Packs today={today} />
       <p className="muted small">{today.tz} · {today.date}</p>
       <SetTimes u={setting} close={closeSet} />
     </section>
+  );
+}
+
+/** How many doses are left in each pack, counted by a person. Doses marked given after the count come off it; the days are 'about', from what is on the record. */
+function Packs({ today }: { today: TodayView }): React.JSX.Element | null {
+  const app = useApp();
+  const t = useT();
+  const toast = useToast();
+  const stock = useLoad((a) => a.api.stock(a.now()), [app.warp]);
+  const [vals, setVals] = useState<Record<string, string>>({});
+  const meds = [...new Map(today.items.map((i) => [i.dose_id, i.drug] as const)).entries()];
+  if (meds.length === 0) return null;
+  const by: Record<string, StockRow> = Object.fromEntries((stock.data ?? []).map((s) => [s.dose_id, s]));
+
+  async function save(id: string, drug: string): Promise<void> {
+    const n = Number(vals[id]);
+    if (!Number.isInteger(n) || n < 0 || n > 9999) { toast(t('Enter a whole number from 0 to 9999.')); return; }
+    try {
+      await app.api.setStock(id, n);
+      toast(`${title(drug)}: ${n} ${t('doses left saved.')}`);
+      setVals((v) => ({ ...v, [id]: '' }));
+      app.bump();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not save');
+    }
+  }
+
+  return (
+    <details className="inspect" data-testid="packs">
+      <summary>{t('Packs: how many doses are left')}</summary>
+      <div className="rows">
+        {meds.map(([id, drug]) => {
+          const s = by[id];
+          return (
+            <div key={id} className="item" data-testid="pack">
+              <div>
+                <div className="item__title">{title(drug)}</div>
+                <div className="item__sub" data-testid="pack-left">
+                  {s ? `${s.doses_left} ${t('doses left on the record')}${s.days_left !== null ? ` · ${t('about')} ${s.days_left} ${s.days_left === 1 ? t('day') : t('days')}` : ''}` : t('Not counted yet')}
+                </div>
+              </div>
+              <div className="row">
+                <input type="number" inputMode="numeric" min={0} max={9999} aria-label={`${title(drug)}: ${t('doses left in the pack')}`} value={vals[id] ?? ''}
+                  onChange={(e) => setVals((v) => ({ ...v, [id]: e.target.value }))} style={{ width: '5.5rem' }} data-testid="pack-input" />
+                <button type="button" className="btn btn--soft btn--sm" onClick={() => void save(id, drug)} data-testid="pack-save">{t('Save count')}</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="muted small">{t('Count the doses in the pack and enter the number. Doses marked as given after that come off it. A pack can also be used another way, so check the pack itself.')}</p>
+    </details>
   );
 }
 

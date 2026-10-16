@@ -48,6 +48,17 @@ export interface TodayItem {
   needs_second_carer: boolean;
 }
 
+export interface StockRow {
+  dose_id: string;
+  drug: string;
+  doses_left: number;
+  counted: number;
+  counted_at: number;
+  per_day: number;
+  days_left: number | null;
+  runs_out_on: string | null;
+}
+
 export interface TodayView {
   person: string;
   tz: string;

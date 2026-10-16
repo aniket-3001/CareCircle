@@ -67,6 +67,39 @@ class CareScheduleMixin:
                       {"id": dose_id, "s": slots, "a": bool(as_needed), "e": ends, "by": norm(self.agent), "t": now_ms()}, checked=True)
         return {"id": dose_id, "drug": rows[0][0], "times": slots, "as_needed": bool(as_needed), "ends_on": ends or None}
 
+    # ------------------------------------------------------------------ how many doses are left in the pack
+    async def care_stock_set(self, dose_id: str, doses_left: int) -> dict:
+        """Record how many doses are left in the pack of this entry (counted by a person, today). Doses marked given after this are taken off it."""
+        if isinstance(doses_left, bool) or not isinstance(doses_left, int) or not 0 <= doses_left <= 9999:
+            raise ValueError("doses left is a whole number from 0 to 9999")
+        rows = await self._q("MATCH (x:Dose {id:$id, status:'confirmed', cur:true, action:'set'}) RETURN x.drug", {"id": dose_id}, scope="write")
+        if not rows:
+            raise KeyError(dose_id)
+        await self._q("MATCH (x:Dose {id:$id}) SET x.stock=$n, x.stock_at=$t, x.stock_by=$by", {"id": dose_id, "n": doses_left, "t": now_ms(), "by": norm(self.agent)}, checked=True)
+        return {"id": dose_id, "drug": rows[0][0], "doses_left": doses_left}
+
+    async def care_stock(self, person: str, now: Optional[int] = None) -> list[dict]:
+        """For each current entry with a pack count: the doses left now (the count minus the doses marked given since it was counted) and, when it has fixed
+        times, about how many days that lasts. It works from what people recorded: a pack can also be used up another way, so it says 'about' and 'on the record'."""
+        t = now_ms() if now is None else now
+        tz = await self._tz()
+        reg = {r["id"]: r for r in await self.care_regimen(person, t)}
+        out = []
+        for did, drug, n, at in await self._q(
+                "MATCH (x:Dose {status:'confirmed', cur:true, action:'set'})-[:FOR]->(:Person {id:$p}) WHERE x.stock IS NOT NULL RETURN x.id, x.drug, x.stock, x.stock_at",
+                {"p": norm(person)}, scope="read"):
+            r = reg.get(did)
+            if r is None:                                                    # a course that has ended is not listed
+                continue
+            used = (await self._q("MATCH (g:Give {person:$p, drug:$d}) WHERE g.at >= $s RETURN count(g)", {"p": norm(person), "d": norm(drug), "s": at}, scope="read"))[0][0]
+            left = max(0, int(n) - int(used))
+            per_day = len(r["slots"] or [])
+            days = left // per_day if per_day else None
+            out.append({"dose_id": did, "drug": drug, "doses_left": left, "counted": int(n), "counted_at": at, "per_day": per_day, "days_left": days,
+                        "runs_out_on": (sched.local_date(t, tz) + __import__("datetime").timedelta(days=days)).isoformat() if days is not None else None})
+        out.sort(key=lambda x: (x["days_left"] is None, x["days_left"] if x["days_left"] is not None else 0, x["drug"]))
+        return out
+
     # ------------------------------------------------------------------ the checklist
     async def care_today(self, person: str, now: Optional[int] = None) -> dict:
         """Today's confirmed dose slots in the circle's time zone, in clock order, each with its state: given (and by whom), due, not marked given yet, or
@@ -120,6 +153,17 @@ class CareScheduleMixin:
         today = await self.care_today(person, t)
         carers = [r[0] for r in await self._q("MATCH (c:Person {role:'carer'}) RETURN c.id ORDER BY c.id", scope="read", checked=True)]
         out = []
+        for s in await self.care_stock(person, t):                         # a pack with about three days or fewer left on the record: said once per carer per count
+            if s["days_left"] is None or s["days_left"] > 3:
+                continue
+            for c in carers:
+                if hold and c.lower() in hold:
+                    continue
+                key = f"stock|{norm(person)}|{norm(s['drug'])}|{s['counted_at']}|{c}"
+                r = await self._q("MERGE (n:Nudge {key:$k}) ON CREATE SET n.at=$t, n.fresh=true WITH n, n.fresh AS fresh SET n.fresh=false RETURN fresh", {"k": key, "t": t}, checked=True)
+                if r[0][0]:
+                    out.append({"kind": "stock", "notify": c, "drug": s["drug"], "slot": "",
+                                "message": {"text": f"{s['drug'].capitalize()}: about {s['days_left']} day{'s' if s['days_left'] != 1 else ''} of doses left on the record ({s['doses_left']}). Please check the pack.", "source": "template"}})
         for i in today["items"]:
             if i["state"] not in ("due", "not_marked"):
                 continue
