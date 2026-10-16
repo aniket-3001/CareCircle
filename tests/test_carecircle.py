@@ -443,3 +443,12 @@ async def test_a_reminder_held_for_quiet_hours_is_still_sent_afterwards(gm):
     assert await r.care_nudges("mum", now=later, hold={"meena", "ravi"}) == []   # everyone quiet: nothing claimed
     sent = await r.care_nudges("mum", now=later)                                 # quiet hours over: it goes out, once
     assert sent and await r.care_nudges("mum", now=later) == []
+
+
+def test_strength_read_through_ocr_punctuation_but_not_from_prose():
+    ch = Checker()
+    for text, want in (("Metocurine\n40:mg tablets", "40:mg"), ("selumetinib 50.mg.tablets", "50.mg"), ("Warfarin 5 mg", "5 mg"), ("Metformin 500mg", "500mg")):
+        p = intake.rule_proposals(text, ch)
+        assert p and p[0]["dose_text"] == want, (text, p)
+    p = intake.rule_proposals("Warfarin dose 5: great care is needed", ch)                  # a bare "g" after punctuation is prose, not grams
+    assert p and p[0]["dose_text"] == ""
