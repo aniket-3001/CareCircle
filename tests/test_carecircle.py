@@ -188,6 +188,34 @@ class FakeApi:
         return demo.label_png("Warfarin Sodium 5 mg tablets", "Take ONE tablet daily at bedtime"), "p.png"
 
 
+async def test_a_slow_telegram_reply_does_not_stall_everything_else(gm):
+    """The bot runs in the same process as the web server: a Telegram call that takes seconds must not freeze the event loop for that long."""
+    import asyncio
+    import time
+
+    class SlowApi(FakeApi):
+        def send(self, chat, text, buttons=None):
+            time.sleep(0.6)                                         # a blocking HTTP call, as urllib is
+            super().send(chat, text, buttons)
+
+    api, ticks, stop = SlowApi(), [], asyncio.Event()
+
+    async def ticker():
+        while not stop.is_set():
+            ticks.append(time.perf_counter())
+            await asyncio.sleep(0.02)
+
+    bot = Bot(gm, api, Checker())
+    task = asyncio.create_task(ticker())
+    await asyncio.sleep(0.1)
+    await bot.handle({"message": {"chat": {"id": 7}, "text": "/start"}})
+    await asyncio.sleep(0.1)                                        # let the ticker tick once more, so a freeze shows up as a gap
+    stop.set()
+    await task
+    assert api.out and "records and cross-checks" in api.out[-1][1]
+    assert max(b - a for a, b in zip(ticks, ticks[1:])) < 0.3, "the event loop was blocked while the message was sent"
+
+
 async def test_bot_link_photo_confirm_check_and_nudge(gm, monkeypatch):
     monkeypatch.setenv("CC_LLM", "0")
     t, c = await circle(gm, "ravi", "meena")

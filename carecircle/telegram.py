@@ -43,9 +43,23 @@ class TgApi:
         return urllib.request.urlopen(self.file_base + path, timeout=60).read(), path
 
 
+class _OffLoop:
+    """Telegram's client is blocking (urllib, up to 60 s). The bot shares one process with the web server, so every send runs in a worker thread:
+    a slow Telegram answer then delays that one message, not every request on the server."""
+
+    def __init__(self, api):
+        self._api = api
+
+    async def send(self, chat: int, text: str, buttons: Optional[list] = None) -> None:
+        await asyncio.to_thread(self._api.send, chat, text, buttons)
+
+    def __getattr__(self, name):
+        return getattr(self._api, name)
+
+
 class Bot:
     def __init__(self, gm, api, checker):
-        self.gm, self.api, self.checker = gm, api, checker
+        self.gm, self.api, self.checker = gm, _OffLoop(api), checker
 
     async def _hold(self, cid: str, chat: int, data: dict) -> None:
         """Proposals wait for a human in the control graph, not in memory, so a restart or deploy does not expire the Confirm button."""
@@ -72,12 +86,12 @@ class Bot:
             return
         text = (m.get("text") or "").strip()
         if text.startswith("/start") or text.startswith("/help"):
-            return self.api.send(chat, HELP)
+            return await self.api.send(chat, HELP)
         if text.startswith("/link"):
             return await self._cmd_link(chat, text.split())
         link = await self._link(chat)
         if not link:
-            return self.api.send(chat, "Please link this chat first: /link <key> <circle>")
+            return await self.api.send(chat, "Please link this chat first: /link <key> <circle>")
         if text.startswith("/circles"):
             return await self._cmd_circles(chat, link, text.split())
         mem = self.gm.open(link["agent"], link["circle"])
@@ -87,31 +101,31 @@ class Bot:
         try:
             if text.startswith("/who"):
                 p = await mem.care_people()
-                return self.api.send(chat, f"Cared for: {', '.join(p['patients']) or '-'}\nCarers: {', '.join(p['carers']) or '-'}")
+                return await self.api.send(chat, f"Cared for: {', '.join(p['patients']) or '-'}\nCarers: {', '.join(p['carers']) or '-'}")
             if text.startswith("/regimen"):
                 reg = await mem.care_regimen(arg)
-                return self.api.send(chat, "\n".join(f"- {r['drug']} {r['dose_text']} {r['freq_text']} (by {r['by']}, via {r['source']})"
+                return await self.api.send(chat, "\n".join(f"- {r['drug']} {r['dose_text']} {r['freq_text']} (by {r['by']}, via {r['source']})"
                                                      for r in reg) or "Nothing on record yet.")
             if text.startswith("/check"):
-                return self.api.send(chat, self._format_check(await mem.care_check(arg)))
+                return await self.api.send(chat, self._format_check(await mem.care_check(arg)))
             if text.startswith("/history"):
                 tl = await mem.care_timeline(arg or await self._patient(mem), limit=8)
-                return self.api.send(chat, chr(10).join(f"- {e['text']} ({e['ago']})" for e in tl) or "Nothing recorded yet.")
+                return await self.api.send(chat, chr(10).join(f"- {e['text']} ({e['ago']})" for e in tl) or "Nothing recorded yet.")
             if text.startswith("/ack"):
                 return await self._cmd_ack(chat, mem, arg)
             if text.startswith("/gave"):
                 parts = text.split(maxsplit=3)
                 if len(parts) < 4:
-                    return self.api.send(chat, "Usage: /gave <person> <medicine> <slot>, e.g. /gave asha metformin 2026-10-16 08:00")
+                    return await self.api.send(chat, "Usage: /gave <person> <medicine> <slot>, e.g. /gave asha metformin 2026-10-16 08:00")
                 r = await mem.care_give(parts[1], parts[2], parts[3])
-                return self.api.send(chat, "Recorded." if r["given"] else f"Already recorded by {r['already_given_by']}. {r['note']}")
+                return await self.api.send(chat, "Recorded." if r["given"] else f"Already recorded by {r['already_given_by']}. {r['note']}")
             if "photo" in m or "voice" in m or "audio" in m or "document" in m:
                 return await self._media(chat, m)
             if text and not text.startswith("/"):
                 return await self._propose(chat, intake._done("typed", text, "text"), None)
         except KeyError:
-            return self.api.send(chat, "I could not find that.")
-        self.api.send(chat, HELP)
+            return await self.api.send(chat, "I could not find that.")
+        await self.api.send(chat, HELP)
 
     @staticmethod
     async def _patient(mem) -> str:
@@ -121,19 +135,19 @@ class Bot:
     async def _cmd_link(self, chat, parts):
         """`/link <code>` with the six-character code from the Account page (preferred), or `/link <key> <circle>` for an API key."""
         if len(parts) < 2:
-            return self.api.send(chat, "Usage: /link <code from your Account page>")
+            return await self.api.send(chat, "Usage: /link <code from your Account page>")
         g = await self.gm._ctl()
         if not parts[1].startswith("gm_"):
             from carecircle.accounts import Accounts
             acc = Accounts(self.gm)
             if not await acc.hit(f"tglink|{chat}", 8, 900):
-                return self.api.send(chat, "Too many tries. Wait a few minutes.")
+                return await self.api.send(chat, "Too many tries. Wait a few minutes.")
             agent = await acc.redeem_telegram_code(parts[1])
             if not agent:
-                return self.api.send(chat, "That code is not valid or has expired. Make a new one on the Account page.")
+                return await self.api.send(chat, "That code is not valid or has expired. Make a new one on the Account page.")
             circles = await acc.circles(agent)
             if not circles:
-                return self.api.send(chat, "Your account has no circle yet. Create one in the app, then link again.")
+                return await self.api.send(chat, "Your account has no circle yet. Create one in the app, then link again.")
             want = parts[2].lower() if len(parts) > 2 else ""
             pick = next((c for c in circles if c["id"] == want or c["name"].lower() == want), circles[0])
             # one chat per account: linking a new one replaces the old one, which is told
@@ -141,29 +155,29 @@ class Bot:
             await g.query("MATCH (c:TgChat {agent:$a}) WHERE c.chat <> $c DELETE c", {"a": agent, "c": chat})
             await g.query("MERGE (c:TgChat {chat:$c}) SET c.agent=$a, c.circle=$t", {"c": chat, "a": agent, "t": pick["id"]})
             for o in old:
-                self.api.send(o, "This chat was unlinked: the account now uses another Telegram chat. Link again from the Account page if you want it back.")
-            return self.api.send(chat, f"Linked to {pick['name']}. Send a photo, voice note or text about a medicine. /circles lists your circles.")
+                await self.api.send(o, "This chat was unlinked: the account now uses another Telegram chat. Link again from the Account page if you want it back.")
+            return await self.api.send(chat, f"Linked to {pick['name']}. Send a photo, voice note or text about a medicine. /circles lists your circles.")
         if len(parts) < 3:
-            return self.api.send(chat, "Usage: /link <key> <circle>")
+            return await self.api.send(chat, "Usage: /link <key> <circle>")
         agent = await self.gm.authenticate(parts[1])
         if not agent or parts[2] not in await self.gm.tenants_of(agent):
-            return self.api.send(chat, "That key does not give access to that circle.")
+            return await self.api.send(chat, "That key does not give access to that circle.")
         await g.query("MERGE (c:TgChat {chat:$c}) SET c.agent=$a, c.circle=$t", {"c": chat, "a": agent, "t": parts[2]})
-        self.api.send(chat, f"Linked as {agent} to circle {parts[2]}. Send a photo, voice note or text about a medicine.")
+        await self.api.send(chat, f"Linked as {agent} to circle {parts[2]}. Send a photo, voice note or text about a medicine.")
 
     async def _cmd_circles(self, chat, link, parts):
         from carecircle.accounts import Accounts
         acc = Accounts(self.gm)
         circles = await acc.circles(link["agent"])
         if not circles:
-            return self.api.send(chat, "This chat is linked with a key, not an account, so it has one circle.")
+            return await self.api.send(chat, "This chat is linked with a key, not an account, so it has one circle.")
         if len(parts) > 1 and parts[1].isdigit() and 1 <= int(parts[1]) <= len(circles):
             pick = circles[int(parts[1]) - 1]
             g = await self.gm._ctl()
             await g.query("MATCH (c:TgChat {chat:$c}) SET c.circle=$t", {"c": chat, "t": pick["id"]})
-            return self.api.send(chat, f"Now using {pick['name']}.")
+            return await self.api.send(chat, f"Now using {pick['name']}.")
         nl = chr(10)
-        self.api.send(chat, nl.join(f"{n}. {c['name']}{' (here)' if c['id'] == link['circle'] else ''}" for n, c in enumerate(circles, 1)) + nl + "Send /circles <number> to switch.")
+        await self.api.send(chat, nl.join(f"{n}. {c['name']}{' (here)' if c['id'] == link['circle'] else ''}" for n, c in enumerate(circles, 1)) + nl + "Send /circles <number> to switch.")
 
     async def _media(self, chat, m):
         item = (m.get("photo") or [None])[-1] or m.get("voice") or m.get("audio") or m.get("document")
@@ -174,10 +188,10 @@ class Bot:
 
     async def _propose(self, chat, src, image):
         if src["status"] != "ok":
-            return self.api.send(chat, src.get("note") or "I could not read that. Please type the medicine name.")
+            return await self.api.send(chat, src.get("note") or "I could not read that. Please type the medicine name.")
         props = await asyncio.to_thread(intake.propose, src["text"], self.checker, image, "jpeg")
         if not props:
-            return self.api.send(chat, "I did not find a medicine name. Please type it.")
+            return await self.api.send(chat, "I did not find a medicine name. Please type it.")
         kinds = {"image": "photo", "voice": "voice", "document": "document"}
         link = await self._link(chat)
         who = await self._patient(self.gm.open(link["agent"], link["circle"])) if link else "mum"   # the circle's person
@@ -187,7 +201,7 @@ class Bot:
             await self._hold(cid, chat, {"drug": top, "dose_text": p.get("dose_text", ""), "freq_text": p.get("freq_text", ""),
                                  "quote": p["quote"], "source_text": src["text"], "source_type": kinds.get(src["kind"], "typed")})
             alt = ", ".join(c["name"] for c in p["drug_candidates"][1:])
-            self.api.send(chat, f"I read: {top} {p.get('dose_text', '')} {p.get('freq_text', '')}\nFrom: \"{p['quote'][:120]}\""
+            await self.api.send(chat, f"I read: {top} {p.get('dose_text', '')} {p.get('freq_text', '')}\nFrom: \"{p['quote'][:120]}\""
                                 f"{' (quote verified)' if p.get('verified') else ' (could not verify the quote)'}"
                                 f"{chr(10) + 'Other matches: ' + alt if alt else ''}\nIs this right? It is saved only when you confirm.",
                           [[{"text": f"Confirm for {who}", "callback_data": f"ok|{cid}|{who}"}, {"text": "Discard", "callback_data": f"no|{cid}|"}]])
@@ -198,13 +212,13 @@ class Bot:
         link = await self._link(chat)
         p = await self._take(cid, chat)
         if not link or not p or kind != "ok":
-            return self.api.send(chat, "Discarded." if kind == "no" else "That request expired.")
+            return await self.api.send(chat, "Discarded." if kind == "no" else "That request expired.")
         mem = self.gm.open(link["agent"], link["circle"])
         r = await mem.care_record(person or await self._patient(mem), p["drug"], dose_text=p["dose_text"], freq_text=p["freq_text"],
                                   source_type=p["source_type"], quote=p["quote"], source_text=p["source_text"])
         if r["status"] == "pending":
             await mem.care_confirm(r["id"])                          # the person just confirmed by tapping
-        self.api.send(chat, f"Saved {p['drug']} for {person or 'the person'}. Other carers will be asked to acknowledge it.")
+        await self.api.send(chat, f"Saved {p['drug']} for {person or 'the person'}. Other carers will be asked to acknowledge it.")
 
     async def _cmd_ack(self, chat, mem, person):
         div = await mem.care_divergence(person or await self._patient(mem))
@@ -212,7 +226,7 @@ class Bot:
         todo = div["carers"].get(me, {}).get("unacknowledged", [])
         for u in todo:
             await mem.care_ack(u["dose"])
-        self.api.send(chat, f"Acknowledged {len(todo)} change(s)." if todo else "Nothing waiting for you.")
+        await self.api.send(chat, f"Acknowledged {len(todo)} change(s)." if todo else "Nothing waiting for you.")
 
     @staticmethod
     def _format_check(c: dict) -> str:
@@ -251,7 +265,7 @@ class Bot:
                 for n in await mem.care_nudges(person, now=now, hold=hold):
                     text = n["message"]["text"]
                     for chat in chats.get(n["notify"], []):
-                        self.api.send(chat, text)
+                        await self.api.send(chat, text)
                         sent += 1
                     for agent in members:
                         if agent.lower() == n["notify"]:
