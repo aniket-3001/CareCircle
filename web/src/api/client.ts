@@ -139,7 +139,10 @@ export type AccountApi = ReturnType<typeof accountApi>;
 // ---------------------------------------------------------------- the throw-away anonymous demo
 export async function startDemo(): Promise<Session> {
   const r = await fetch('/demo/start', { method: 'POST' });
-  if (!r.ok) throw new ApiError('Could not start the demo', r.status);
+  if (!r.ok) {
+    const said = ((await r.json().catch(() => ({}))) as { detail?: unknown }).detail;                 // 429 and 503 say why, in words a person can use
+    throw new ApiError(typeof said === 'string' && said ? said : 'Could not start the demo', r.status);
+  }
   const j = (await r.json()) as { circle: string; person: string; keys: Record<string, string> };
   return { circle: j.circle, person: j.person, keys: j.keys, as: Object.keys(j.keys)[0] ?? '', demoCircle: true };
 }

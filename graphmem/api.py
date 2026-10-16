@@ -14,7 +14,9 @@ Admin endpoints are disabled (503) unless GRAPHMEM_ADMIN_KEY is set.
 """
 from __future__ import annotations
 
+import collections
 import hmac
+import ipaddress
 import os
 import time
 from typing import Optional
@@ -68,6 +70,39 @@ def _bearer(authorization: Optional[str]) -> str:
     return authorization[7:].strip()
 
 
+def client_ip(request: Request) -> str:
+    """The caller's address. Behind our own reverse proxy (a private or loopback peer) the proxy puts the real address in X-Forwarded-For; a
+    caller that reaches the server directly cannot choose its address that way, because the header is only believed from a private peer."""
+    peer = request.client.host if request.client else "?"
+    try:
+        private = ipaddress.ip_address(peer).is_private
+    except ValueError:
+        private = False
+    fwd = request.headers.get("x-forwarded-for", "")
+    return fwd.split(",")[0].strip() or peer if private and fwd else peer
+
+
+class HourlyCap:
+    """At most `limit` events per key in any rolling hour; held in this process's memory like the other limiters."""
+
+    def __init__(self, limit: int):
+        self.limit, self.events = limit, {}
+
+    def allow(self, key: str) -> bool:
+        if self.limit <= 0:
+            return True
+        now = time.monotonic()
+        q = self.events.setdefault(key, collections.deque())
+        while q and now - q[0] > 3600:
+            q.popleft()
+        if len(self.events) > 5000:
+            self.events.clear()
+        if len(q) >= self.limit:
+            return False
+        q.append(now)
+        return True
+
+
 class RateLimiter:
     """Per-caller token bucket held in this process's memory. With several API processes each enforces its own limit,
     so the effective ceiling is limit x processes; put a shared limiter (proxy/CDN) in front for a hard global cap."""
@@ -107,7 +142,7 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
             app.state.tg = asyncio.create_task(telegram.poll(gm, token))
 
     async def agent_id(request: Request, authorization: Optional[str] = Header(None)) -> str:
-        ip = request.client.host if request.client else "?"
+        ip = client_ip(request)
         who = await gm.authenticate(_bearer(authorization))
         if not who:
             if not bad_auth.allow(ip):
@@ -166,19 +201,32 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
         app.mount("/assets", StaticFiles(directory=str(dist / "assets")), name="assets")     # hashed file names: cacheable
 
     demo_on = os.getenv("CC_DEMO", "1") == "1"
-    demo_circles: list[str] = []
+    demo_circles: list[list] = []                                   # [circle, time it was made]; the time is 0 for those found at startup
+    demo_per_caller = HourlyCap(int(os.getenv("CC_DEMO_PER_HOUR", "12")))
+    demo_everyone = HourlyCap(int(os.getenv("CC_DEMO_ALL_PER_HOUR", "600")))
     app.state.accounts = accounts_api.mount(app, gm, agent_id, demo_on)            # sign-in, profiles, circles, invitations
 
     @app.post("/demo/start")
-    async def demo_start():
-        """Create a fresh synthetic demo circle (keys returned). Capped: the oldest demo circle is deleted beyond CC_DEMO_MAX."""
+    async def demo_start(request: Request):
+        """Create a fresh synthetic demo circle (keys returned). Capped: beyond CC_DEMO_MAX the oldest demo circle is deleted, but never one made in the last
+        CC_DEMO_KEEP_MIN minutes (someone is probably using it); a caller may make CC_DEMO_PER_HOUR an hour, everyone together CC_DEMO_ALL_PER_HOUR."""
         if not demo_on:
             raise HTTPException(404, "demo disabled")
+        if not demo_per_caller.allow(client_ip(request)) or not demo_everyone.allow("all"):
+            raise HTTPException(429, "Too many demo circles were started. Wait a little and try again.")
         from carecircle import demo
+        cap, keep = int(os.getenv("CC_DEMO_MAX", "40")), float(os.getenv("CC_DEMO_KEEP_MIN", "20")) * 60
+        old_enough = lambda e: time.time() - e[1] >= keep  # noqa: E731
+        if len(demo_circles) >= 2 * cap and not any(old_enough(e) for e in demo_circles):
+            raise HTTPException(503, "The demo is busy right now. Try again in a few minutes.")
         out = await demo.start(gm)
-        demo_circles.append(out["circle"])
-        while len(demo_circles) > int(os.getenv("CC_DEMO_MAX", "40")):
-            await demo.forget(gm, demo_circles.pop(0))
+        demo_circles.append([out["circle"], time.time()])
+        while len(demo_circles) > cap:
+            victim = next((e for e in demo_circles if old_enough(e)), None)
+            if victim is None:
+                break                                               # everything left is recent: keep it, even if that is briefly over the cap
+            demo_circles.remove(victim)
+            await demo.forget(gm, victim[0])
         return out
 
     @app.on_event("startup")
@@ -187,9 +235,9 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
             return
         try:
             from carecircle import demo
-            demo_circles[:] = await demo.known(gm)
+            demo_circles[:] = [[c, 0.0] for c in await demo.known(gm)]
             while len(demo_circles) > int(os.getenv("CC_DEMO_MAX", "40")):
-                await demo.forget(gm, demo_circles.pop(0))
+                await demo.forget(gm, demo_circles.pop(0)[0])
         except Exception as e:           # never keep the server from starting over housekeeping
             print("demo circle registry not restored:", type(e).__name__, e)
 

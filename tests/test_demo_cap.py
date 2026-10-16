@@ -47,6 +47,8 @@ async def test_forget_refuses_anything_that_is_not_an_anonymous_demo_circle(gm, 
 
 async def test_the_cap_holds_through_the_api_and_the_dropped_keys_stop_working(gm, monkeypatch):
     monkeypatch.setenv("CC_DEMO_MAX", "2")
+    monkeypatch.setenv("CC_DEMO_KEEP_MIN", "0")                         # no protection for recent circles: this test is about the cap itself
+    monkeypatch.setenv("CC_DEMO_PER_HOUR", "0")
     app = create_app(gm, admin_key="admin-secret")
     made = []
     try:
@@ -89,3 +91,66 @@ async def test_the_cap_survives_a_restart(gm, monkeypatch):
         for d in older:
             if (await exists(gm, d["circle"]))[1]:
                 await demo.forget(gm, d["circle"])
+
+
+async def _start(c, **headers):
+    return await c.post("/demo/start", headers=headers)
+
+
+async def test_one_caller_cannot_flood_the_demo_and_others_are_not_affected(gm, monkeypatch):
+    monkeypatch.setenv("CC_DEMO_MAX", "50")
+    monkeypatch.setenv("CC_DEMO_PER_HOUR", "2")
+    app = create_app(gm, admin_key="admin-secret")
+    made = []
+    try:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+            for _ in range(2):
+                r = await _start(c, **{"x-forwarded-for": "203.0.113.7"})
+                assert r.status_code == 200
+                made.append(r.json())
+            assert (await _start(c, **{"x-forwarded-for": "203.0.113.7"})).status_code == 429       # the third in an hour from the same address
+            other = await _start(c, **{"x-forwarded-for": "198.51.100.9"})
+            assert other.status_code == 200                                                         # a different caller is fine
+            made.append(other.json())
+    finally:
+        for d in made:
+            if (await exists(gm, d["circle"]))[1]:
+                await demo.forget(gm, d["circle"])
+
+
+async def test_a_circle_someone_just_started_is_not_pushed_out_by_the_cap(gm, monkeypatch):
+    """Starting demos in a loop used to rotate every other visitor's circle out mid-session. Recent circles are kept; past twice the cap the demo says it is busy."""
+    monkeypatch.setenv("CC_DEMO_MAX", "1")
+    monkeypatch.setenv("CC_DEMO_KEEP_MIN", "60")
+    monkeypatch.setenv("CC_DEMO_PER_HOUR", "0")
+    app = create_app(gm, admin_key="admin-secret")
+    made = []
+    try:
+        async with app.router.lifespan_context(app):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+                for _ in range(2):
+                    r = await _start(c)
+                    assert r.status_code == 200
+                    made.append(r.json())
+                for d in made:
+                    assert await exists(gm, d["circle"]) == (True, 1, 2, 2)                          # both survive, although the cap is 1
+                assert (await _start(c)).status_code == 503                                         # twice the cap, nothing old enough to remove: busy
+                for d in made:
+                    assert await exists(gm, d["circle"]) == (True, 1, 2, 2)
+    finally:
+        for d in made:
+            if (await exists(gm, d["circle"]))[1]:
+                await demo.forget(gm, d["circle"])
+
+
+def test_the_forwarded_address_is_believed_only_from_a_private_peer():
+    from graphmem.api import client_ip
+
+    class Req:
+        def __init__(self, peer, fwd=None):
+            self.client = type("C", (), {"host": peer})()
+            self.headers = {"x-forwarded-for": fwd} if fwd else {}
+    assert client_ip(Req("172.18.0.5", "203.0.113.7, 10.0.0.1")) == "203.0.113.7"          # our proxy, on the private network
+    assert client_ip(Req("127.0.0.1", "203.0.113.7")) == "203.0.113.7"
+    assert client_ip(Req("8.8.8.8", "198.51.100.1")) == "8.8.8.8"                  # a direct caller cannot choose its address
+    assert client_ip(Req("8.8.8.8")) == "8.8.8.8"
