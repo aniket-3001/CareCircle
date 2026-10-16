@@ -80,3 +80,12 @@ def test_known_single_ingredient_labels_behave_as_before(ch):
     props = intake.rule_proposals("Warfarin Sodium 5 mg tablets\nTake ONE tablet daily at bedtime", ch)
     assert names(props) == ["warfarin"] and props[0]["dose_text"] == "5 mg" and props[0]["freq_text"].lower() == "daily"
     assert "combination" not in props[0] and "unchecked" not in props[0]["drug_candidates"][0]
+
+
+def test_what_goes_to_the_model_has_no_names_numbers_or_addresses_but_keeps_the_medicine_lines():
+    from carecircle.intake import redact_identifiers
+    text = "Patient: Asha Rao\nAge 71 F\nPh 98765 43210\nDr. Mehta MBBS, mehta@clinic.in\nTab Telma-AM 40/5 once daily\nWarfarin 5 mg at bedtime\nAddress: 12 Park Road, Delhi"
+    out = redact_identifiers(text)
+    for gone in ("Asha", "Rao", "71", "98765", "Mehta", "mehta@", "Park Road"):
+        assert gone not in out, gone
+    assert "Tab Telma-AM 40/5 once daily" in out and "Warfarin 5 mg at bedtime" in out

@@ -215,6 +215,19 @@ _PROMPT = ("You read medication information. Extract every medicine mentioned. R
            "from the source; use \"\" when absent. Never infer, convert, complete or correct anything. No advice, no commentary.")
 
 
+_ID_LINE = re.compile(r"^[ \t]*(?:patient|pt|name|mr|mrs|ms|miss|shri|smt|dr|doctor|address|addr|dob|d\.o\.b|age|sex|gender|phone|mobile|mob|tel|contact|uhid|mrn|reg(?:istration)?\.? ?no|id|aadhaar|aadhar)\b[^\n]*$", re.I | re.M)
+_PHONE = re.compile(r"(?<![\d.])(?:\+?\d[\d \-]{8,}\d)(?![\d.])")
+_EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+
+
+def redact_identifiers(text: str) -> str:
+    """What leaves the server for the model: lines that carry who the patient or doctor is (name, age, address, phone, ids) and any phone number or
+    email are replaced by a marker. Medicine lines are left as they are, and the proposals are still checked against the ORIGINAL text, so nothing a person
+    sees is changed by this."""
+    t = _ID_LINE.sub("[removed]", text)
+    return _EMAIL.sub("[removed]", _PHONE.sub("[removed]", t))
+
+
 def llm_proposals(text: str, image: Optional[bytes] = None, image_format: str = "png") -> list[dict]:
     """Bedrock Converse. Returns [] on any failure so the caller falls back to rules. Output is untrusted: strict shape + caps."""
     if os.getenv("CC_LLM", "1") == "0":
@@ -225,7 +238,7 @@ def llm_proposals(text: str, image: Optional[bytes] = None, image_format: str = 
         content = []
         if image:
             content.append({"image": {"format": image_format, "source": {"bytes": image}}})
-        content.append({"text": _PROMPT + "\n\nSOURCE TEXT:\n" + text[:6000]})
+        content.append({"text": _PROMPT + "\n\nSOURCE TEXT:\n" + redact_identifiers(text)[:6000]})
         r = client.converse(modelId=os.getenv("CC_MODEL", "us.amazon.nova-pro-v1:0"), messages=[{"role": "user", "content": content}],
                             inferenceConfig={"maxTokens": 800, "temperature": 0})
         raw = r["output"]["message"]["content"][0]["text"]
