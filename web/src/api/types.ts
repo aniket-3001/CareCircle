@@ -11,6 +11,7 @@ export interface Session {
 }
 
 export interface RegimenEntry {
+  product?: string;
   slots?: string[];
   as_needed?: boolean;
   ends_on?: string | null;
@@ -85,12 +86,21 @@ export interface Judgement {
   statement: string;
 }
 
+export interface DuplicateFlag {
+  kind: 'duplicate';
+  ingredient: string;
+  entries: { id: string; product: string; dose_text: string; freq_text: string; by: string }[];
+  meaning: string;
+  source: string;
+}
+
 export interface CheckResult {
   checked: string[];
   not_in_reference: string[];
   direct: DirectFlag[];
   unrated: DirectFlag[];
   enzyme_paths: EnzymePath[];
+  duplicates?: DuplicateFlag[];
   regimen_risk: number | null;
   notice: string;
   regimen: RegimenEntry[];

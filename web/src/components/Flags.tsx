@@ -9,10 +9,20 @@ const TONE: Record<string, Tone> = { major: 'bad', moderate: 'warn', minor: 'min
 
 /** Every flag with its source and the graph pattern behind it. Unrated pairs are shown as unrated, never as safe. */
 export function Flags({ check }: { check: CheckResult }): React.JSX.Element {
-  const none = !check.direct.length && !check.enzyme_paths.length && !check.unrated.length;
+  const dups = check.duplicates ?? [];
+  const none = !check.direct.length && !check.enzyme_paths.length && !check.unrated.length && !dups.length;
   if (none) return <p className="muted">{tr('No flags from the reference data. That is not a statement of safety.')}</p>;
   return (
     <div className="stack">
+      {dups.map((d) => (
+        <div key={d.ingredient} className="flag flag--path" data-testid="duplicate-flag">
+          <div className="row row--wrap">
+            <b>{title(d.ingredient)} {tr('is on record more than once')}</b>
+            <Pill tone="warn">{tr('possible duplicate')}</Pill>
+          </div>
+          <span className="muted small">{d.entries.map((e) => `${e.product ? title(e.product) : tr('entered as the medicine itself')}${e.dose_text ? ` ${e.dose_text}` : ''}`).join(' · ')}. {tr('It may be the same medicine from two sources. Discuss with a prescriber or pharmacist.')}</span>
+        </div>
+      ))}
       {check.direct.map((f) => {
         const k = sevKey(f.level);
         return (

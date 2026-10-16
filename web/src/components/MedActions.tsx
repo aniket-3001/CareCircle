@@ -20,7 +20,7 @@ export function MedActions({ r }: { r: RegimenEntry }): React.JSX.Element {
   async function save(action: 'set' | 'stop'): Promise<void> {
     setBusy(true);
     try {
-      const rec = await app.api.record({ drug: r.drug, action, dose_text: action === 'stop' ? r.dose_text : dose, freq_text: action === 'stop' ? r.freq_text : freq, source_type: 'typed', quote: '', source_text: '' });
+      const rec = await app.api.record({ drug: r.drug, action, dose_text: action === 'stop' ? r.dose_text : dose, freq_text: action === 'stop' ? r.freq_text : freq, source_type: 'typed', quote: '', source_text: '', product: r.product ?? '' });
       await app.api.confirm(rec.id);
       toast(rec.warning ? `${title(r.drug)} updated. ${rec.warning}` : action === 'stop' ? `${title(r.drug)} recorded as stopped. The other carers will be asked to acknowledge it.` : `${title(r.drug)} updated. The other carers will be asked to acknowledge it.`);
       setMode(null);

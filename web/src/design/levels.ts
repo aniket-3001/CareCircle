@@ -29,7 +29,7 @@ export type SeverityKey = keyof typeof SEVERITY;
 export function worstSeverity(c: CheckResult): SeverityKey {
   const levels = c.direct.map((f) => f.level.toLowerCase());
   if (levels.includes('major')) return 'major';
-  if (levels.includes('moderate') || c.enzyme_paths.length > 0) return 'moderate';
+  if (levels.includes('moderate') || c.enzyme_paths.length > 0 || (c.duplicates?.length ?? 0) > 0) return 'moderate';
   if (levels.includes('minor')) return 'minor';
   if (c.unrated.length > 0 || c.judgement.state === 'partial') return 'unrated';
   return c.judgement.state === 'no_known_conflict' ? 'none' : 'unrated';

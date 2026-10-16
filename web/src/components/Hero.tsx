@@ -24,11 +24,13 @@ export interface Chip {
 export function Hero({ check, chips }: { check: CheckResult; chips: Chip[] }): React.JSX.Element {
   const t = useT();
   const j = check.judgement;
-  const n = check.direct.length + check.enzyme_paths.length;
+  const dupCount = check.duplicates?.length ?? 0;
+  const n = check.direct.length + check.enzyme_paths.length + dupCount;
   const shown = useSettle(n);
   const noData = j.state === 'no_data';
   const sev = worstSeverity(check);
   const level = SEVERITY[sev];
+  const onlyDuplicates = dupCount > 0 && check.direct.length + check.enzyme_paths.length === 0;
   const top = [...check.direct].sort((a, b) => (sevKey(b.level) === 'major' ? 1 : 0) - (sevKey(a.level) === 'major' ? 1 : 0))[0];
   return (
     <section className={`hero${noData ? ' hero--neutral' : ''}`} style={noData ? undefined : levelVars(sev)} aria-labelledby="hero-title" data-testid="verdict" data-state={j.state}>
@@ -44,7 +46,7 @@ export function Hero({ check, chips }: { check: CheckResult; chips: Chip[] }): R
         </div>
         <div>
           <h2 id="hero-title" className="hero-level">
-            {t(noData ? 'Nothing to check yet' : HEAD[sev])}
+            {t(noData ? 'Nothing to check yet' : onlyDuplicates ? 'Possible duplicate flagged' : HEAD[sev])}
           </h2>
           <p className="hero-line">{j.statement}</p>
         </div>

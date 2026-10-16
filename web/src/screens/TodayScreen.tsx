@@ -72,7 +72,7 @@ export function TodayScreen(): React.JSX.Element {
                           </span>
                           <div>
                             <div className="item__title">
-                              {title(r.drug)} <span className="muted">{r.dose_text} {r.freq_text}</span>
+                              {title(r.drug)} <span className="muted">{r.dose_text} {r.freq_text}</span>{r.product ? <span className="pill pill--mute" style={{ marginLeft: 6 }}>{t('as')} {title(r.product)}</span> : null}
                             </div>
                             <div className="item__sub">
                               added by {nameOf(r.by)} {SOURCE[r.source]}, {ago(r.since, app.now())}
@@ -107,7 +107,7 @@ export function TodayScreen(): React.JSX.Element {
                 </ul>
               </section>
             </div>
-            {(c.direct.length > 0 || c.enzyme_paths.length > 0 || c.unrated.length > 0) && (
+            {(c.direct.length > 0 || c.enzyme_paths.length > 0 || c.unrated.length > 0 || (c.duplicates?.length ?? 0) > 0) && (
               <section className="card wide" aria-labelledby="flags-title">
                 <h2 id="flags-title">{t('Flags, with their sources')}</h2>
                 <Flags check={c} />

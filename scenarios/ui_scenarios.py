@@ -450,6 +450,34 @@ def u13(w, b, r):
     ctx.close()
 
 
+@scenario("U14", "The same ingredient from two products: a second doctor's Telma-AM next to plain amlodipine is flagged as a possible duplicate")
+def u14(w, b, r):
+    errs = []
+    ctx, pg = new_page(b, errs=errs)
+    email = f"u14-{rid()}@scenario.test"
+    ui_signup(pg, "Dup", email)
+    ui_circle(pg, "Mum's medicines", "Mum")
+    expect(pg.get_by_text("Nothing on record yet")).to_be_visible()
+    u = api_user(w, email)
+    c = circle_of(u)
+    u.ok(c, "care_record", person="mum", drug="amlodipine", dose_text="5 mg", freq_text="once daily")
+    tab(pg, "Add")
+    pg.get_by_placeholder("e.g. Clarithromycin 500 mg twice daily for 7 days").fill("Telma-AM 40 mg once daily")
+    pg.get_by_role("button", name="Read it").click()
+    expect(pg.get_by_test_id("proposal")).to_have_count(2, timeout=20000)
+    for _ in range(2):
+        pg.get_by_role("button", name="Confirm and save").first.click()
+        pg.wait_for_timeout(900)
+    expect(pg.get_by_test_id("duplicate-flag")).to_be_visible(timeout=20000)
+    txt = pg.get_by_test_id("duplicate-flag").inner_text().lower()
+    r.check("amlodipine" in txt and "telma-am" in txt and "may be the same medicine from two sources" in txt, "the flag names the ingredient and both sources", txt)
+    r.check("duplicate" in pg.get_by_test_id("verdict").inner_text().lower(), "and the verdict says a possible duplicate was found", pg.get_by_test_id("verdict").inner_text()[:120])
+    reg = u.ok(c, "care_regimen", person="mum")
+    r.check(sorted((x["drug"], x["product"]) for x in reg) == [("amlodipine", ""), ("amlodipine", "telma-am"), ("telmisartan", "telma-am")], "both amlodipine entries are kept, not one replacing the other", reg)
+    r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
+    ctx.close()
+
+
 def main():
     w = World()
     total = failed = 0
