@@ -178,8 +178,20 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
         out = await demo.start(gm)
         demo_circles.append(out["circle"])
         while len(demo_circles) > int(os.getenv("CC_DEMO_MAX", "40")):
-            await gm.db.drop_tenant(demo_circles.pop(0))
+            await demo.forget(gm, demo_circles.pop(0))
         return out
+
+    @app.on_event("startup")
+    async def _demo_registry():          # the list above lives in memory: after a restart, take it back from the control graph so the cap still holds
+        if not demo_on:
+            return
+        try:
+            from carecircle import demo
+            demo_circles[:] = await demo.known(gm)
+            while len(demo_circles) > int(os.getenv("CC_DEMO_MAX", "40")):
+                await demo.forget(gm, demo_circles.pop(0))
+        except Exception as e:           # never keep the server from starting over housekeeping
+            print("demo circle registry not restored:", type(e).__name__, e)
 
     @app.get("/demo/label.png")
     async def demo_label(drug: str = "Clarithromycin 500 mg tablets", sig: str = "Take ONE tablet twice daily for 7 days"):

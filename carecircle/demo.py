@@ -5,6 +5,7 @@ a carer who has not been told -> reminder."""
 from __future__ import annotations
 
 import io
+import re
 import uuid
 
 from PIL import Image, ImageDraw, ImageFont
@@ -13,6 +14,7 @@ PERSON = "asha"
 BASELINE = [("metformin", "500 mg", "twice daily with food"), ("amlodipine", "5 mg", "once daily"),
             ("atorvastatin", "20 mg", "at bedtime")]
 CARERS = ("ravi", "meena")
+ANON_DEMO = re.compile(r"demo-[0-9a-f]{8}")         # what start() names an anonymous demo circle
 SEED_VERSION = 5          # raise it when the shared demo story changes: the next start rebuilds the circle
 
 
@@ -48,6 +50,28 @@ async def start(gm, prefix: str = "demo") -> dict:
         await meena.care_ack(i)
     await meena.care_record(PERSON, "vitamin d", dose_text="1000 iu", freq_text="once daily")      # makes meena a known carer
     return {"circle": circle, "person": PERSON, "agents": agents, "keys": keys}
+
+
+async def forget(gm, circle: str) -> None:
+    """Remove one anonymous demo circle completely: its graph, its tenant record, its two carer agents and their keys. The shared demo circle is refused."""
+    from .accounts import SHARED_CIRCLE
+    if circle == SHARED_CIRCLE or not ANON_DEMO.fullmatch(circle):
+        raise ValueError(f"{circle!r} is not an anonymous demo circle")
+    await gm.db.drop_tenant(circle)
+    ctl = await gm._ctl()
+    ids = [f"{c}-{circle[-8:]}" for c in CARERS]                      # the names start() gave them
+    grants = (await ctl.query("MATCH (a:Agent)-[:GRANTED]->(t:Tenant) WHERE a.id IN $ids RETURN a.id, t.id", {"ids": ids})).result_set
+    shared = {a for a, t in grants if t != circle}                      # an agent that also reaches some other circle is not ours to delete
+    await ctl.query("MATCH (a:Agent) WHERE a.id IN $ids OPTIONAL MATCH (a)-[:HAS_KEY]->(k) DETACH DELETE k, a", {"ids": [i for i in ids if i not in shared]})
+    await ctl.query("MATCH (t:Tenant {id:$c}) DETACH DELETE t", {"c": circle})
+
+
+async def known(gm) -> list[str]:
+    """The anonymous demo circles the control graph knows, oldest first (not the shared one): how the cap survives a restart."""
+    from .accounts import SHARED_CIRCLE
+    rows = (await (await gm._ctl()).query("MATCH (t:Tenant) WHERE t.id STARTS WITH 'demo-' AND t.id <> $s AND t.created_at IS NOT NULL "
+                                          "RETURN t.id ORDER BY t.created_at, t.id", {"s": SHARED_CIRCLE})).result_set
+    return [r[0] for r in rows if ANON_DEMO.fullmatch(r[0])]
 
 
 async def seed_shared(gm, acc) -> None:
