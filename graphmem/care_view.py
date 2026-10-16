@@ -200,13 +200,18 @@ class CareViewMixin:
         t = now_ms() if now is None else now
         p = norm(person)
         out = []
-        for (did, drug, dt, ft, action, src, quote, by, at, status, vf) in await self._q(
+        for (did, drug, dt, ft, action, src, quote, by, at, status, vf, mby, mat, mwhy) in await self._q(
                 """MATCH (x:Dose)-[:FOR]->(:Person {id:$p})
-                   RETURN x.id, x.drug, x.dose_text, x.freq_text, x.action, x.source_type, x.quote, x.by, x.at, x.status, x.valid_from""",
+                   RETURN x.id, x.drug, x.dose_text, x.freq_text, x.action, x.source_type, x.quote, x.by, x.at, x.status, x.valid_from,
+                          x.mistake_by, x.mistake_at, x.mistake_reason""",
                 {"p": p}, scope="read"):
             verb = "stopped" if action == "stop" else "recorded"
-            pend = " (waiting for confirmation)" if status == "pending" else ""
-            out.append({"at": at, "kind": "stop" if action == "stop" else "record", "dose": did, "who": who(by),
+            pend = " (waiting for confirmation)" if status == "pending" else " (marked as entered by mistake)" if status == "mistake" else ""
+            if status == "mistake" and mat:
+                out.append({"at": mat, "kind": "mistake", "dose": did, "who": who(mby),
+                            "text": f"{who(mby)} marked the entry for {_title(drug)} as entered by mistake{': ' + mwhy if mwhy else ''}.",
+                            "quote": "", "when": iso(mat), "ago": ago(mat, t)})
+            out.append({"at": at, "kind": "stop" if action == "stop" else "record", "dose": did, "status": status, "who": who(by),
                         "text": f"{who(by)} {verb} {_title(drug)}{' ' + dt if dt else ''}{' ' + ft if ft else ''}, {SOURCE_WORDS.get(src, src)}{pend}.",
                         "quote": quote or "", "when": iso(at), "ago": ago(at, t)})
         for (c, did, drug, at) in await self._q(
@@ -229,9 +234,10 @@ class CareViewMixin:
         """Remove one entry for good and return a receipt.
 
         The dose, frequency, quote, links and acknowledgements are deleted. What stays is a receipt with a SHA-256 of what was removed
-        (so it can be matched to a copy someone kept, but does not reveal it), who did it, and when."""
+        (so it can be matched to a copy someone kept, but does not reveal it), who did it, and when. Only the owner of the circle may do this: it cannot
+        be undone and it removes what other carers may rely on. Any carer can instead mark an entry as entered by mistake (care_mark_mistake), which keeps it in the history."""
         rows = await self._q("MATCH (x:Dose {id:$id}) RETURN x.drug, x.dose_text, x.freq_text, x.quote, x.by, x.at, x.status",
-                             {"id": dose_id}, scope="write")
+                             {"id": dose_id}, scope="admin")
         if not rows:
             raise KeyError(dose_id)
         drug, dt, ft, quote, by, at, status = rows[0]
@@ -246,6 +252,31 @@ class CareViewMixin:
         left = (await self._q("MATCH (x:Dose {id:$id}) RETURN count(x)", {"id": dose_id}, scope="read"))[0][0]
         return {"receipt": rid, "forgotten": left == 0, "removed": "the entry, its quote, its links and acknowledgements", "sha256": digest,
                 "note": "The hash lets you match this to a copy someone else kept; it does not reveal the content."}
+
+    async def care_mark_mistake(self, dose_id: str, reason: str = "") -> dict:
+        """Take an entry off the record as entered by mistake, without erasing it: it stays in the history, marked, with who marked it and why, and the entry
+        before it becomes current again. Any carer can do this; the owner (or whoever marked it) can put it back with care_restore_entry."""
+        rows = await self._q("MATCH (x:Dose {id:$id})-[:FOR]->(p:Person) WHERE x.status IN ['confirmed', 'pending'] RETURN x.drug, p.id, x.status", {"id": dose_id}, scope="write")
+        if not rows:
+            raise KeyError(dose_id)
+        drug, person, was = rows[0]
+        await self._q("MATCH (x:Dose {id:$id}) SET x.status='mistake', x.status_before=$was, x.cur=false, x.mistake_by=$by, x.mistake_at=$t, x.mistake_reason=$why",
+                      {"id": dose_id, "was": was, "by": norm(self.agent), "t": now_ms(), "why": (reason or "")[:200]}, checked=True)
+        await self._care_rechain(person, drug)
+        return {"id": dose_id, "status": "mistake", "note": "Marked as entered by mistake. It stays in the history; the owner or you can put it back."}
+
+    async def care_restore_entry(self, dose_id: str) -> dict:
+        """Put back an entry that was marked as entered by mistake. Only the owner or the carer who marked it."""
+        rows = await self._q("MATCH (x:Dose {id:$id, status:'mistake'})-[:FOR]->(p:Person) RETURN x.drug, p.id, x.status_before, x.mistake_by", {"id": dose_id}, scope="write")
+        if not rows:
+            raise KeyError(dose_id)
+        drug, person, before, marker = rows[0]
+        if norm(marker) != norm(self.agent) and self._guard:
+            await self._guard("admin")                                       # anyone but the carer who marked it needs the owner's right to undo it
+        await self._q("MATCH (x:Dose {id:$id}) SET x.status=$st, x.status_before=null, x.mistake_by=null, x.mistake_at=null, x.mistake_reason=null",
+                      {"id": dose_id, "st": before or "confirmed"}, checked=True)
+        await self._care_rechain(person, drug)
+        return {"id": dose_id, "status": before or "confirmed"}
 
     async def care_forget_person(self, person: str, confirm: str = "") -> dict:
         """Remove everything about the person cared for (entries, dose slots, reminders). Needs the person's name typed as `confirm`."""

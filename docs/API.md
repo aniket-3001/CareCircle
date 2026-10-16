@@ -54,6 +54,7 @@ Content-Type: application/json
 | `graph_communities` | read | `method`, `label`, `top` | Groups of nodes that belong together: method 'wcc' (connected components) or 'labelpropagation' (communities inside a connected graph). `label` is optional: a node label from graph_schema to group only those nodes. `top` is how many groups to return. |
 | `graph_neighbourhood` | read | `ref`*, `depth`, `label`, `limit` | Everything within `depth` hops of one node, ignoring direction, nearest first (at most `limit` nodes). `ref` names the node by its id, key or name; `label` is an optional node label from graph_schema that narrows the match. |
 | `care_record` | write | `person`*, `drug`*, `action`, `dose_text`, `freq_text`, `source_type`, `quote`, `source_text`, `confirm`, `at`, `edited` | A change to what `person` takes. action 'set' (start/change) or 'stop'. The previous current entry is closed and linked |
+| `care_add_person` | write | `person`* | Add another person to the circle on purpose (a name close to someone already there is otherwise refused as a likely typing slip). |
 | `care_confirm` | write | `dose_id`* | A person confirms a pending entry (after looking at the quote beside the source). Makes it current. |
 | `care_regimen` | read | `person`*, `as_of` | What `person` takes now, or at `as_of` (ms): confirmed 'set' entries valid at that time. |
 | `care_check` | read | `person`*, `as_of` | Interaction flags for the regimen at `as_of`, from the shared reference graph (sources attached; never 'safe'). |
@@ -93,8 +94,10 @@ Content-Type: application/json
 | `care_hubs` | read | `person`* | Graph-algorithm views: which medicines sit in most hazards within this regimen, and the PageRank hubs of the reference graph |
 | `care_graph` | read | `person`*, `include_history`, `now` | The circle as a graph: nodes and edges, each with plain-language metadata (read scope). |
 | `care_timeline` | read | `person`*, `limit`, `now` | Everything that happened for this person, newest first, as plain sentences. |
-| `care_forget` | write | `dose_id`*, `reason` | Remove one entry for good and return a receipt. |
-| `care_forget_person` | write | `person`*, `confirm` | Remove everything about the person cared for (entries, dose slots, reminders). Needs the person's name typed as `confirm`. |
+| `care_forget` | admin | `dose_id`*, `reason` | Remove one entry for good and return a receipt. |
+| `care_forget_person` | admin | `person`*, `confirm` | Remove everything about the person cared for (entries, dose slots, reminders). Needs the person's name typed as `confirm`. |
+| `care_mark_mistake` | write | `dose_id`*, `reason` | Take an entry off the record as entered by mistake, without erasing it: it stays in the history, marked, with who marked it and why, and the entry |
+| `care_restore_entry` | write | `dose_id`* | Put back an entry that was marked as entered by mistake. Only the owner or the carer who marked it. |
 | `care_receipts` | read | none | Receipts of everything that was removed for good (hash, who, when), newest first. |
 | `care_export_fhir` | read | `person`* | The regimen as a FHIR R4 Bundle of MedicationStatement resources (free text only). |
 | `care_followup_suggest` | read | `person`*, `now` | Suggested follow-ups from the record as it is now, minus any already on the list. Read-only: nothing is written until a person approves. |
