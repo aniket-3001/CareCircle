@@ -17,6 +17,8 @@ docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d
 ```
 The reference graph (`cc_ref`) can always be rebuilt from public data: `python -c "from carecircle import reference as r; r.load()"`.
 
-**Tested:** a snapshot downloaded from the bucket and loaded into a fresh FalkorDB container came back with `cc_ref` (1,831 drugs, 219,723 interactions) and every demo circle (2026-10-15). Note: on Windows Docker Desktop use `docker cp` into the container, not a bind mount.
+**Tested:** `scripts/restore_drill.py` takes the newest snapshot from the production bucket, loads it into a throwaway FalkorDB and checks it through the real engine. On 2026-10-16 the 6:17 UTC snapshot (8.3 MB) restored into a fresh database in 3 seconds (the whole drill took 41 seconds, mostly the download from India) with `cc_ref` (1,831 drugs, 219,723 interactions), both demo accounts and the demo circle (10 medicines, 139 events, 37 readings) intact. Run it again whenever backups change. The drill proves the snapshot file is good and loads; the on-instance steps above are the same primitives, but were not rehearsed on the production volume (that would mean stopping the live site).
+
+**What to expect (recovery numbers).** A crash or reboot: back in about a minute from the append-only file, losing at most the last second of writes. A lost disk or host: restore the newest snapshot, which loses up to 6 hours of writes (the backup interval) and takes minutes. There is no replica, so a restore is manual.
 
 **Demo circles are synthetic**, so losing them costs nothing; the backup matters most for any circle created with real use.

@@ -52,7 +52,7 @@ Latency under contention (150 agents all writing one session, local): median 130
 
 ## Limits, stated plainly
 
-- One FalkorDB instance, no replica: a hot tenant is bounded by one writer, and a lost disk is recovered from the 6-hourly S3 snapshot, not failed over.
+- One FalkorDB instance, no replica: a hot tenant is bounded by one writer, and a lost disk is recovered from the 6-hourly S3 snapshot, not failed over. The restore path is rehearsed (`scripts/restore_drill.py`: newest production snapshot into a fresh database in 3 seconds, data intact); recovery loses at most the last second after a crash and up to 6 hours after a lost disk (`deploy/RESTORE.md`).
 - The load test is closed-loop (each simulated agent sends its next request when the last returns) and shows saturation behaviour; it is not a model of any real traffic.
 - Vector (paraphrase) recall needs an embedding model; with none configured, recall is lexical plus graph (`tests/test_semantic.py` covers the vector path with a fake embedder).
 - The memory engine holds what agents write. It does not judge whether a fact is true.
