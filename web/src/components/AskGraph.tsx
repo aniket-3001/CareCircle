@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { GNode, GPath } from '../api/types';
+import type { GNode, GPath, Unlinked } from '../api/types';
 import { tr } from '../lib/i18n';
 import { useApp, useLoad } from '../state';
 import { Async } from './Async';
@@ -8,10 +8,16 @@ import { Segmented } from './Segmented';
 
 const show = (n: GNode): string => (n.title && n.title !== n.ref ? `${n.label} · ${n.title}` : `${n.label} · ${n.ref}`);
 
+/** Said beside a ranking when most records are not linked to anything, so it is not read as a finding. The counts come from the server; the sentence is built here, so it is translated. */
+function Shallow({ u }: { u?: Unlinked }): React.JSX.Element | null {
+  if (!u) return null;
+  return <p className="muted small" data-testid="ag-shallow">{`${u.records} ${tr('of')} ${u.of} ${tr('records are not linked to anything here, so these rankings are shallow.')}`}</p>;
+}
+
 /** The graph-algorithm operations on this circle's own graph, asked in plain words. Every figure is computed by FalkorDB on the server; the Cypher that ran is printed under each. */
 export function AskGraph(): React.JSX.Element {
   const app = useApp();
-  const [metric, setMetric] = useState<'pagerank' | 'harmonic'>('pagerank');
+  const [metric, setMetric] = useState<'pagerank' | 'harmonic' | 'betweenness'>('pagerank');
   const [method, setMethod] = useState<'wcc' | 'labelpropagation'>('wcc');
   const influence = useLoad((a) => a.api.influence(metric), [metric]);
   const groups = useLoad((a) => a.api.communities(method), [method]);
@@ -42,9 +48,9 @@ export function AskGraph(): React.JSX.Element {
     <div className="layout layout--even" style={{ marginTop: 0 }} data-testid="ask-graph">
       <section className="card" aria-labelledby="ag-infl" style={{ alignContent: 'start' }}>
         <h2 id="ag-infl">{tr('What the record hangs on')}</h2>
-        <p className="muted small">{tr('PageRank: records that many others point to. Reach: records from which the rest of the graph can be reached fastest, following the links.')}</p>
+        <p className="muted small">{tr('PageRank: records that many others point to. Reach: records from which the rest of the graph can be reached fastest, following the links. Bridges: records that many shortest routes between other records pass through.')}</p>
         <Segmented name="ag-metric" label={tr('Measure')} value={metric} onChange={setMetric}
-          options={[{ value: 'pagerank', label: 'PageRank' }, { value: 'harmonic', label: tr('Reach') }]} />
+          options={[{ value: 'pagerank', label: 'PageRank' }, { value: 'harmonic', label: tr('Reach') }, { value: 'betweenness', label: tr('Bridges') }]} />
         <Async state={influence}>
           {(r) => (
             <>
@@ -58,6 +64,8 @@ export function AskGraph(): React.JSX.Element {
                   ))}
                 </div>
               )}
+              <Shallow u={r.unlinked} />
+              {r.metric === 'betweenness' && <p className="muted small" data-testid="ag-computed">{tr('Computed exactly by this server from the links stored in FalkorDB.')}</p>}
               <code className="code">{r.cypher}</code>
             </>
           )}
@@ -72,6 +80,7 @@ export function AskGraph(): React.JSX.Element {
         <Async state={groups}>
           {(r) => (
             <>
+              <Shallow u={r.unlinked} />
               {r.groups.length === 0 ? <p className="muted">{tr('Nothing to group yet.')}</p> : (
                 <div className="rows" data-testid="ag-groups">
                   {r.groups.map((g) => (

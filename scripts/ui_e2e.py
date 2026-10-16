@@ -80,6 +80,10 @@ with sync_playwright() as p:
     expect(pg.locator("[data-testid=ag-influence]")).to_contain_text("Person")
     expect(pg.locator("[data-testid=ag-groups] .item").first).to_contain_text("Dose")
     expect(pg.locator("[data-testid=ask-graph]")).to_contain_text("algo.WCC")
+    pg.get_by_label("Bridges").check(force=True)                                    # exact betweenness, computed by the server
+    expect(pg.locator("[data-testid=ag-computed]")).to_be_visible(timeout=15000)
+    expect(pg.locator("[data-testid=ag-influence] .item").first).to_be_visible()
+    pg.get_by_label("PageRank").check(force=True)
     expect(pg.locator("[data-testid=ag-find]")).to_be_disabled()
     pg.select_option("[data-testid=ag-from]", index=1)
     pg.select_option("[data-testid=ag-to]", index=2)

@@ -175,7 +175,7 @@ cc_ref also has  (:Cached {url, at, body})  public lookups, by medicine name onl
 | Enzyme path | `(x)-[:INHIBITS\|INDUCES]->(e:Enzyme)<-[:SUBSTRATE_OF]-(y)` | `carecircle/checks.py` |
 | Hub medicines | `CALL algo.pageRank('Drug','HAZARD')` | `carecircle/algos.py hub_drugs` |
 | Shortest path between two records | breadth-first, one `MATCH (a)-[r]-(b) WHERE id(a) IN $frontier` per hop (FalkorDB 4.22 has no undirected `shortestPath`), deterministic ties | `graphmem/graph_algos.py graph_path` |
-| What the record hangs on | `CALL algo.pageRank($label, null)` or `CALL algo.HarmonicCentrality({nodeLabels: [$label]})` on the tenant's own graph | `graph_algos.py graph_influence` |
+| What the record hangs on | `CALL algo.pageRank($label, null)` or `CALL algo.HarmonicCentrality({nodeLabels: [$label]})` on the tenant's own graph; betweenness is computed by the server (Brandes) over the links read from FalkorDB | `graph_algos.py graph_influence` |
 | What belongs together | `CALL algo.WCC(...)` or `CALL algo.labelPropagation(...)`, grouped and counted | `graph_algos.py graph_communities` |
 | Everything near one record | level-by-level `MATCH (a)-[r]-(b) WHERE id(a) IN $frontier`, nearest first, capped | `graph_algos.py graph_neighbourhood` |
 | Hazard clusters | `CALL algo.WCC({nodeLabels:['Drug'], relationshipTypes:['HAZARD']})` | `algos.py clusters` |
@@ -191,7 +191,7 @@ Each flag and each hub list shown in the app carries the query or path that prod
 **Algorithms as agent tools.** The four `graph_*` rows above (plus `graph_schema`, which lists what a graph holds) are ordinary read-only operations, so an agent calls them over HTTP or MCP
 (`graph_path`, `graph_influence`, `graph_communities`, `graph_neighbourhood`) instead of writing traversals. They run on the caller's own tenant graph through `GRAPH.RO_QUERY`, need read scope
 only, take labels as parameters checked against the labels that exist, clamp every size and hop count, and return the Cypher they ran. The Graph tab's "Ask the graph" cards use the same operations.
-Limits: they run on one tenant graph at a time, and on a graph with few links PageRank and harmonic centrality say little (a medicine record has few). Betweenness centrality is deliberately not offered: on FalkorDB 4.22 (what production runs) `algo.betweenness` returned 0, 1 or 2 for the middle of the same three-node chain on different runs, so the operation refuses it and says why; harmonic centrality, PageRank, WCC and label propagation gave identical results over 25 freshly built graphs. Timing on a 2,200-node graph was 5 to 30 ms per call (one run, one machine). ### FalkorDB features used, where, and what checks them
+Limits: they run on one tenant graph at a time, and on a graph with few links PageRank and harmonic centrality say little (a medicine record has few). Betweenness is computed by the server, not by FalkorDB: on FalkorDB 4.22 (what production runs) `algo.betweenness` returned 0, 1 or 2 for the middle of the same three-node chain on different runs, so the server reads the links and runs exact Brandes itself (checked against the definition on 60 random graphs; refused above about four million record-times-link steps, around a second of work). PageRank, harmonic centrality, WCC and label propagation gave identical results over 25 freshly built graphs. When most records of a graph are not linked to anything, the answer carries a note saying its rankings are shallow. Timing on a 2,200-node graph was 5 to 30 ms per call (FalkorDB's own algorithms; exact betweenness about 0.8 s at 2,000 records and 3,000 links) (one run, one machine). ### FalkorDB features used, where, and what checks them
 
 | Feature | Where | Checked by |
 |---|---|---|
@@ -200,7 +200,7 @@ Limits: they run on one tenant graph at a time, and on a graph with few links Pa
 | Variable-length paths | `graphmem/memory.py` (`SUPERSEDES*1..10`, `INFERRED_FROM*1..8`: is a plan's input out of date) | `tests/test_requirements.py`, `tests/test_track02.py` (a plan whose input changed is reported stale) |
 | `MERGE`, `FOREACH`, `UNWIND` | `graphmem/care.py` (atomic dose claim, supersede on confirm), `graphmem/memory.py` (ordered, gap-free events) | `tests/test_track02.py` (claim race, sequence numbers), `tests/test_rebuild.py` |
 | `algo.pageRank`, `algo.WCC` on the public reference graph | `carecircle/algos.py` (op `care_hubs`) | `tests/test_care_hubs.py` |
-| `algo.pageRank`, `algo.HarmonicCentrality`, `algo.WCC`, `algo.labelPropagation` on a tenant's own graph | `graphmem/graph_algos.py` (ops `graph_influence`, `graph_communities`) | `tests/test_graph_algos.py` |
+| `algo.pageRank`, `algo.HarmonicCentrality`, `algo.WCC`, `algo.labelPropagation` on a tenant's own graph; exact betweenness computed by the server | `graphmem/graph_algos.py` (ops `graph_influence`, `graph_communities`) | `tests/test_graph_algos.py` |
 | Read-only queries (`GRAPH.RO_QUERY`), ACL read-only database user | `graphmem/db.py ro_graph` | `tests/test_requirements.py` (read scope runs as a read-only user), `tests/test_graph_algos.py` |
 | `GRAPH.COPY` (memory forks) | `graphmem/branch.py` | `tests/test_branch.py` |
 | Full-text index; vector index (optional) | `graphmem/memory.py` (`search_text`, `recall`), `graphmem/embed.py` | `tests/test_track02.py`, `tests/test_semantic.py` |

@@ -102,7 +102,7 @@ export const HI_MORE: Record<string, string> = {
   'Create a circle': 'सर्कल बनाएँ', 'One circle looks after one person. You are its owner and can invite other carers.': 'एक सर्कल एक व्यक्ति की देखभाल करता है। आप इसके मालिक हैं और दूसरे देखभालकर्ताओं को आमंत्रित कर सकते हैं।',
   'Person being looked after': 'जिसकी देखभाल हो रही है', 'Create': 'बनाएँ',
   'What the record hangs on': 'रिकॉर्ड किन चीज़ों पर टिका है',
-  'PageRank: records that many others point to. Reach: records from which the rest of the graph can be reached fastest, following the links.': 'PageRank: वे रिकॉर्ड जिनकी ओर कई दूसरे रिकॉर्ड इशारा करते हैं। पहुँच: वे रिकॉर्ड जिनसे कड़ियों के सहारे बाक़ी ग्राफ़ तक सबसे जल्दी पहुँचा जा सकता है।',
+  'PageRank: records that many others point to. Reach: records from which the rest of the graph can be reached fastest, following the links. Bridges: records that many shortest routes between other records pass through.': 'PageRank: वे रिकॉर्ड जिनकी ओर कई दूसरे रिकॉर्ड इशारा करते हैं। पहुँच: वे रिकॉर्ड जिनसे कड़ियों के सहारे बाक़ी ग्राफ़ तक सबसे जल्दी पहुँचा जा सकता है। सेतु: वे रिकॉर्ड जिनसे होकर दूसरे रिकॉर्डों के बीच के कई सबसे छोटे रास्ते गुज़रते हैं।',
   'Measure': 'माप',
   'Reach': 'पहुँच',
   'Nothing to rank yet.': 'अभी रैंक करने के लिए कुछ नहीं है।',
@@ -122,4 +122,8 @@ export const HI_MORE: Record<string, string> = {
   'steps': 'कदम',
   'No connection found.': 'कोई संबंध नहीं मिला।',
   'Could not ask the graph': 'ग्राफ़ से पूछा नहीं जा सका',
+  'Bridges': 'सेतु',
+  'of': 'में से',
+  'records are not linked to anything here, so these rankings are shallow.': 'रिकॉर्ड यहाँ किसी से जुड़े नहीं हैं, इसलिए ये रैंकिंग उथली हैं।',
+  'Computed exactly by this server from the links stored in FalkorDB.': 'यह सर्वर FalkorDB में रखी कड़ियों से इसे सटीक रूप से निकालता है।',
 };

@@ -75,7 +75,7 @@ export function apiFor(s: Session) {
     handover: (text: string) => op<{ id: string }>('care_handover', { person: p, text }),
     gives: () => op<GiveRecord[]>('care_gives', { person: p }),
     hubs: () => op<Hubs>('care_hubs', { person: p }),
-    influence: (metric: 'pagerank' | 'harmonic', top = 8) => op<GInfluence>('graph_influence', { metric, top }),
+    influence: (metric: 'pagerank' | 'harmonic' | 'betweenness', top = 8) => op<GInfluence>('graph_influence', { metric, top }),
     communities: (method: 'wcc' | 'labelpropagation', top = 5) => op<GCommunities>('graph_communities', { method, top }),
     path: (source: string, target: string, sourceLabel: string, targetLabel: string) =>
       op<GPath>('graph_path', { source, target, source_label: sourceLabel, target_label: targetLabel }),
