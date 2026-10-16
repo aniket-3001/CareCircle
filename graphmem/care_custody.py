@@ -26,6 +26,8 @@ class CareCustodyMixin:
 
     async def care_witness(self, person: str, drug: str, slot: str) -> dict:
         """A carer other than the one who gave the dose confirms they saw it given. Idempotent for the same witness; refused for the giver."""
+        from .care import parse_slot
+        slot, _ = parse_slot(slot)
         key = f"{norm(person)}|{norm(drug)}|{norm(slot)}"
         rows = await self._q("MATCH (g:Give {key:$k}) RETURN g.by, g.witness", {"k": key}, scope="read")
         if not rows:

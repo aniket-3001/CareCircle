@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
+from datetime import datetime, timezone
 from typing import Optional
 
 from carecircle import risk
@@ -42,6 +44,24 @@ def checker() -> Checker:
     return _checker
 
 
+SLOT_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$")
+
+
+def parse_slot(slot: str) -> tuple[str, int]:
+    """A dose slot is a local date and time such as '2026-10-16 08:00'. Returns it in that exact form and as milliseconds (read as UTC; callers allow for the
+    time zone). Anything else is refused: a typo must not turn into a 'dose given' that never happened."""
+    m = SLOT_RE.match(" ".join(str(slot).split()))
+    if not m:
+        raise ValueError("a dose slot looks like 2026-10-16 08:00 (year-month-day hour:minute)")
+    try:
+        when = datetime(*(int(x) for x in m.groups()), tzinfo=timezone.utc)
+    except ValueError:
+        raise ValueError("that date and time do not exist") from None
+    if not 2000 <= when.year <= 2100 or when.timestamp() * 1000 > now_ms() + 2 * 86_400_000:
+        raise ValueError("a dose cannot be recorded as given more than a day or two ahead")
+    return when.strftime("%Y-%m-%d %H:%M"), int(when.timestamp() * 1000)
+
+
 class CareMixin:
     # ------------------------------------------------------------------ record / confirm
     async def care_record(self, person: str, drug: str, action: str = "set", dose_text: str = "", freq_text: str = "",
@@ -57,6 +77,16 @@ class CareMixin:
         verified = quote_in_source(quote, source_text) if quote else source_type == "typed"
         status = "confirmed" if (confirm and verified) else "pending"
         d, ts, did = norm(drug), (now_ms() if at is None else at), new_id("dose")
+        if not d or len(d) > 80:
+            raise ValueError("a medicine name is 1 to 80 characters")
+        cur = await self._q("MATCH (o:Dose {cur:true, drug:$d})-[:FOR]->(:Person {id:$p}) RETURN o.id, o.dose_text, o.freq_text, o.valid_from LIMIT 1",
+                            {"d": d, "p": norm(person)}, scope="read")
+        if action == "stop" and not cur:
+            raise KeyError(f"{d} is not on the record, so there is nothing to stop")
+        same = lambda x, y: " ".join((x or "").lower().split()) == " ".join((y or "").lower().split())      # noqa: E731
+        if action == "set" and cur and ts >= cur[0][3] and same(cur[0][1], dose_text) and same(cur[0][2], freq_text):
+            return {"id": cur[0][0], "status": "confirmed", "verified": True, "unchanged": True,
+                    "note": "already on the record exactly like this, so nothing was added"}
         warning = None
         if action == "set" and dose_text:
             from carecircle import dose as dosemod
@@ -68,10 +98,10 @@ class CareMixin:
             MERGE (dr:Drug {name:$d})
             MERGE (au:Person {id:$by}) ON CREATE SET au.role='carer'
             CREATE (x:Dose {id:$id, drug:$d, dose_text:$dt, freq_text:$ft, valid_from:$ts, cur:false, action:$a, status:$st,
-                            source_type:$src, quote:$q, verified:$v, by:$by, at:$ts, edited:$ed})
+                            source_type:$src, quote:$q, verified:$v, by:$by, at:$ts, created_at:$now, edited:$ed})
             CREATE (x)-[:FOR]->(p) CREATE (x)-[:OF]->(dr)
             RETURN x.id""",
-            {"p": norm(person), "d": d, "id": did, "dt": dose_text[:80], "ft": freq_text[:80], "ts": ts, "a": action, "st": status,
+            {"p": norm(person), "d": d, "id": did, "dt": dose_text[:80], "ft": freq_text[:80], "ts": ts, "now": now_ms(), "a": action, "st": status,
              "src": source_type, "q": quote[:200], "v": verified, "by": norm(self.agent), "ed": ",".join(sorted({x for x in edited.split(",") if x in ("drug", "dose", "freq")}))})
         if status == "confirmed":
             await self._care_activate(did)
@@ -82,15 +112,35 @@ class CareMixin:
         return out
 
     async def _care_activate(self, did: str) -> None:
-        """Make a confirmed entry current and close the previous one for the same person+drug."""
+        """A confirmed entry has joined the record: lay out that medicine's whole timeline again."""
+        rows = await self._q("MATCH (x:Dose {id:$id})-[:FOR]->(p:Person) RETURN p.id, x.drug", {"id": did}, checked=True)
+        if rows:
+            await self._care_rechain(rows[0][0], rows[0][1])
+
+    async def _care_rechain(self, person: str, drug: str) -> None:
+        """Lay out every confirmed entry for one person and medicine in date order, as one timeline: each entry ends where the next begins, only the
+        last 'set' is current, a 'stop' ends the medicine, and each entry replaces the one before it (SUPERSEDES). Because the order comes from the
+        entries' own dates, an older prescription typed in late slots into the history instead of overriding the current one, and forgetting an entry
+        simply closes the gap, so the entry before it is current again. Each statement recomputes from what is stored, so racing writers converge."""
+        order = "ORDER BY x.valid_from, coalesce(x.created_at, x.valid_from), x.id"
         await self._q(
-            """
-            MATCH (x:Dose {id:$id})-[:FOR]->(p:Person)
-            OPTIONAL MATCH (old:Dose {cur:true, drug:x.drug})-[:FOR]->(p) WHERE old.id <> x.id
-            FOREACH (_ IN CASE WHEN old IS NULL THEN [] ELSE [1] END |
-                     SET old.cur=false, old.valid_to=x.valid_from CREATE (x)-[:SUPERSEDES]->(old))
-            SET x.cur = (x.action = 'set'), x.valid_to = CASE WHEN x.action = 'stop' THEN x.valid_from ELSE null END""",
-            {"id": did}, checked=True)
+            f"""MATCH (x:Dose {{drug:$d, status:'confirmed'}})-[:FOR]->(:Person {{id:$p}})
+                WITH x {order}
+                WITH collect(x) AS es
+                UNWIND range(0, size(es) - 1) AS i
+                WITH es[i] AS x, CASE WHEN i + 1 < size(es) THEN es[i + 1] ELSE null END AS nxt
+                SET x.cur = (nxt IS NULL AND x.action = 'set'),
+                    x.valid_to = CASE WHEN x.action = 'stop' THEN x.valid_from WHEN nxt IS NULL THEN null ELSE nxt.valid_from END""",
+            {"p": person, "d": drug}, checked=True)
+        await self._q("MATCH (x:Dose {drug:$d})-[:FOR]->(:Person {id:$p}) MATCH (x)-[r:SUPERSEDES]->(:Dose) DELETE r", {"p": person, "d": drug}, checked=True)
+        await self._q(
+            f"""MATCH (x:Dose {{drug:$d, status:'confirmed'}})-[:FOR]->(:Person {{id:$p}})
+                WITH x {order}
+                WITH collect(x) AS es
+                UNWIND range(1, size(es) - 1) AS i
+                WITH es[i] AS n, es[i - 1] AS o
+                CREATE (n)-[:SUPERSEDES]->(o)""",
+            {"p": person, "d": drug}, checked=True)
 
     async def care_confirm(self, dose_id: str) -> dict:
         """A person confirms a pending entry (after looking at the quote beside the source). Makes it current."""
@@ -144,7 +194,7 @@ class CareMixin:
         t = now_ms() if now is None else now
         carers = [r[0] for r in await self._q("MATCH (c:Person {role:'carer'}) RETURN c.id ORDER BY c.id", scope="read")]
         changes = await self._q("MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p}) "
-                                "RETURN x.id, x.drug, x.action, x.at, x.by ORDER BY x.at", {"p": norm(person)}, scope="read", checked=True)
+                                "RETURN x.id, x.drug, x.action, x.at, x.by ORDER BY x.valid_from, coalesce(x.created_at, x.valid_from), x.id", {"p": norm(person)}, scope="read", checked=True)
         flags = await self.care_check(person)
         heavy: dict[str, float] = {}
         for f in flags["direct"]:
@@ -157,7 +207,10 @@ class CareMixin:
         out = {}
         for c in carers:
             acked = {r[0] for r in await self._q("MATCH (:Person {id:$c})-[:ACKED]->(x:Dose) RETURN x.id", {"c": c}, scope="read", checked=True)}
-            miss = [(i, d, a, at) for i, d, a, at, by in changes if i not in acked and norm(by) != c]
+            latest: dict[str, tuple] = {}
+            for row in changes:                                                      # ordered by time: the last row per medicine is where it stands now
+                latest[row[1]] = row
+            miss = [(i, d, a, at) for i, d, a, at, by in latest.values() if i not in acked and norm(by) != c]
             ws = [heavy.get(d, 0.3) for _, d, _, _ in miss]
             ages = [(t - at) / H for *_, at in miss]
             out[c] = {"unacknowledged": [{"dose": i, "drug": d, "action": a, "age_hours": round((t - at) / H, 1)} for i, d, a, at in miss],
@@ -218,6 +271,13 @@ class CareMixin:
     async def care_give(self, person: str, drug: str, slot: str) -> dict:
         """Record that the calling carer gave `drug` for dose slot `slot` (e.g. '2026-10-16 08:00'). A slot can be claimed once:
         the claim is a single MERGE, so two carers racing get exactly one winner and the other is told who already recorded it."""
+        slot, slot_ms = parse_slot(slot)
+        on_record = await self._q(
+            """MATCH (x:Dose {drug:$d, action:'set', status:'confirmed'})-[:FOR]->(:Person {id:$p})
+               WHERE x.valid_from <= $ms + $slack AND (x.valid_to IS NULL OR x.valid_to >= $ms - $slack) RETURN x.id LIMIT 1""",
+            {"d": norm(drug), "p": norm(person), "ms": slot_ms, "slack": 14 * 3_600_000}, scope="read")      # slack: the slot is local time, the record is UTC
+        if not on_record:
+            raise KeyError(f"{norm(drug) or 'that medicine'} was not on the record at that time, so a dose of it cannot be recorded as given")
         key = f"{norm(person)}|{norm(drug)}|{norm(slot)}"
         rows = await self._q(
             """MERGE (g:Give {key:$k}) ON CREATE SET g.by=$me, g.at=$t, g.person=$p, g.drug=$d, g.slot=$s, g.won=true

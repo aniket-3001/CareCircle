@@ -235,11 +235,14 @@ class CareViewMixin:
         if not rows:
             raise KeyError(dose_id)
         drug, dt, ft, quote, by, at, status = rows[0]
+        owner = await self._q("MATCH (x:Dose {id:$id})-[:FOR]->(p:Person) RETURN p.id", {"id": dose_id}, scope="write")
         digest = hashlib.sha256(json.dumps([drug, dt, ft, quote, by, at], sort_keys=True).encode()).hexdigest()
         rid, t = new_id("rcpt"), now_ms()
         await self._q("MATCH (x:Dose {id:$id}) OPTIONAL MATCH (n:Nudge) WHERE n.key CONTAINS $id DETACH DELETE n, x", {"id": dose_id})
         await self._q("CREATE (:Receipt {id:$r, kind:'dose', hash:$h, at:$t, by:$by, reason:$why, removed:'dose, quote, links, acknowledgements'})",
                       {"r": rid, "h": digest, "t": t, "by": norm(self.agent), "why": reason[:200]})
+        if owner:                                                   # close the gap: the entry before it becomes current again
+            await self._care_rechain(owner[0][0], drug)
         left = (await self._q("MATCH (x:Dose {id:$id}) RETURN count(x)", {"id": dose_id}, scope="read"))[0][0]
         return {"receipt": rid, "forgotten": left == 0, "removed": "the entry, its quote, its links and acknowledgements", "sha256": digest,
                 "note": "The hash lets you match this to a copy someone else kept; it does not reveal the content."}
