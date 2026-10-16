@@ -1,19 +1,59 @@
+<p align="center">
+  <img src="docs/img/banner.svg" alt="Care Circle: an animated graph of two carers, a person, their medicines and an enzyme, with a flagged interaction pulsing and a change travelling from one carer to the person" width="100%" />
+</p>
+
 # Care Circle
 
 **One shared, verified memory of a loved one's medicines, for the family who look after them.**
-Graph Hacks 2026 (WeMakeDevs x FalkorDB), Track 02: Agent Memory & Coordination.
 
-When several people care for one person, nobody holds the whole picture. A photo of a new prescription lands in one chat, a dose
-changes by phone, a sibling gives a tablet the other already gave. Care Circle keeps one memory in a FalkorDB graph. Each carer reaches
-it through a web app or Telegram (their own agent identity), adds a medicine by **photo, voice note, PDF/Word or text**, and the circle then
-knows what is on record, **who has seen each change**, which entries **interact** according to public sources, and which dose slots are **already given**.
+*Graph Hacks 2026 (WeMakeDevs x FalkorDB), Track 02: Agent Memory & Coordination.*
 
-**It records and cross-checks. It never advises.** It never says what to take, stop or change. Every flag shows its source and the graph
-path behind it, and "no flag" is never reported as "safe". All data in the demo is synthetic; no real person's data is used.
+It is 9 pm. Ravi has just changed his mother's warfarin dose by phone. His sister Meena is on the night shift and has not seen it. Tomorrow a pharmacist adds an antibiotic that interacts with it, and nobody holds the whole picture.
 
-**Live demo: https://3-228-70-117.sslip.io** (press "Start a demo circle"; synthetic data only).
+Care Circle keeps that picture in one FalkorDB graph. Each carer reaches it through a web app or Telegram (their own agent identity), adds a medicine by **photo, voice note, PDF/Word or text**, and the circle then knows what is on record, **who has seen each change**, which entries **interact** according to public sources, and which dose slots are **already given**.
 
-![Today](docs/img/flags.png)
+**It records and cross-checks. It never advises.** It never says what to take, stop or change. Every flag shows its source and the graph path behind it, and "no flag" is never reported as "safe". All data in the demo is synthetic; no real person's data is used.
+
+Live: **https://3-228-70-117.sslip.io** (press **Start a demo circle**; synthetic data only) · The same memory for any agent: **`POST /mcp`** on the same address ([Connect your agent stack](#connect-your-agent-stack))
+
+![Today: the verdict tile and the flags, each with its source](docs/img/flags.png)
+
+## Why it is different
+
+- **One memory for the whole circle.** Not a chat per person: one graph that says what is on record now, what it replaced, and which carer has not yet seen the change.
+- **Every flag shows its work.** The source (DDInter 2.0 or the FDA table), the edge it came from, and the exact line of the photo or voice note that produced the entry. A pair the source lists without a severity is shown *unrated*, never "safe".
+- **Code decides, AI only structures.** A model may turn OCR or a transcript into *proposed* fields; each proposal's quote must appear in the text that was read, and nothing reaches the regimen until a person confirms it. It never decides an interaction or a dose.
+- **The graph is the product.** Reference knowledge (224,449 interaction pairs, enzyme links), every circle's history, who has seen what, the once-per-slot dose guard and the access grants all live in FalkorDB, one graph per circle.
+- **Agents can use the same memory.** An MCP endpoint, LangChain and LlamaIndex tools and graph algorithms (paths, PageRank, betweenness, communities) run on a circle's graph, with the same keys and read-only checks.
+
+Built with Claude as a coding assistant (see [AI use disclosure](#ai-use-disclosure)).
+
+## Try it in two minutes
+
+1. Open the live address and press **Start a demo circle**. Asha takes metformin, amlodipine and atorvastatin; two carers, Ravi and Meena, have both acknowledged them.
+2. **Add**, then **Sample label**: a synthetic pharmacy label is read by OCR. You see the proposed entry, the exact line it came from and a *quote verified* badge. Nothing is saved yet. Confirm it.
+3. **Today** now flags clarithromycin with atorvastatin as *major*, with the enzyme path behind it. Open the flag to see the source.
+4. **Circle**: Meena has not acknowledged the change. Slide the time warp 13 hours: a reminder for Meena, then an escalation to Ravi, each exactly once.
+5. **Graph**: watch the circle assemble, click the clarithromycin node and the red line: both explain themselves in words. Below it, the cards **What the record hangs on** and **What belongs together** run PageRank, betweenness, groups and paths on this circle's own graph.
+6. Point an agent at it: [Connect your agent stack](#connect-your-agent-stack). The full 90-second script is [The demo story](#the-demo-story-90-seconds).
+
+## What it does
+
+| Screen | |
+|---|---|
+| **Today** | One verdict tile (never "safe"), the regimen, and every flag with its source Cypher or enzyme path. |
+| **Add** | A photo, voice note, PDF, Word file or typed text becomes proposals with the exact quoted line; a person confirms each one. |
+| **Circle** | Who has seen each change, reminders and escalation, and a once-per-slot dose log that refuses a second "given". |
+| **Graph** | The circle as a living graph (people, entries, medicines, enzymes); click anything for a plain-words explanation; cards for what the record hangs on, bridges, groups and a path finder. |
+| **History** | A look-back slider (what the flags were), a written timeline, FHIR R4 export, and *forget with a receipt*. |
+| **Helper** | Answers from the circle's own record, in English or Hindi; declines to advise and points to a prescriber or pharmacist. |
+| **Telegram** | The same without the app: photo, voice, text, `/regimen`, `/check`, `/history`, `/ack`, `/gave`. |
+
+Every number and flag says where it came from, and when the sources disagree or are missing the app says so rather than guessing. Details of each part are below.
+
+## Where FalkorDB fits
+
+The three graphs, the data model, every Cypher query and algorithm, and the test that checks each one follow: [Why the graph is the product](#why-the-graph-is-the-product), [Three graphs, on purpose](#three-graphs-on-purpose), [Graph data model](#graph-data-model), [Queries and algorithms](#queries-and-algorithms). To look at the graphs yourself in FalkorDB Browser: [`docs/EXPLORE.md`](docs/EXPLORE.md).
 
 ## Why the graph is the product
 Remove FalkorDB and nothing is left: the reference knowledge (about 218,000 interaction pairs, enzyme links), every circle's history, the
@@ -29,124 +69,12 @@ carer-acknowledgement state, the dose-slot guard and the access grants all live 
 | Hubs | `algo.pageRank` over the interaction graph; degree inside the regimen | no way to rank which medicine matters most |
 | Privacy | one graph per circle (`mem__<circle>`), grants on every query | rows in a shared table |
 
-## Run it
-Deployed on one AWS EC2 instance (t3.large, Docker Compose, Caddy for HTTPS, Bedrock through the instance role, only ports 80/443 open): `deploy/docker-compose.prod.yml`.
-
-```bash
-# everything: FalkorDB (append-only volume) + app. First start downloads the public reference data and loads it (a few minutes).
-GRAPHMEM_ADMIN_KEY=change-me docker compose up -d --build
-open http://localhost:8000          # press "Start a demo circle"     (FalkorDB Browser: http://localhost:3000)
-```
-Without Docker (needs a FalkorDB on :6379, e.g. `docker run -p 6379:6379 falkordb/falkordb`):
-```bash
-python -m venv .venv && .venv/bin/pip install -r requirements.txt          # Windows: .venv/Scripts
-python scripts/fetch_reference.py                                           # DDInter + FDA tables into data/ref (gitignored)
-python -c "from carecircle import reference as r; print(r.load())"          # build the shared cc_ref graph
-(cd web && npm ci && npm run build)                                         # the React app (served by the API from web/dist)
-python -m graphmem.api                                                      # http://127.0.0.1:8000
-python -m pytest -q tests                                                   # 112 tests against live FalkorDB
-(cd web && npm test)                                                        # UI unit tests; `npm run dev` for hot reload (proxies to :8000)
-PORT=8000 python scripts/ui_e2e.py && PORT=8000 python scripts/ui_e2e_accounts.py    # browser walk-throughs: demo, then accounts (need Chrome and `pip install playwright`)
-PYTHONPATH=. python bench/care_bench.py                                     # benchmarks below (`--out run.json`, then `python bench/gate.py bench/baselines/care_bench.json run.json` compares two runs)
-```
-Optional: `CC_COGNITO_POOL_ID` / `CC_COGNITO_CLIENT_ID` (email sign-up through Amazon Cognito; unset = built-in accounts), `CC_ASSISTANT=0` (the helper answers from rules only), `CC_MODEL` / `AWS_REGION` + AWS credentials let Amazon Bedrock (default `us.amazon.nova-pro-v1:0`) structure what the OCR read;
-`CC_LLM=0` or no credentials falls back to rules. Set `TELEGRAM_BOT_TOKEN` to also run the Telegram bot in the server process (`/link <key> <circle>`, then send a photo, voice note or text).
-
-**Look inside the graph.** `python scripts/seed_explore.py` loads two small synthetic graphs (a care circle and an agent's memory); then open FalkorDB Browser at <http://localhost:3000>, connect to `localhost:6379`, and run the queries in [`docs/EXPLORE.md`](docs/EXPLORE.md): the regimen and its history, who has not seen a change, why an agent decided something, and PageRank over the interaction graph. A test runs every query in that guide, so they work. The live site does not expose the Browser (one login would show every family's circle); the Graph tab shows each circle's own graph and the Cypher behind it.
-
-## Accounts, circles and the helper
-- **Sign in with email.** On the deployed site Amazon Cognito proves the email (a code by email on sign-up and for a forgotten password), the page signs in straight to Cognito as
-  [The Vayu Project](https://github.com/hrsh-kr/the-vayu-project) does, and the server checks the ID token's signature, issuer, audience, expiry and verified email (`carecircle/cognito.py`)
-  before it creates the account in FalkorDB. Without Cognito configured (local development, CI) the app has its own email-and-password accounts (scrypt hashes, sign-in throttling, 30-day sessions
-  stored only as a SHA-256). Set `CC_COGNITO_POOL_ID` and `CC_COGNITO_CLIENT_ID` to switch.
-- **Demo accounts.** Two ordinary accounts, Ravi and Meena, share a demo circle for Asha; their password is shown on the sign-in page so anyone can try how a change reaches the second carer.
-  "Reset the demo circle" restores it. There is also a throw-away anonymous demo with no account.
-- **Your data is real and on the server.** A new account and a new circle start **empty**: nothing is pre-filled or invented. Profile, circles, roles, invitations, medicines, acknowledgements,
-  doses, reminders, the helper conversation and Telegram links are all read from the graph on every load; the browser keeps only a sign-in token and which circle is open
-  (`web/src/lib/session.ts`, with a test that nothing else is stored). Demo-only tools (the time warp, seeded people) appear only in demo circles.
-- **Circles and carers.** Create a circle for one person, invite carers with a one-time code (72 hours, one use), rename it, remove or leave. A carer counts toward "who has not seen this" from the
-  moment they join. The owner alone can invite, remove carers and erase everything about the person; if the owner leaves, the longest-standing carer becomes owner; the last member leaving deletes the circle.
-  Deleting an account removes it and every circle it alone was in.
-- **Profile and account page.** Name, circles and members, invitations, the Telegram link (a six-character one-time code: `/link CODE`, `/circles` to switch), password change, sign out, delete account.
-- **The helper** (the sparkles button). It answers from the circle's own record: who has not seen a change, what is on record, what is flagged and why, what changed, who gave a dose, and "tell me about <medicine>". "Add warfarin 5 mg once daily"
-  becomes a proposal you confirm. Questions that ask for advice (*should she stop...*, *is it safe...*, *how much...*) get a fixed refusal pointing to a prescriber or pharmacist, and an emergency gets the emergency line.
-  Rules answer first; only a question no rule covers goes to Amazon Bedrock, with names masked, and its answer is used only if it has no advice, no reassurance words, no imperative, no link and no number that is not in the facts
-  (`carecircle/assistant.py`, 20 tests including a prompt-injection attempt). The conversation is stored on the server per carer (60 questions a day), can be cleared, and can be asked by voice and read aloud.
-- **More:** change a recorded dose or record a medicine as stopped (a new entry, the old one stays in the history), a printable one-page summary for a pharmacist, FHIR export, forget with a receipt.
-
-## More than medicines
-Around the medicine record, a circle also keeps what a family needs at the doctor's door. Everything below is stored in the circle's graph, is typed or confirmed by a carer, and never advises.
-- **Readings over time** (blood pressure, sugar, INR, weight, pulse, temperature, oxygen, TSH): kept as typed, drawn as a line with the dates a medicine's entry changed marked on it, with the plain mean before and after each change. Only typing slips are refused (a pressure of 1200); a value is never called good or bad.
-- **Appointments** with who goes and what to bring; a past one reads as done and stays in the history. **"What to bring"** assembles, from the record alone, what changed since the previous visit, the flags and their sources, anything not yet seen by every carer, readings in that time and any allergy hit.
-- **Conditions and allergies.** An allergy is cross-checked against the medicines on record: an exact generic name or a medicine in a short, hand-written group list (penicillins, NSAIDs, statins ...). A hit says "ask the prescriber"; no hit is never shown as safe.
-- **Recalls and label text.** Public sources, queried by medicine name only, cached in the reference graph: RxNorm (name to ingredient, used when the local match is weak and kept only if the reference graph has that medicine), openFDA drug labels (the official boxed warning and "used for" text, quoted with its source and date) and openFDA recall reports. Live calls are not covered by CI.
-- **Only one carer knows.** A graph query over the acknowledgement edges lists current entries known to a single carer (a single point of failure) and the carer holding most of them.
-- **Reminders** reach people through the Telegram bot and, where the server has VAPID keys, as browser notifications (Web Push, no chat app needed); one claim per reminder, so it is never produced twice however many channels it goes to.
-- **Hindi** across the screens, the helper (Devanagari and Hinglish), Hindi voice input and read-aloud.
-
 ## Three graphs, on purpose
 | Graph | Holds | Why separate |
 |---|---|---|
 | `cc_ref` | public knowledge only: DDInter, the FDA enzyme table, cached public lookups | shared by everyone; only the system writes; no personal data |
 | `mem__<circle>` | everything about one person: doses, acknowledgements, readings, appointments, conditions, allergies, notes | one graph so one query can cross types ("readings in the two weeks after the warfarin change") and so erasing a person is one drop with one receipt; each graph carries a schema version and is migrated forward when opened (`graphmem/schema.py`) |
 | `ctl` | accounts, sessions, invitations, keys, push subscriptions | never holds health data |
-
-## What is in the app
-The web app is React + TypeScript + Vite, in the visual language of [The Vayu Project](https://github.com/hrsh-kr/the-vayu-project) (Hanken Grotesk, a soft wash in the colour of the most serious flag, a status
-card with a big number and a face, white hairline cards, dashed add tiles, a floating pill tab bar and round buttons; the AQI level colours become flag severity), phone to desktop.
-- **Today:** one verdict tile (never "safe"), the regimen, and every flag with its source and the Cypher or enzyme path behind it.
-- **Add:** a photo, voice note (recorded in the browser), PDF, Word file or typed text becomes proposals that show the exact quoted line, a verified badge and the top three drug matches. Nothing is saved until a person confirms.
-- **Circle:** who has not seen which change (graph query), reminders with a time-warp control, and a once-per-slot dose log.
-- **Graph:** the circle as an animated force-directed graph (people, entries, medicines, enzymes). Nodes pop in, edges draw themselves, flagged edges carry flowing dashes, major interactions pulse. **Click any node or line** and a panel explains it in plain words: what it is, who recorded it and when, the source and quoted line, who acknowledged it, interaction counts and PageRank hub rank for medicines, and the graph pattern it comes from. Layers can be toggled, nodes dragged, the view zoomed; it is keyboard-reachable.
-- **History:** a look-back slider (regimen and flags as they were), a timeline written as sentences, **FHIR R4 export** (free-text `MedicationStatement`s; no medicine codes are invented), and **forget with a receipt**: remove one entry or everything about the person for good, leaving only a SHA-256 hash, who and when.
-- **Follow-ups**: the record suggests things to ask or tell (a flagged pair, a recent change, a carer who has not seen a medicine, an allergy hit); a carer ticks which to keep; each is marked stale if the entry it was written from later changes (`BASIS` edges to the `Dose`).
-- **Account basics**: change password (also for Cognito accounts), show/hide password, sign out of all devices, download all my data as JSON, delete a circle, quiet hours for reminders (held, not dropped), text size, search in History, edit appointments and conditions, a Help section, and an installable web app.
-- **Light and dark theme**, a toggle in the header; it follows the device until a person chooses, then remembers the choice. English and Hindi (toggle beside it).
-- **Telegram** does the same without an app: photo, voice, text, `/regimen`, `/check`, `/history`, `/ack`, `/gave`; proposals wait in the database, so a redeploy does not expire a Confirm button.
-
-## The demo story (90 seconds)
-1. **Start a demo circle.** Asha takes metformin, amlodipine, atorvastatin; two carers, Ravi and Meena, have acknowledged them.
-2. **Add > "Use a sample label".** A synthetic pharmacy label is read by OCR. You see the proposed entry with the **exact line it came from** and a
-   *quote verified* badge. Nothing is saved yet. Confirm it (as Ravi).
-3. **Today** now flags clarithromycin + atorvastatin as *major* (DDInter), with the enzyme path `clarithromycin -INHIBITS(strong)-> CYP3A <-SUBSTRATE_OF- atorvastatin`.
-   Pairs the source lists without a severity are shown as *unrated*, not safe.
-4. **Circle.** Meena has not acknowledged the change. Slide the time warp to 13 hours: a reminder is produced for Meena, and an escalation for Ravi. Each is produced exactly once.
-5. **Doses** (in the Circle tab). Record a dose as Ravi, then as Meena: the second is refused and names who already gave it.
-6. **Graph.** Watch it assemble, click the clarithromycin node, then the red line: both explain themselves in words.
-7. **History.** Slide back to see the regimen and flags as they were; export FHIR; remove an entry and see the receipt.
-
-## Connect your agent stack
-
-The memory engine is not tied to the web app: any agent can use the same graph through the door it already speaks. Each of these is covered by a test that does exactly what is shown (`tests/test_mcp_http.py`, `tests/test_langchain_tools.py`, `tests/test_llamaindex_tools.py`, `tests/test_api.py`, `tests/test_track02.py`).
-
-| You use | How it connects | Notes |
-|---|---|---|
-| **An MCP client** (an editor, a desktop assistant, an agent framework with MCP support) | `POST https://<host>/mcp`, streamable HTTP, header `Authorization: Bearer <key>` | The same tools as the stdio server: `call(tenant, op, args_json)` for any of the ~90 operations, `remember`, `recall`, forks, shared spaces, and the graph algorithms as typed tools of their own (`graph_schema`, `graph_path`, `graph_influence`, `graph_communities`, `graph_neighbourhood`), so a model sees each with its arguments. Stateless: no MCP session is kept on the server. Same grants, scopes and rate limits as the REST API; a wrong key is a 401. Off with `CC_MCP_HTTP=0` |
-| **MCP over stdio** (a local process) | `GRAPHMEM_API_KEY=gm_... python -m graphmem.mcp_server` | For a client that starts its server itself |
-| **LangChain** (agents, LangGraph tool nodes, `bind_tools`) | `graphmem_tools(url, key, tenant)` in `integrations/langchain_tools.py` returns one tool per operation, built from `GET /v1/ops` | `pip install -r requirements-integrations.txt` (`langchain-core`; the server needs nothing extra). Tested against a real server: sync and async calls, a tool-call message in and a `ToolMessage` out, refusals returned to the model as text. Pass `include=["graph_path", "recall", ...]` to expose only some |
-| **LlamaIndex** (agents, workflows, tool calling) | `graphmem_tools(url, key, tenant)` in `integrations/llamaindex_tools.py` returns one `FunctionTool` per operation, from the same catalogue | `llama-index-core` (in `requirements-integrations.txt`). Tested at the tool level against a real server: sync and async calls, refusals returned as text, the OpenAI tool schema a model sees. Also run with an agent driven by a real model; see below |
-| **FalkorDB's own MCP server** (`@falkordb/mcpserver`) | run it against the same database as a read-only database user; recipe and findings in [`docs/EXPLORE.md`](docs/EXPLORE.md) section 6 | Run by hand against the pinned database: schema, read queries and PageRank worked; writes and `delete_graph` were refused for a read-only user. With the default user its "read-only" setting did **not** stop `delete_graph`. It uses database credentials, so it bypasses our per-key grants: for your own machine only |
-| **LangGraph** (agent state across sessions) | FalkorDB's own `FalkorDBSaver` (`pip install "langchain-falkordb[langgraph]"`) holds the agent's step-by-step state; our tools hold its long-term memory | Tested: an agent graph checkpointed in FalkorDB is found by a brand-new saver and graph (the next session), carries on in the same thread, leaves another thread untouched, and its checkpoint graph sits beside the `mem__*` graphs without mixing with them (`tests/test_langgraph_checkpoint.py`, no model needed). The saver is FalkorDB's code and connects to the database directly with the database's credentials, so it does not go through our per-key grants: use it from your own server-side agent, and give it its own graph name (`database="..."`) |
-| **Anything else that can send HTTP** (LlamaIndex, a script) | `POST /v1/tenants/{tenant}/{op}` with a JSON body; `GET /v1/ops` lists every operation with its arguments | `docs/API.md` is generated from the code. Wrap an operation as a tool in two lines in any framework |
-| **A key** | a signed-in person's session token works as the bearer for their own circles; an agent key (`gm_...`) comes from the admin plane | A key sees only the tenants it was granted, with the scopes it was granted |
-
-```python
-# a real MCP client, as tested: list the tools, then ask the graph how two records connect
-from mcp import ClientSession
-from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
-
-http = create_mcp_http_client(headers={"Authorization": "Bearer " + KEY})
-async with streamable_http_client("https://3-228-70-117.sslip.io/mcp", http_client=http) as streams:
-    async with ClientSession(streams[0], streams[1]) as session:
-        await session.initialize()
-        print(await session.call_tool("whoami", {}))            # which circles this key may read
-        print(await session.call_tool("call", {"tenant": CIRCLE, "op": "graph_path",
-                                               "args_json": '{"source": "asha", "target": "atorvastatin"}'}))
-```
-
-**Run with a real model.** `scripts/agent_demo.py` (by hand, not in CI: it calls a paid model) drives a LlamaIndex `FunctionAgent` and a LangGraph agent with Amazon Bedrock's Nova Pro against a synthetic demo circle, using our tools. Both read the schema first, called `graph_path` with the real labels (`Person`, `Drug`), called `graph_influence` for betweenness, and gave answers that match the tool results (asha reaches atorvastatin through one dose; the dose with the highest betweenness is metformin's). The first run, before the tool descriptions told the model what a `label` was, showed the failure worth knowing: the model invented a label (`record`), the server refused it with a message listing the real labels, and the model stopped instead of retrying. The catalogue now carries each operation's full description, which fixed it. A model can still choose badly; the server's refusals are the safety net, not the model's judgement.
-
-Also relevant to the FalkorDB ecosystem, stated plainly: Graphiti was tried first and is **not** the runtime (three defects on exactly the multi-tenant path, measured in `docs/DECISION.md`); we borrowed its ideas (episode to fact provenance, bi-temporal validity) and wrote them as Cypher. QueryWeaver (text to SQL), GraphRAG-SDK, Cognee and Mem0 were **not** run against this project (they need an LLM key for extraction, or do not fit), so nothing is claimed about them. The graphs are ordinary FalkorDB graphs (`mem__<circle>`), so a tool that reads FalkorDB can open them (see "Explore the graph").
 
 ## Graph data model
 ```
@@ -215,6 +143,93 @@ Limits: they run on one tenant graph at a time, and on a graph with few links Pa
 
 **Connected knowledge.** A circle is private and small; the public interaction data (DDInter, 1,833 medicines, 224,449 pairs) is large and shared. They are two graphs joined by medicine name at query time (`carecircle/checks.py`), so a family's record is checked against public knowledge without either being copied into the other, and a flag always names the edge and source it came from.
 
+## Connect your agent stack
+
+The memory engine is not tied to the web app: any agent can use the same graph through the door it already speaks. Each of these is covered by a test that does exactly what is shown (`tests/test_mcp_http.py`, `tests/test_langchain_tools.py`, `tests/test_llamaindex_tools.py`, `tests/test_api.py`, `tests/test_track02.py`).
+
+| You use | How it connects | Notes |
+|---|---|---|
+| **An MCP client** (an editor, a desktop assistant, an agent framework with MCP support) | `POST https://<host>/mcp`, streamable HTTP, header `Authorization: Bearer <key>` | The same tools as the stdio server: `call(tenant, op, args_json)` for any of the ~90 operations, `remember`, `recall`, forks, shared spaces, and the graph algorithms as typed tools of their own (`graph_schema`, `graph_path`, `graph_influence`, `graph_communities`, `graph_neighbourhood`), so a model sees each with its arguments. Stateless: no MCP session is kept on the server. Same grants, scopes and rate limits as the REST API; a wrong key is a 401. Off with `CC_MCP_HTTP=0` |
+| **MCP over stdio** (a local process) | `GRAPHMEM_API_KEY=gm_... python -m graphmem.mcp_server` | For a client that starts its server itself |
+| **LangChain** (agents, LangGraph tool nodes, `bind_tools`) | `graphmem_tools(url, key, tenant)` in `integrations/langchain_tools.py` returns one tool per operation, built from `GET /v1/ops` | `pip install -r requirements-integrations.txt` (`langchain-core`; the server needs nothing extra). Tested against a real server: sync and async calls, a tool-call message in and a `ToolMessage` out, refusals returned to the model as text. Pass `include=["graph_path", "recall", ...]` to expose only some |
+| **LlamaIndex** (agents, workflows, tool calling) | `graphmem_tools(url, key, tenant)` in `integrations/llamaindex_tools.py` returns one `FunctionTool` per operation, from the same catalogue | `llama-index-core` (in `requirements-integrations.txt`). Tested at the tool level against a real server: sync and async calls, refusals returned as text, the OpenAI tool schema a model sees. Also run with an agent driven by a real model; see below |
+| **FalkorDB's own MCP server** (`@falkordb/mcpserver`) | run it against the same database as a read-only database user; recipe and findings in [`docs/EXPLORE.md`](docs/EXPLORE.md) section 6 | Run by hand against the pinned database: schema, read queries and PageRank worked; writes and `delete_graph` were refused for a read-only user. With the default user its "read-only" setting did **not** stop `delete_graph`. It uses database credentials, so it bypasses our per-key grants: for your own machine only |
+| **LangGraph** (agent state across sessions) | FalkorDB's own `FalkorDBSaver` (`pip install "langchain-falkordb[langgraph]"`) holds the agent's step-by-step state; our tools hold its long-term memory | Tested: an agent graph checkpointed in FalkorDB is found by a brand-new saver and graph (the next session), carries on in the same thread, leaves another thread untouched, and its checkpoint graph sits beside the `mem__*` graphs without mixing with them (`tests/test_langgraph_checkpoint.py`, no model needed). The saver is FalkorDB's code and connects to the database directly with the database's credentials, so it does not go through our per-key grants: use it from your own server-side agent, and give it its own graph name (`database="..."`) |
+| **Anything else that can send HTTP** (LlamaIndex, a script) | `POST /v1/tenants/{tenant}/{op}` with a JSON body; `GET /v1/ops` lists every operation with its arguments | `docs/API.md` is generated from the code. Wrap an operation as a tool in two lines in any framework |
+| **A key** | a signed-in person's session token works as the bearer for their own circles; an agent key (`gm_...`) comes from the admin plane | A key sees only the tenants it was granted, with the scopes it was granted |
+
+```python
+# a real MCP client, as tested: list the tools, then ask the graph how two records connect
+from mcp import ClientSession
+from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
+
+http = create_mcp_http_client(headers={"Authorization": "Bearer " + KEY})
+async with streamable_http_client("https://3-228-70-117.sslip.io/mcp", http_client=http) as streams:
+    async with ClientSession(streams[0], streams[1]) as session:
+        await session.initialize()
+        print(await session.call_tool("whoami", {}))            # which circles this key may read
+        print(await session.call_tool("call", {"tenant": CIRCLE, "op": "graph_path",
+                                               "args_json": '{"source": "asha", "target": "atorvastatin"}'}))
+```
+
+**Run with a real model.** `scripts/agent_demo.py` (by hand, not in CI: it calls a paid model) drives a LlamaIndex `FunctionAgent` and a LangGraph agent with Amazon Bedrock's Nova Pro against a synthetic demo circle, using our tools. Both read the schema first, called `graph_path` with the real labels (`Person`, `Drug`), called `graph_influence` for betweenness, and gave answers that match the tool results (asha reaches atorvastatin through one dose; the dose with the highest betweenness is metformin's). The first run, before the tool descriptions told the model what a `label` was, showed the failure worth knowing: the model invented a label (`record`), the server refused it with a message listing the real labels, and the model stopped instead of retrying. The catalogue now carries each operation's full description, which fixed it. A model can still choose badly; the server's refusals are the safety net, not the model's judgement.
+
+Also relevant to the FalkorDB ecosystem, stated plainly: Graphiti was tried first and is **not** the runtime (three defects on exactly the multi-tenant path, measured in `docs/DECISION.md`); we borrowed its ideas (episode to fact provenance, bi-temporal validity) and wrote them as Cypher. QueryWeaver (text to SQL), GraphRAG-SDK, Cognee and Mem0 were **not** run against this project (they need an LLM key for extraction, or do not fit), so nothing is claimed about them. The graphs are ordinary FalkorDB graphs (`mem__<circle>`), so a tool that reads FalkorDB can open them (see "Explore the graph").
+
+## Accounts, circles and the helper
+- **Sign in with email.** On the deployed site Amazon Cognito proves the email (a code by email on sign-up and for a forgotten password), the page signs in straight to Cognito as
+  [The Vayu Project](https://github.com/hrsh-kr/the-vayu-project) does, and the server checks the ID token's signature, issuer, audience, expiry and verified email (`carecircle/cognito.py`)
+  before it creates the account in FalkorDB. Without Cognito configured (local development, CI) the app has its own email-and-password accounts (scrypt hashes, sign-in throttling, 30-day sessions
+  stored only as a SHA-256). Set `CC_COGNITO_POOL_ID` and `CC_COGNITO_CLIENT_ID` to switch.
+- **Demo accounts.** Two ordinary accounts, Ravi and Meena, share a demo circle for Asha; their password is shown on the sign-in page so anyone can try how a change reaches the second carer.
+  "Reset the demo circle" restores it. There is also a throw-away anonymous demo with no account.
+- **Your data is real and on the server.** A new account and a new circle start **empty**: nothing is pre-filled or invented. Profile, circles, roles, invitations, medicines, acknowledgements,
+  doses, reminders, the helper conversation and Telegram links are all read from the graph on every load; the browser keeps only a sign-in token and which circle is open
+  (`web/src/lib/session.ts`, with a test that nothing else is stored). Demo-only tools (the time warp, seeded people) appear only in demo circles.
+- **Circles and carers.** Create a circle for one person, invite carers with a one-time code (72 hours, one use), rename it, remove or leave. A carer counts toward "who has not seen this" from the
+  moment they join. The owner alone can invite, remove carers and erase everything about the person; if the owner leaves, the longest-standing carer becomes owner; the last member leaving deletes the circle.
+  Deleting an account removes it and every circle it alone was in.
+- **Profile and account page.** Name, circles and members, invitations, the Telegram link (a six-character one-time code: `/link CODE`, `/circles` to switch), password change, sign out, delete account.
+- **The helper** (the sparkles button). It answers from the circle's own record: who has not seen a change, what is on record, what is flagged and why, what changed, who gave a dose, and "tell me about <medicine>". "Add warfarin 5 mg once daily"
+  becomes a proposal you confirm. Questions that ask for advice (*should she stop...*, *is it safe...*, *how much...*) get a fixed refusal pointing to a prescriber or pharmacist, and an emergency gets the emergency line.
+  Rules answer first; only a question no rule covers goes to Amazon Bedrock, with names masked, and its answer is used only if it has no advice, no reassurance words, no imperative, no link and no number that is not in the facts
+  (`carecircle/assistant.py`, 20 tests including a prompt-injection attempt). The conversation is stored on the server per carer (60 questions a day), can be cleared, and can be asked by voice and read aloud.
+- **More:** change a recorded dose or record a medicine as stopped (a new entry, the old one stays in the history), a printable one-page summary for a pharmacist, FHIR export, forget with a receipt.
+
+## More than medicines
+Around the medicine record, a circle also keeps what a family needs at the doctor's door. Everything below is stored in the circle's graph, is typed or confirmed by a carer, and never advises.
+- **Readings over time** (blood pressure, sugar, INR, weight, pulse, temperature, oxygen, TSH): kept as typed, drawn as a line with the dates a medicine's entry changed marked on it, with the plain mean before and after each change. Only typing slips are refused (a pressure of 1200); a value is never called good or bad.
+- **Appointments** with who goes and what to bring; a past one reads as done and stays in the history. **"What to bring"** assembles, from the record alone, what changed since the previous visit, the flags and their sources, anything not yet seen by every carer, readings in that time and any allergy hit.
+- **Conditions and allergies.** An allergy is cross-checked against the medicines on record: an exact generic name or a medicine in a short, hand-written group list (penicillins, NSAIDs, statins ...). A hit says "ask the prescriber"; no hit is never shown as safe.
+- **Recalls and label text.** Public sources, queried by medicine name only, cached in the reference graph: RxNorm (name to ingredient, used when the local match is weak and kept only if the reference graph has that medicine), openFDA drug labels (the official boxed warning and "used for" text, quoted with its source and date) and openFDA recall reports. Live calls are not covered by CI.
+- **Only one carer knows.** A graph query over the acknowledgement edges lists current entries known to a single carer (a single point of failure) and the carer holding most of them.
+- **Reminders** reach people through the Telegram bot and, where the server has VAPID keys, as browser notifications (Web Push, no chat app needed); one claim per reminder, so it is never produced twice however many channels it goes to.
+- **Hindi** across the screens, the helper (Devanagari and Hinglish), Hindi voice input and read-aloud.
+
+## What is in the app
+The web app is React + TypeScript + Vite, in the visual language of [The Vayu Project](https://github.com/hrsh-kr/the-vayu-project) (Hanken Grotesk, a soft wash in the colour of the most serious flag, a status
+card with a big number and a face, white hairline cards, dashed add tiles, a floating pill tab bar and round buttons; the AQI level colours become flag severity), phone to desktop.
+- **Today:** one verdict tile (never "safe"), the regimen, and every flag with its source and the Cypher or enzyme path behind it.
+- **Add:** a photo, voice note (recorded in the browser), PDF, Word file or typed text becomes proposals that show the exact quoted line, a verified badge and the top three drug matches. Nothing is saved until a person confirms.
+- **Circle:** who has not seen which change (graph query), reminders with a time-warp control, and a once-per-slot dose log.
+- **Graph:** the circle as an animated force-directed graph (people, entries, medicines, enzymes). Nodes pop in, edges draw themselves, flagged edges carry flowing dashes, major interactions pulse. **Click any node or line** and a panel explains it in plain words: what it is, who recorded it and when, the source and quoted line, who acknowledged it, interaction counts and PageRank hub rank for medicines, and the graph pattern it comes from. Layers can be toggled, nodes dragged, the view zoomed; it is keyboard-reachable.
+- **History:** a look-back slider (regimen and flags as they were), a timeline written as sentences, **FHIR R4 export** (free-text `MedicationStatement`s; no medicine codes are invented), and **forget with a receipt**: remove one entry or everything about the person for good, leaving only a SHA-256 hash, who and when.
+- **Follow-ups**: the record suggests things to ask or tell (a flagged pair, a recent change, a carer who has not seen a medicine, an allergy hit); a carer ticks which to keep; each is marked stale if the entry it was written from later changes (`BASIS` edges to the `Dose`).
+- **Account basics**: change password (also for Cognito accounts), show/hide password, sign out of all devices, download all my data as JSON, delete a circle, quiet hours for reminders (held, not dropped), text size, search in History, edit appointments and conditions, a Help section, and an installable web app.
+- **Light and dark theme**, a toggle in the header; it follows the device until a person chooses, then remembers the choice. English and Hindi (toggle beside it).
+- **Telegram** does the same without an app: photo, voice, text, `/regimen`, `/check`, `/history`, `/ack`, `/gave`; proposals wait in the database, so a redeploy does not expire a Confirm button.
+
+## The demo story (90 seconds)
+1. **Start a demo circle.** Asha takes metformin, amlodipine, atorvastatin; two carers, Ravi and Meena, have acknowledged them.
+2. **Add > "Sample label".** A synthetic pharmacy label is read by OCR. You see the proposed entry with the **exact line it came from** and a
+   *quote verified* badge. Nothing is saved yet. Confirm it (as Ravi).
+3. **Today** now flags clarithromycin + atorvastatin as *major* (DDInter), with the enzyme path `clarithromycin -INHIBITS(strong)-> CYP3A <-SUBSTRATE_OF- atorvastatin`.
+   Pairs the source lists without a severity are shown as *unrated*, not safe.
+4. **Circle.** Meena has not acknowledged the change. Slide the time warp to 13 hours: a reminder is produced for Meena, and an escalation for Ravi. Each is produced exactly once.
+5. **Doses** (in the Circle tab). Record a dose as Ravi, then as Meena: the second is refused and names who already gave it.
+6. **Graph.** Watch it assemble, click the clarithromycin node, then the red line: both explain themselves in words.
+7. **History.** Slide back to see the regimen and flags as they were; export FHIR; remove an entry and see the receipt.
+
 ## Safety by design
 - **No advice.** A scanner (`carecircle/safety.py`) rejects outgoing text that tells someone to take, stop, skip or change a dose. Messages are
   templates whose facts (drug, hours, carer) are checked before sending.
@@ -230,6 +245,7 @@ Limits: they run on one tenant graph at a time, and on a graph with few links Pa
 
 - **Interaction check latency:** 16 ms median (range 12-18 over 7 runs) and 20 ms at the 95th percentile (range 16-24), for a 10-medicine regimen (direct pairs, enzyme paths and combined weight in three reads), warm, one process, FalkorDB 4.22.1 (`bench/care_bench.py`, B5). The exact results (B1-B3) were identical in all 7 runs.
 - **Intake on real input:** 5 real bottle photos and 1 spoken note (browser microphone to Whisper): drug found in 6/6, with one wrong extra candidate; see `docs/BENCHMARKS.md` (B4).
+- **Intake on 150 rendered labels, three levels of damage:** the right medicine first in 150/150 clean, 150/150 moderate and 139/150 harsh (10 harsh images gave no proposal); the strength copied right in 145, 150 and 129 of 150, never with a wrong extra suggestion. One harsh label lost a decimal point (`05mg` for 0.5 mg), which is why every proposal shows its quoted line and waits for a person. Synthetic labels, not photographs (`bench/intake_bench.py`, B4b).
 
 ## What runs, and how it is checked
 | Feature | Where it is answered | Checked by |
@@ -271,6 +287,31 @@ Enzyme data: the FDA "Drug Development and Drug Interactions" substrates/inhibit
 This project was built with substantial help from Claude (Anthropic) via Claude Code: design discussion, code, tests and docs were written with
 AI assistance and reviewed and run by the author. At runtime, an optional Amazon Bedrock model (Amazon Nova) only turns OCR/transcript text into
 proposed fields; it never decides interactions or doses.
+
+## Run it
+Deployed on one AWS EC2 instance (t3.large, Docker Compose, Caddy for HTTPS, Bedrock through the instance role, only ports 80/443 open): `deploy/docker-compose.prod.yml`.
+
+```bash
+# everything: FalkorDB (append-only volume) + app. First start downloads the public reference data and loads it (a few minutes).
+GRAPHMEM_ADMIN_KEY=change-me docker compose up -d --build
+open http://localhost:8000          # press "Start a demo circle"     (FalkorDB Browser: http://localhost:3000)
+```
+Without Docker (needs a FalkorDB on :6379, e.g. `docker run -p 6379:6379 falkordb/falkordb`):
+```bash
+python -m venv .venv && .venv/bin/pip install -r requirements.txt          # Windows: .venv/Scripts
+python scripts/fetch_reference.py                                           # DDInter + FDA tables into data/ref (gitignored)
+python -c "from carecircle import reference as r; print(r.load())"          # build the shared cc_ref graph
+(cd web && npm ci && npm run build)                                         # the React app (served by the API from web/dist)
+python -m graphmem.api                                                      # http://127.0.0.1:8000
+python -m pytest -q tests                                                   # 112 tests against live FalkorDB
+(cd web && npm test)                                                        # UI unit tests; `npm run dev` for hot reload (proxies to :8000)
+PORT=8000 python scripts/ui_e2e.py && PORT=8000 python scripts/ui_e2e_accounts.py    # browser walk-throughs: demo, then accounts (need Chrome and `pip install playwright`)
+PYTHONPATH=. python bench/care_bench.py                                     # benchmarks below (`--out run.json`, then `python bench/gate.py bench/baselines/care_bench.json run.json` compares two runs)
+```
+Optional: `CC_COGNITO_POOL_ID` / `CC_COGNITO_CLIENT_ID` (email sign-up through Amazon Cognito; unset = built-in accounts), `CC_ASSISTANT=0` (the helper answers from rules only), `CC_MODEL` / `AWS_REGION` + AWS credentials let Amazon Bedrock (default `us.amazon.nova-pro-v1:0`) structure what the OCR read;
+`CC_LLM=0` or no credentials falls back to rules. Set `TELEGRAM_BOT_TOKEN` to also run the Telegram bot in the server process (`/link <key> <circle>`, then send a photo, voice note or text).
+
+**Look inside the graph.** `python scripts/seed_explore.py` loads two small synthetic graphs (a care circle and an agent's memory); then open FalkorDB Browser at <http://localhost:3000>, connect to `localhost:6379`, and run the queries in [`docs/EXPLORE.md`](docs/EXPLORE.md): the regimen and its history, who has not seen a change, why an agent decided something, and PageRank over the interaction graph. A test runs every query in that guide, so they work. The live site does not expose the Browser (one login would show every family's circle); the Graph tab shows each circle's own graph and the Cypher behind it.
 
 ## Layout
 `carecircle/` product logic (reference graph, checks, risk math, safety, intake, Telegram, algorithms, demo) · `graphmem/` the multi-tenant graph
