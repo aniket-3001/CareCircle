@@ -128,7 +128,17 @@ with sync_playwright() as p:
     card.get_by_label("New password").fill(PW + "x2")
     card.get_by_role("button", name="Change password").click()
     expect(pg.get_by_text("Password changed")).to_be_visible(timeout=15000)
-    pg.get_by_test_id("top-signout").click()
+    with pg.expect_download(timeout=20000) as dl:                               # everything held for the account, as one file
+        pg.get_by_test_id("download-all").click()
+    assert dl.value.suggested_filename.startswith("care-circle-my-data-")
+    # deleting a circle needs its name typed first (its details are already open)
+    pg.get_by_test_id("delete-circle").click()
+    expect(pg.get_by_test_id("delete-circle-go")).to_be_disabled()
+    pg.locator("dialog[open]").get_by_label("Circle name").fill("Mum's medicines")
+    expect(pg.get_by_test_id("delete-circle-go")).to_be_enabled()
+    pg.locator("dialog[open] .icon-btn[aria-label=Close]").click()
+    pg.get_by_test_id("signout-all").click()                                    # signs out every device, this one included
+    expect(pg.get_by_test_id("open-signin")).to_be_visible(timeout=15000)
     pg.get_by_test_id("open-signin").click()
     pg.get_by_label("Email").fill(f"priya{stamp}@e2e.test")
     pg.get_by_label("Password", exact=True).fill(PW)
