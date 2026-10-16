@@ -120,6 +120,13 @@ with sync_playwright() as p:
     p2.get_by_role("button", name="Add note").click()
     expect(p2.get_by_test_id("handover").get_by_text("INR 2.4 on Tuesday")).to_be_visible(timeout=15000)
     print("5a second-carer confirmation and handover note ok")
+    p2.get_by_test_id("fu-suggest").click()                                     # follow-ups: suggested, approved by a person, then ticked off
+    expect(p2.get_by_test_id("fu-suggestions")).to_be_visible(timeout=15000)
+    p2.get_by_test_id("fu-approve").click()
+    expect(p2.get_by_test_id("followup").first).to_be_visible(timeout=15000)
+    p2.get_by_test_id("followup").first.get_by_role("button", name="Done").click()
+    expect(p2.get_by_text("Done by").first).to_be_visible(timeout=15000)
+    print("5b follow-ups ok")
 
     # ---- readings, conditions and allergies, appointments and the what-to-bring page
     tab(pg, "Today")
