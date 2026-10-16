@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import type { CheckResult } from '../api/types';
 import { SEVERITY, levelVars, sevKey, worstSeverity } from '../design/levels';
-import { pct, title } from '../lib/format';
+import { title } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { useSettle } from '../lib/useSettle';
 import { FaceIcon } from './Face';
@@ -30,7 +30,6 @@ export function Hero({ check, chips }: { check: CheckResult; chips: Chip[] }): R
   const sev = worstSeverity(check);
   const level = SEVERITY[sev];
   const top = [...check.direct].sort((a, b) => (sevKey(b.level) === 'major' ? 1 : 0) - (sevKey(a.level) === 'major' ? 1 : 0))[0];
-  const risk = check.regimen_risk;
   return (
     <section className={`hero${noData ? ' hero--neutral' : ''}`} style={noData ? undefined : levelVars(sev)} aria-labelledby="hero-title" data-testid="verdict" data-state={j.state}>
       <div className="hero-top">
@@ -64,14 +63,6 @@ export function Hero({ check, chips }: { check: CheckResult; chips: Chip[] }): R
             </span>
           </dd>
         </dl>
-      )}
-      {risk != null && (
-        <div style={{ display: 'grid', gap: 6 }}>
-          <div className="bar" aria-hidden="true" style={{ background: 'rgb(255 255 255 / 0.5)' }}>
-            <i style={{ width: `${Math.min(100, risk * 100)}%`, background: 'var(--ink)' }} />
-          </div>
-          <p className="hero-fine">Combined flag weight {pct(risk)}: a noisy-OR over assumed weights, not a chance of harm.</p>
-        </div>
       )}
       <ul className="hero-chips" aria-label="The circle at a glance">
         {chips.map(({ Icon, text }) => (

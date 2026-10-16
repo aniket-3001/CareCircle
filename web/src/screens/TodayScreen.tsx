@@ -102,7 +102,6 @@ export function TodayScreen(): React.JSX.Element {
                 <ul className="steps">
                   <li><span><b>Direct pairs:</b> DDInter 2.0, a curated interaction database, with its severity.</span></li>
                   <li><span><b>Enzyme paths:</b> one medicine slows or speeds a liver enzyme that clears another (FDA table, a two-step graph path).</span></li>
-                  <li><span><b>Combined weight:</b> noisy-OR over assumed severity weights. A label, not a clinical value.</span></li>
                 </ul>
               </section>
             </div>
