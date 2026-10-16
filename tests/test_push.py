@@ -26,17 +26,24 @@ def test_off_without_keys(monkeypatch):
 
 async def test_subscribe_validates_and_dead_endpoints_are_removed(gm, keys, monkeypatch):
     await gm.register_agent("pushy")
-    for bad in (("http://x/y", "a", "b"), ("https://push.example/x", "", "b"), ("https://push.example/x", "a", "")):
+    for host in ("https://evil.example/x", "https://169.254.169.254/latest/meta-data", "https://fcm.googleapis.com.evil.example/x", "https://user:pw@fcm.googleapis.com/x",
+                 "https://fcm.googleapis.com:8443/x", "https://localhost/x", "https://10.0.0.5/x", "https://notfcm.googleapis.com.attacker.io/x"):
+        with pytest.raises(ValueError):                                          # the server later sends a request here: only browsers' push services are allowed
+            await webpush.subscribe(gm, "pushy", host, "a", "b")
+    for good in ("https://fcm.googleapis.com/fcm/send/abc", "https://updates.push.services.mozilla.com/wpush/v2/abc", "https://web.push.apple.com/abc", "https://par02p.notify.windows.com/w/?token=abc"):
+        await webpush.subscribe(gm, "pushy", good, "k", "a")
+    await webpush.unsubscribe(gm, "pushy")
+    for bad in (("http://x/y", "a", "b"), ("https://fcm.googleapis.com/fcm/send/x", "", "b"), ("https://fcm.googleapis.com/fcm/send/x", "a", "")):
         with pytest.raises(ValueError):
             await webpush.subscribe(gm, "pushy", *bad)
-    await webpush.subscribe(gm, "pushy", "https://push.example/ok", "k1", "a1")
-    await webpush.subscribe(gm, "pushy", "https://push.example/gone", "k2", "a2")
-    await webpush.subscribe(gm, "pushy", "https://push.example/ok", "k1b", "a1b")                    # same endpoint: updated, not duplicated
+    await webpush.subscribe(gm, "pushy", "https://fcm.googleapis.com/fcm/send/ok", "k1", "a1")
+    await webpush.subscribe(gm, "pushy", "https://fcm.googleapis.com/fcm/send/gone", "k2", "a2")
+    await webpush.subscribe(gm, "pushy", "https://fcm.googleapis.com/fcm/send/ok", "k1b", "a1b")                    # same endpoint: updated, not duplicated
     assert len(await webpush.subscriptions(gm, "pushy")) == 2
     sent = []
     monkeypatch.setattr(webpush, "_send_one", lambda sub, payload: sent.append(payload) or (False if sub["endpoint"].endswith("gone") else True))
     assert await webpush.push(gm, "pushy", "The change to warfarin made 5 hours ago is not yet acknowledged.") == 1
-    assert sent[0]["body"].startswith("The change to warfarin") and [s["endpoint"] for s in await webpush.subscriptions(gm, "pushy")] == ["https://push.example/ok"]
+    assert sent[0]["body"].startswith("The change to warfarin") and [s["endpoint"] for s in await webpush.subscriptions(gm, "pushy")] == ["https://fcm.googleapis.com/fcm/send/ok"]
     assert await webpush.unsubscribe(gm, "pushy") == 1 and await webpush.subscriptions(gm, "pushy") == []
     for a in ("pushy",):
         g = await gm._ctl()

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+from urllib.parse import urlparse
 import json
 import os
 from typing import Optional
@@ -46,9 +47,26 @@ def _sig(endpoint: str) -> str:
     return hashlib.sha256(endpoint.encode()).hexdigest()
 
 
+# Where a browser's push subscription can legitimately point: the push services run by the browser makers. The server later sends a request to this
+# address, so a person must not be able to aim it at any other server (an internal service, or one they run to learn this server's address).
+PUSH_HOSTS = ("fcm.googleapis.com", "android.googleapis.com", "push.services.mozilla.com", "push.apple.com", "notify.windows.com")
+
+
+def allowed_endpoint(endpoint: str) -> bool:
+    try:
+        u = urlparse(endpoint)
+        host = (u.hostname or "").lower()
+        return (u.scheme == "https" and not u.username and not u.password and u.port in (None, 443)
+                and any(host == h or host.endswith("." + h) for h in PUSH_HOSTS))
+    except ValueError:
+        return False
+
+
 async def subscribe(gm, agent: str, endpoint: str, p256dh: str, auth: str) -> None:
     if not (endpoint.startswith("https://") and len(endpoint) < 1000 and p256dh and auth and len(p256dh) < 200 and len(auth) < 100):
         raise ValueError("that does not look like a browser push subscription")
+    if not allowed_endpoint(endpoint):
+        raise ValueError("that address is not a browser's push service")
     g = await gm._ctl()
     await g.query("MERGE (s:PushSub {hash:$h}) SET s.endpoint=$e, s.p256dh=$k, s.auth=$a, s.agent=$ag, s.at=$t",
                   {"h": _sig(endpoint), "e": endpoint, "k": p256dh, "a": auth, "ag": agent, "t": now_ms()})
