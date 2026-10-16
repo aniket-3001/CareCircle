@@ -2,6 +2,7 @@ import { Bot, Check, ChevronDown, Copy, Download, LogOut, ShieldAlert, Trash2, U
 import { useState } from 'react';
 import type { CircleInfo, Invite, Member } from '../api/types';
 import { DisplayCard } from '../components/DisplayCard';
+import { QuietHours } from '../components/QuietHours';
 import { PasswordInput } from '../components/PasswordInput';
 import { Async } from '../components/Async';
 import { CircleForms } from '../components/CircleForms';
@@ -123,6 +124,8 @@ export function AccountScreen(): React.JSX.Element {
               <button type="button" className="btn btn--soft" onClick={() => void acct.telegramCode().then(setTg, (e) => toast(e instanceof Error ? e.message : 'Could not make a code'))}>{tr('Link Telegram')}</button>
             )}
           </section>
+
+          {!p.demo && <QuietHours />}
 
           <DisplayCard />
 
