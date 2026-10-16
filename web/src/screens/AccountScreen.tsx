@@ -113,16 +113,16 @@ export function AccountScreen(): React.JSX.Element {
             {p.telegram.length > 0 && (
               <div className="rows">
                 {p.telegram.map((t) => <div key={t.chat} className="item"><div><div className="item__title">Chat {t.chat}</div><div className="item__sub">{p.circles.find((c) => c.id === t.circle)?.name ?? t.circle}</div></div></div>)}
-                <button type="button" className="btn btn--ghost btn--sm" style={{ justifySelf: 'start', color: 'var(--danger)' }} onClick={() => void acct.telegramUnlink().then(app.refreshProfile).then(() => toast('Telegram unlinked'))}>{tr('Unlink Telegram')}</button>
+                <button type="button" className="btn btn--ghost btn--sm" style={{ justifySelf: 'start', color: 'var(--danger)' }} onClick={() => void acct.telegramUnlink().then(() => setTg(null)).then(app.refreshProfile).then(() => toast('Telegram unlinked'))}>{tr('Unlink Telegram')}</button>
               </div>
             )}
-            {tg ? (
+            {p.telegram.length === 0 && (tg ? (
               <div className="banner" role="status" data-testid="tg-code">
                 <div>{tr('Open')} <a href={`https://t.me/${BOT}`} target="_blank" rel="noreferrer">@{BOT}</a> and send:<br /><b className="tnum" style={{ fontSize: 20 }}>/link {tg.code}</b><br /><span className="small">The code works once, for {tg.minutes} minutes.</span></div>
               </div>
             ) : (
               <button type="button" className="btn btn--soft" onClick={() => void acct.telegramCode().then(setTg, (e) => toast(e instanceof Error ? e.message : 'Could not make a code'))}>{tr('Link Telegram')}</button>
-            )}
+            ))}
           </section>
 
           {!p.demo && <QuietHours />}
