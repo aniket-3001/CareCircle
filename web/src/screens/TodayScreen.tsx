@@ -8,6 +8,7 @@ import { MedActions } from '../components/MedActions';
 import { PageHead } from '../components/PageHead';
 import { Pill } from '../components/Pill';
 import { ProfileCard } from '../components/ProfileCard';
+import { Checklist } from '../components/Checklist';
 import { Counts } from '../components/Counts';
 import { Readings } from '../components/Readings';
 import { Recalls } from '../components/Recalls';
@@ -33,6 +34,7 @@ export function TodayScreen(): React.JSX.Element {
         {(c) => (
           <div className="layout">
             <div className="col">
+              <Checklist />
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: 'easeOut' }}>
                 <Hero
                   check={c}

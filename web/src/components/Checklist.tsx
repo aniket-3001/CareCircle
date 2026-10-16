@@ -1,0 +1,167 @@
+import { CalendarClock, Check, Clock } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import type { Suggestion, TodayItem, TodayView } from '../api/types';
+import { useT, tr } from '../lib/i18n';
+import { nameOf, title } from '../lib/format';
+import { useApp, useLoad } from '../state';
+import { Pill } from './Pill';
+import { Sheet } from './Sheet';
+import { useToast } from './Toast';
+
+const STATE: Record<TodayItem['state'], { text: string; tone: 'ok' | 'info' | 'warn' | 'mute' }> = {
+  given: { text: 'Given', tone: 'ok' },
+  due: { text: 'Due now', tone: 'info' },
+  not_marked: { text: 'Not marked as given yet', tone: 'warn' },
+  upcoming: { text: 'Later today', tone: 'mute' },
+};
+
+/** Today's doses, from the times a carer confirmed: one row per slot, with who marked it given. It reports what is recorded ("not marked as given yet");
+ *  it never says what to take or skip. A medicine with no confirmed times is listed below with a way to set them. */
+export function Checklist(): React.JSX.Element | null {
+  const app = useApp();
+  const t = useT();
+  const toast = useToast();
+  const today = useLoad((a) => a.api.today(a.now()), [app.warp]);
+  const [setting, setSetting] = useState<TodayView['unscheduled'][number] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  // The circle's time zone decides which day a slot belongs to. If nobody has set it, take this device's, once.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const z = await app.api.timezone();
+        const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (!z.set && here) { await app.api.setTimezone(here); app.bump(); }
+      } catch { /* a read-only member cannot set it: the default stays */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [app.session.circle]);
+
+  async function give(i: TodayItem): Promise<void> {
+    setBusy(`${i.dose_id}|${i.time}`);
+    try {
+      const r = await app.api.giveSlot(i.dose_id, i.time);
+      toast(r.given ? `${title(i.drug)} at ${i.time} marked as given.` : `Already marked as given by ${nameOf(r.already_given_by ?? '')}. Check with them before giving another.`);
+      app.bump();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not mark it');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Checked today={today.data} error={today.error} onGive={give} busy={busy} onSet={setSetting} setting={setting} closeSet={() => setSetting(null)} t={t} />
+  );
+}
+
+function Checked({ today, error, onGive, busy, onSet, setting, closeSet, t }: {
+  today: TodayView | undefined; error: string | undefined; onGive: (i: TodayItem) => Promise<void>; busy: string | null;
+  onSet: (u: TodayView['unscheduled'][number]) => void; setting: TodayView['unscheduled'][number] | null; closeSet: () => void; t: (s: string) => string;
+}): React.JSX.Element | null {
+  if (error || !today) return null;
+  const nothing = today.items.length === 0 && today.unscheduled.length === 0 && today.as_needed.length === 0;
+  if (nothing) return null;
+  const late = today.counts.not_marked;
+  return (
+    <section className="card" aria-labelledby="checklist-title" data-testid="checklist">
+      <div className="card-head">
+        <h2 id="checklist-title"><CalendarClock size={20} strokeWidth={1.75} aria-hidden="true" /> {t("Today's doses")}</h2>
+        <Pill tone={late ? 'warn' : 'info'}>{today.counts.given} / {today.items.length} {t('marked given')}</Pill>
+      </div>
+      {late > 0 && <p className="muted" role="status" data-testid="checklist-late">{late === 1 ? t('1 dose is not marked as given yet.') : `${late} ${t('doses are not marked as given yet.')}`} {t('Check with the others before marking one.')}</p>}
+      <div className="rows">
+        {today.items.map((i) => (
+          <div key={`${i.dose_id}|${i.time}`} className="item" data-testid="slot" data-state={i.state}>
+            <div>
+              <div className="item__title"><Clock size={16} aria-hidden="true" /> {i.time} · {title(i.drug)} <span className="muted">{i.dose_text}</span></div>
+              <div className="item__sub">
+                <Pill tone={STATE[i.state].tone}>{t(STATE[i.state].text)}</Pill>
+                {i.given_by && <> {t('by')} {nameOf(i.given_by)}</>}
+                {i.needs_second_carer && <> · {t('a second carer should confirm')}</>}
+              </div>
+            </div>
+            {i.state !== 'given' && (
+              <button type="button" className="btn btn--sm" disabled={busy === `${i.dose_id}|${i.time}`} onClick={() => void onGive(i)} data-testid="give-slot">
+                <Check size={16} aria-hidden="true" /> {t('Mark as given')}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      {today.unscheduled.length > 0 && (
+        <div className="rows" data-testid="unscheduled">
+          <p className="eyebrow">{t('No times set yet')}</p>
+          {today.unscheduled.map((u) => (
+            <div key={u.dose_id} className="item">
+              <div>
+                <div className="item__title">{title(u.drug)} <span className="muted">{u.dose_text} {u.freq_text}</span></div>
+                <div className="item__sub">{u.suggestion.understood ? t('The label says') + ` ${u.suggestion.label}.` : u.suggestion.why}</div>
+              </div>
+              <button type="button" className="btn btn--soft btn--sm" onClick={() => onSet(u)} data-testid="set-times">{t('Set times')}</button>
+            </div>
+          ))}
+        </div>
+      )}
+      {today.as_needed.length > 0 && <p className="muted small">{t('Taken as needed, so no fixed times:')} {today.as_needed.map((a) => title(a.drug)).join(', ')}.</p>}
+      <p className="muted small">{today.tz} · {today.date}</p>
+      <SetTimes u={setting} close={closeSet} />
+    </section>
+  );
+}
+
+function SetTimes({ u, close }: { u: TodayView['unscheduled'][number] | null; close: () => void }): React.JSX.Element {
+  const app = useApp();
+  const toast = useToast();
+  const [times, setTimes] = useState<string[]>([]);
+  const [asNeeded, setAsNeeded] = useState(false);
+  const [ends, setEnds] = useState('');
+  const [busy, setBusy] = useState(false);
+  const s: Suggestion | undefined = u?.suggestion;
+  useEffect(() => {
+    if (!u) return;
+    setTimes(u.suggestion.times);
+    setAsNeeded(u.suggestion.as_needed);
+    setEnds('');
+  }, [u]);
+
+  async function save(): Promise<void> {
+    if (!u) return;
+    setBusy(true);
+    try {
+      await app.api.setSchedule(u.dose_id, asNeeded ? [] : times, asNeeded, ends);
+      toast(`${title(u.drug)}: times saved.`);
+      close();
+      app.bump();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not save');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const setAt = (i: number, v: string): void => setTimes((cur) => cur.map((x, j) => (j === i ? v : x)));
+  return (
+    <Sheet open={u !== null} title={u ? `${tr('Times for')} ${title(u.drug)}` : ''} onClose={close}>
+      {u && (
+        <>
+          <p className="muted">{s?.understood && !s.as_needed ? `${tr('The label says')} ${s.label}. ${tr('These times are only a starting point: set the ones on the pack.')}` : s?.why}</p>
+          <label className="row"><input type="checkbox" checked={asNeeded} onChange={(e) => setAsNeeded(e.target.checked)} data-testid="as-needed" /> {tr('Taken only when needed (no fixed times)')}</label>
+          {!asNeeded && (
+            <div className="stack">
+              {times.map((x, i) => (
+                <div key={i} className="row">
+                  <input type="time" value={x} aria-label={`${tr('Time')} ${i + 1}`} onChange={(e) => setAt(i, e.target.value)} data-testid="time-input" />
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => setTimes((cur) => cur.filter((_, j) => j !== i))}>{tr('Remove')}</button>
+                </div>
+              ))}
+              {times.length < 6 && <button type="button" className="btn btn--soft btn--sm" onClick={() => setTimes((cur) => [...cur, '12:00'])}>{tr('Add a time')}</button>}
+            </div>
+          )}
+          <label className="field">{tr('Last day of the course (optional)')}<input type="date" value={ends} onChange={(e) => setEnds(e.target.value)} data-testid="ends-on" /></label>
+          <button type="button" className="btn" disabled={busy || (!asNeeded && times.length === 0)} onClick={() => void save()} data-testid="save-times">{tr('Save times')}</button>
+        </>
+      )}
+    </Sheet>
+  );
+}

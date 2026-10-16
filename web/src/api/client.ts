@@ -1,6 +1,6 @@
 import type { Counts, Followup, FollowupSuggestion, Handover, AllergyCheck, Appointment, CareProfile, Visit, DrugInfo, Reading, Trend, Recalls, SoleKnowers,
   Account, AuthConfig, CareGraph, ChatMessage, CheckResult, Divergence, FhirBundle, GiveRecord, GiveResult, Hubs, GInfluence, GCommunities, GPath, IntakeResult, Invite, Member, Reminder, People,
-  Profile, Receipt, RegimenEntry, Session, TimelineEvent, CircleInfo,
+  Profile, Receipt, RegimenEntry, Session, TimelineEvent, CircleInfo, TodayView,
 } from './types';
 
 export class ApiError extends Error {
@@ -83,6 +83,11 @@ export function apiFor(s: Session) {
     timeline: (now: number) => op<TimelineEvent[]>('care_timeline', { person: p, now, limit: 300 }),
     forget: (dose_id: string, reason: string) => op<{ receipt: string; forgotten: boolean; sha256: string }>('care_forget', { dose_id, reason }),
     forgetPerson: (confirm: string) => op<{ receipt: string; forgotten: boolean; removed_entries: number }>('care_forget_person', { person: p, confirm }),
+    today: (now: number) => op<TodayView>('care_today', { person: p, now }),
+    timezone: () => op<{ tz: string; set: boolean }>('care_timezone'),
+    setTimezone: (tz: string) => op<{ tz: string }>('care_set_timezone', { tz }),
+    giveSlot: (dose_id: string, time: string) => op<GiveResult>('care_give_slot', { person: p, dose_id, time }),
+    setSchedule: (dose_id: string, times: string[], as_needed: boolean, ends_on: string) => op<{ id: string }>('care_schedule_set', { dose_id, times, as_needed, ends_on }),
     markMistake: (dose_id: string, reason: string) => op<{ id: string }>('care_mark_mistake', { dose_id, reason }),
     restoreEntry: (dose_id: string) => op<{ id: string }>('care_restore_entry', { dose_id }),
     me: () => get<{ tenants: Record<string, string[]> }>('/v1/me', token),

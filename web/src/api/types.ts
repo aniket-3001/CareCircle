@@ -11,6 +11,9 @@ export interface Session {
 }
 
 export interface RegimenEntry {
+  slots?: string[];
+  as_needed?: boolean;
+  ends_on?: string | null;
   id: string;
   drug: string;
   dose_text: string;
@@ -19,6 +22,39 @@ export interface RegimenEntry {
   source: 'typed' | 'photo' | 'voice' | 'document';
   quote: string;
   by: string;
+}
+
+export interface Suggestion {
+  times: string[];
+  label: string;
+  as_needed: boolean;
+  ends_in_days: number | null;
+  understood: boolean;
+  why: string;
+}
+
+export interface TodayItem {
+  dose_id: string;
+  drug: string;
+  dose_text: string;
+  freq_text: string;
+  time: string;
+  slot: string;
+  at: number;
+  state: 'given' | 'due' | 'not_marked' | 'upcoming';
+  given_by: string | null;
+  given_at: number | null;
+  needs_second_carer: boolean;
+}
+
+export interface TodayView {
+  person: string;
+  tz: string;
+  date: string;
+  items: TodayItem[];
+  counts: { given: number; due: number; not_marked: number; upcoming: number };
+  unscheduled: { dose_id: string; drug: string; dose_text: string; freq_text: string; suggestion: Suggestion }[];
+  as_needed: { dose_id: string; drug: string; dose_text: string; freq_text: string }[];
 }
 
 export interface DirectFlag {
