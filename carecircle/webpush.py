@@ -90,7 +90,7 @@ def _send_one(sub: dict, payload: dict) -> Optional[bool]:
     from pywebpush import WebPushException, webpush
     try:
         webpush(subscription_info={"endpoint": sub["endpoint"], "keys": {"p256dh": sub["p256dh"], "auth": sub["auth"]}}, data=json.dumps(payload),
-                vapid_private_key=_private_pem(), vapid_claims={"sub": os.getenv("CC_VAPID_SUBJECT", "mailto:carecircle@example.com")}, ttl=3600, timeout=8)
+                vapid_private_key=_private_pem(), vapid_claims={"sub": os.getenv("CC_VAPID_SUBJECT") or "mailto:carecircle@example.com"}, ttl=3600, timeout=8)
         return True
     except WebPushException as e:
         code = getattr(getattr(e, "response", None), "status_code", None)
