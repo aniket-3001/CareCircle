@@ -480,3 +480,23 @@ def test_strength_read_through_ocr_punctuation_but_not_from_prose():
         assert p and p[0]["dose_text"] == want, (text, p)
     p = intake.rule_proposals("Warfarin dose 5: great care is needed", ch)                  # a bare "g" after punctuation is prose, not grams
     assert p and p[0]["dose_text"] == ""
+
+
+async def test_divergence_weighs_an_enzyme_flag_by_its_medicines_not_by_parsing_its_text(gm, monkeypatch):
+    """The flag names its two medicines as fields; the readable path text is for people and must not be taken apart."""
+    t, c = await circle(gm, "ravi", "meena")
+    await c["ravi"].care_record("mum", "warfarin", dose_text="5 mg", freq_text="at bedtime", source_type="typed", at=1)
+    seen = await c["ravi"].care_record("mum", "aspirin", dose_text="75 mg", freq_text="daily", source_type="typed", at=2)
+    await c["meena"].care_ack(seen["id"])                  # meena is now a carer in the circle, and has seen aspirin but not warfarin
+    await c["ravi"].care_ack(seen["id"])
+
+    async def fake_check(self, person):
+        return {"direct": [], "enzyme_paths": [{"path": "free text with SUBSTRATE_OF- and -dashes- in it", "x": "clarithromycin", "y": "warfarin", "weight": 0.7}]}
+    monkeypatch.setattr(type(c["ravi"]), "care_check", fake_check)
+    d = await c["meena"].care_divergence("mum", now=1 + 20 * 3_600_000)
+    assert [u["drug"] for u in d["carers"]["meena"]["unacknowledged"]] == ["warfarin"]
+    plain = (await c["meena"].care_divergence("mum", now=1 + 20 * 3_600_000))["carers"]["meena"]["divergence"]
+    async def none_check(self, person): return {"direct": [], "enzyme_paths": []}
+    monkeypatch.setattr(type(c["ravi"]), "care_check", none_check)
+    base = (await c["meena"].care_divergence("mum", now=1 + 20 * 3_600_000))["carers"]["meena"]["divergence"]
+    assert plain > base                         # warfarin's 0.7 flag weight counted, instead of the default 0.3

@@ -203,8 +203,7 @@ class CareMixin:
             for d in f["drugs"]:
                 heavy[d] = max(heavy.get(d, 0), f["weight"])
         for f in flags["enzyme_paths"]:
-            left, right = f["path"].split(" -", 1)[0], f["path"].rsplit("SUBSTRATE_OF- ", 1)[-1]
-            for d in (left, right):
+            for d in (f["x"], f["y"]):                                          # the medicines are fields of the flag; the path text is for people to read
                 heavy[d] = max(heavy.get(d, 0), f["weight"])
         out = {}
         for c in carers:
