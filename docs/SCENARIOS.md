@@ -4,7 +4,7 @@ Unit tests check that a function does what its author meant. A scenario checks t
 
 ```
 python -m graphmem.api &                                   # a server on :8000 (or set SCENARIO_URL)
-SCENARIO_URL=http://localhost:8000 python scenarios/run.py            # 40 scenarios through the API (about 640 checks)
+SCENARIO_URL=http://localhost:8000 python scenarios/run.py            # 47 scenarios through the API (about 685 checks)
 SCENARIO_URL=http://localhost:8000 python scenarios/ui_scenarios.py   # 11 scenarios in Chrome (about 50 checks)
 python scenarios/run.py M                                  # only the scenarios whose id starts with M
 ```
@@ -54,6 +54,13 @@ The cast: **Priya** owns a circle for Mum, **Omar** is a second carer, **Mallory
 | X4 | Manipulation | 14 attempts (ignore instructions, role-play, "system:", code fences, translate, poems, "school project") |
 | X5 | Adding by chat | Only proposes; several medicines in one sentence; injection text writes nothing |
 | X6, X7 | Chat input and history | Empty, huge, emoji, script tags; daily limit; each carer's conversation is their own and clearable |
+| N1 | Races: sign-up | Ten sign-ups for one email at once: exactly one account |
+| N2 | Races: invitation | One code used by ten people at once: exactly one gets in |
+| N3 | Races: edits | Twelve edits to one medicine from two carers at once: one current entry, all thirteen stored, history unbroken, the latest-dated entry wins |
+| N4 | Races: acknowledge and give | Fifteen acknowledgements and 32 gives across 16 slots: one record per slot |
+| N5 | Uploads | Empty, fake, executable, 13 MB, path-in-name and silent-audio files: clean answers, anything proposed still needs a person |
+| N6 | Rate limit | A flood from one carer is slowed (429); another carer is unaffected |
+| N7 | Telegram codes | New code each time, sign-in required, nothing linked until the bot confirms |
 | U1 | Browser: hostile text | A script/event-handler string in the name, circle, person, medicine, condition, allergy, note, appointment, reading and chat: shown as text, nothing runs |
 | U2 | Browser: double-click | One entry, one note |
 | U3 | Browser: reload and Back | Same tab, still signed in; after sign-out, Back shows nothing private |
@@ -87,6 +94,8 @@ Every row was found by a scenario, fixed, and is now pinned by it.
 | "Why does she feel dizzy after the tablets?" and "can I crush the tablet?" got a flat "I can't answer" with no pointer | They get the same prescriber-or-pharmacist pointer as other advice requests, in English and Hindi |
 | When a session ended (signed out elsewhere, password changed, expired) the page kept looking signed in with broken sections | Any 401 returns to sign-in with a plain explanation |
 | A very long unbroken name or note widened the page past a phone screen | Text wraps inside its box; the header cannot widen the page |
+| Ten simultaneous sign-ups for one email crashed some of them (500) | The database's own uniqueness rule decides: one account, the losers get a clean 409 and leave nothing behind |
+| A push-notification address could be any web address, and the server later sends a request to it | Only browsers' own push services are accepted (Chrome, Firefox, Safari, Edge); anything else, including internal addresses and look-alike hosts, is refused |
 
 Earlier probing of the memory engine itself (handing a task to an agent with no access, empty or oversized events, bad limits) is in `docs/TRACK02.md`.
 
