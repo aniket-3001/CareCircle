@@ -113,6 +113,33 @@ card with a big number and a face, white hairline cards, dashed add tiles, a flo
 6. **Graph.** Watch it assemble, click the clarithromycin node, then the red line: both explain themselves in words.
 7. **History.** Slide back to see the regimen and flags as they were; export FHIR; remove an entry and see the receipt.
 
+## Connect your agent stack
+
+The memory engine is not tied to the web app: any agent can use the same graph through the door it already speaks. Each of these is covered by a test that does exactly what is shown (`tests/test_mcp_http.py`, `tests/test_api.py`, `tests/test_track02.py`).
+
+| You use | How it connects | Notes |
+|---|---|---|
+| **An MCP client** (an editor, a desktop assistant, an agent framework with MCP support) | `POST https://<host>/mcp`, streamable HTTP, header `Authorization: Bearer <key>` | The same tools as the stdio server: `call(tenant, op, args_json)` for any of the ~90 operations, `remember`, `recall`, forks, shared spaces. Stateless: no MCP session is kept on the server. Same grants, scopes and rate limits as the REST API; a wrong key is a 401. Off with `CC_MCP_HTTP=0` |
+| **MCP over stdio** (a local process) | `GRAPHMEM_API_KEY=gm_... python -m graphmem.mcp_server` | For a client that starts its server itself |
+| **Anything that can send HTTP** (LangChain, LlamaIndex, a script) | `POST /v1/tenants/{tenant}/{op}` with a JSON body; `GET /v1/ops` lists every operation with its arguments | `docs/API.md` is generated from the code. Wrap an operation as a tool in two lines in any framework |
+| **A key** | a signed-in person's session token works as the bearer for their own circles; an agent key (`gm_...`) comes from the admin plane | A key sees only the tenants it was granted, with the scopes it was granted |
+
+```python
+# a real MCP client, as tested: list the tools, then ask the graph how two records connect
+from mcp import ClientSession
+from mcp.client.streamable_http import create_mcp_http_client, streamable_http_client
+
+http = create_mcp_http_client(headers={"Authorization": "Bearer " + KEY})
+async with streamable_http_client("https://3-228-70-117.sslip.io/mcp", http_client=http) as streams:
+    async with ClientSession(streams[0], streams[1]) as session:
+        await session.initialize()
+        print(await session.call_tool("whoami", {}))            # which circles this key may read
+        print(await session.call_tool("call", {"tenant": CIRCLE, "op": "graph_path",
+                                               "args_json": '{"source": "asha", "target": "atorvastatin"}'}))
+```
+
+Also relevant to the FalkorDB ecosystem, stated plainly: Graphiti was tried first and is **not** the runtime (three defects on exactly the multi-tenant path, measured in `docs/DECISION.md`); we borrowed its ideas (episode to fact provenance, bi-temporal validity) and wrote them as Cypher. The FalkorDB MCP server, QueryWeaver, GraphRAG-SDK, LlamaIndex and Cognee were **not** run against this project, so nothing is claimed about them. The graphs are ordinary FalkorDB graphs (`mem__<circle>`), so a tool that reads FalkorDB can open them (see "Explore the graph").
+
 ## Graph data model
 ```
 cc_ref   (shared, read-only reference graph; built from public data)
