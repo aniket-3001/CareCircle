@@ -1,1 +1,3 @@
 langchain-core         # integrations/langchain_tools.py (not needed by the server)
+langgraph              # tests/test_langgraph_checkpoint.py: an agent graph whose checkpoints live in FalkorDB
+langchain-falkordb[langgraph]   # FalkorDBSaver, FalkorDB's LangGraph checkpointer
