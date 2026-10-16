@@ -109,6 +109,9 @@ export interface IntakeResult {
   proposals: Proposal[];
 }
 
+export interface FollowupSuggestion { key: string; kind: string; text: string; basis: string[] }
+export interface Followup { id: string; text: string; kind: string; status: 'open' | 'done'; by: string; at: number; done_by: string | null; done_at: number | null; stale: boolean }
+
 export interface Counts {
   reading: { saved: number; unchanged: number; statement: string };
   load: { medicines: number; times_of_day: number; special_directions: number; statement: string };

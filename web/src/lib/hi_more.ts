@@ -1,5 +1,7 @@
 /** Hindi for the rest of the screens (Add, Circle, Graph, History, Account, readings, appointments, profile). Keys are the English text. */
 export const HI_MORE: Record<string, string> = {
+  // Follow-ups
+  'Follow-ups': 'अगले कदम', 'Things to ask or tell, drawn from the record. You choose which to keep.': 'पूछने या बताने की बातें, रिकॉर्ड से। कौन-सी रखनी हैं, आप चुनें।', 'Suggest from the record': 'रिकॉर्ड से सुझाव लें', 'Nothing new to suggest.': 'सुझाने को कुछ नया नहीं।', 'Add the ticked ones': 'चुनी हुई जोड़ें', 'Done by': 'पूरा किया', 'Added by': 'जोड़ा', 'The record has changed since: look again first': 'तब से रिकॉर्ड बदला है: पहले फिर देख लें', 'Dismiss': 'हटाएँ', 'Done': 'हो गया', 'Cancel': 'रद्द करें',
   // Add
   'Choose how': 'तरीका चुनें', 'Photo': 'फ़ोटो', 'Document': 'दस्तावेज़', 'PDF or Word': 'PDF या Word', 'Sample label': 'नमूना लेबल', 'Or type it': 'या टाइप करें',
   'Medicine, dose and how often': 'दवा, खुराक और कितनी बार', 'Read it': 'पढ़ें', 'What was read': 'क्या पढ़ा गया', 'Medicine (pick the right one)': 'दवा (सही वाली चुनें)',
