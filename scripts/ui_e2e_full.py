@@ -138,6 +138,10 @@ with sync_playwright() as p:
     pg.get_by_label("Add a condition").fill("Atrial fibrillation")
     pg.get_by_label("Add a condition").press("Enter")
     expect(pg.get_by_text("Atrial fibrillation").first).to_be_visible(timeout=15000)
+    pg.get_by_label("Edit Atrial fibrillation").click()                          # reword a condition in place
+    pg.get_by_label("Reword it").fill("Atrial fibrillation (paroxysmal)")
+    pg.get_by_label("Reword it").press("Enter")
+    expect(pg.get_by_text("Atrial fibrillation (paroxysmal)").first).to_be_visible(timeout=15000)
     pg.locator("[data-testid=readings] select").first.select_option("inr")
     pg.locator("[data-testid=readings] input[type=number]").fill("2.4")
     pg.get_by_role("button", name="Save reading").click()
@@ -151,6 +155,10 @@ with sync_playwright() as p:
     pg.locator("[data-testid=appointments] input[type=text]").first.fill("INR check")
     pg.get_by_role("button", name="Add appointment").click()
     expect(pg.get_by_text("INR check").first).to_be_visible(timeout=15000)
+    pg.get_by_test_id("edit-appt").first.click()                                # change an appointment's place
+    pg.locator("dialog[open]").get_by_label("Where").fill("North clinic")
+    pg.locator("dialog[open]").get_by_role("button", name="Save changes").click()
+    expect(pg.get_by_text("North clinic").first).to_be_visible(timeout=15000)
     pg.get_by_role("button", name="What to bring").first.click()
     expect(pg.get_by_test_id("visit")).to_contain_text("Changed on record", timeout=15000)
     expect(pg.get_by_test_id("visit")).to_contain_text("not advice")
