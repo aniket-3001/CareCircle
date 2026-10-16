@@ -174,3 +174,8 @@ async def build(ravi, meena, person: str, now: int) -> None:
             r = await handle[giver].care_give(person, drug, slot)
             if r.get("given"):
                 await handle[giver]._q("MATCH (g:Give {key:$k}) SET g.at=$t", {"k": f"{norm(person)}|{norm(drug)}|{norm(slot)}", "t": at})
+    from .demo import schedule_all                                                  # the times the carers gave doses at are the times on the checklist
+    by_drug: dict[str, list[str]] = {}
+    for drug, hhmm, _who in sched:
+        by_drug.setdefault(drug, []).append(hhmm)
+    await schedule_all(ravi, person, {d: sorted(v) for d, v in by_drug.items()})

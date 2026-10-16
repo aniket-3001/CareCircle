@@ -34,6 +34,15 @@ def label_png(drug: str = "Clarithromycin 500 mg tablets", sig: str = "Take ONE 
     return buf.getvalue()
 
 
+async def schedule_all(m, person: str, times: dict | None = None) -> None:
+    """Confirm times for every current medicine, as a carer would from the pack: the suggestion from what the label says, or the given times."""
+    from . import schedule
+    for r in await m.care_regimen(person):
+        want = (times or {}).get(r["drug"]) or schedule.suggest(r["freq_text"])["times"]
+        if want:
+            await m.care_schedule_set(r["id"], want)
+
+
 async def start(gm, prefix: str = "demo") -> dict:
     """Fresh circle + two carer agents with keys, baseline regimen acknowledged by both carers."""
     circle = f"{prefix}-{uuid.uuid4().hex[:8]}"
@@ -49,6 +58,7 @@ async def start(gm, prefix: str = "demo") -> dict:
     for i in ids:
         await meena.care_ack(i)
     await meena.care_record(PERSON, "vitamin d", dose_text="1000 iu", freq_text="once daily")      # makes meena a known carer
+    await schedule_all(ravi, PERSON)
     return {"circle": circle, "person": PERSON, "agents": agents, "keys": keys}
 
 

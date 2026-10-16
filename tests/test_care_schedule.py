@@ -198,3 +198,14 @@ async def test_the_bot_delivers_a_due_slot_to_each_linked_carer_once(gm):
     assert n == 2 and sorted(c for c, _ in api.out) == [91, 92] and all("08:00: due now" in x for _, x in api.out)
     assert "advice" not in " ".join(x for _, x in api.out).lower()
     assert await bot.deliver_nudges(now=at(day, "08:15")) == 0                         # once
+
+
+async def test_the_one_click_demo_circle_opens_with_a_checklist_not_an_empty_one(gm):
+    from carecircle import demo
+    d = await demo.start(gm)
+    gm._created.append(d["circle"])
+    m = gm.open(d["agents"]["ravi"], d["circle"])
+    today = await m.care_today(d["person"], at(date(2026, 10, 17), "09:00"))
+    assert today["unscheduled"] == [] and len(today["items"]) >= 8
+    assert {"08:00", "20:00"} <= {i["time"] for i in today["items"] if i["drug"] == "metformin"}
+    assert [i["time"] for i in today["items"]] == sorted(i["time"] for i in today["items"])
