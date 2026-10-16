@@ -216,8 +216,12 @@ def u5(w, b, r):
     email = f"u5-{rid()}@scenario.test"
     ui_signup(pg, "Sia", email)
     ui_circle(pg)
+    pg.wait_for_timeout(2500)                                                                             # the first screen finishes loading (it sets the time zone) before the session dies
     api_user(w, email).post("/v1/account/signout-all")
-    tab(pg, "History")                                                                                    # this screen asks the server afresh
+    try:
+        tab(pg, "History")                                                                                # this screen asks the server afresh
+    except Exception:                                                                                     # the page may already have noticed and gone back to sign-in: also fine
+        pass
     pg.wait_for_timeout(3000)
     body = pg.inner_text("body")
     signed_out = pg.get_by_test_id("open-signin").count() > 0 or pg.get_by_test_id("top-signin").count() > 0
