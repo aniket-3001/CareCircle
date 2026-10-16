@@ -76,3 +76,9 @@ def tid(gm, label="a"):
     t = f"tt-{label}-{uuid.uuid4().hex[:6]}"
     gm._created.append(t)
     return t
+
+
+def day(offset: int = 0) -> str:
+    """A date (UTC) relative to the day the test runs, so a dose slot is always inside the time its medicine has been on record. Nothing here ages."""
+    import datetime as _dt
+    return (_dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(days=offset)).strftime("%Y-%m-%d")

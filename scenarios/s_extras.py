@@ -190,7 +190,7 @@ def e1(w: World, r):
     for who, drug in (("mum", "warfarin"), ("dad", "metformin")):
         d = priya.ok(c, "care_record", person=who, drug=drug, dose_text="4 mg", freq_text="daily", at=now - 6 * H)
         priya.ok(c, "care_watch", person=who, drug=drug, on=True)
-        priya.ok(c, "care_give", person=who, drug=drug, slot="2026-10-16 08:00")
+        priya.ok(c, "care_give", person=who, drug=drug, slot=time.strftime("%Y-%m-%d %H:00", time.gmtime((now - 5 * H) / 1000)))      # five hours ago, inside the entry's time
         priya.ok(c, "care_measure", person=who, kind="weight", value=70)
         priya.ok(c, "care_appoint", person=who, title="Clinic", at=now + DAY)
         priya.ok(c, "care_condition_add", person=who, name="Hypertension")

@@ -1,9 +1,11 @@
 """Second-carer confirmation (the family's rule) and append-only handover notes."""
 import asyncio
 
+import time
+
 import pytest
 
-from conftest import tid
+from conftest import day, tid
 
 
 async def _two(gm, name):
@@ -15,19 +17,19 @@ async def _two(gm, name):
 
 async def test_watched_dose_needs_a_different_carer(gm):
     ravi, meena = await _two(gm, "cu")
-    await ravi.care_record("asha", "warfarin", dose_text="4 mg")
-    await ravi.care_record("asha", "metformin", dose_text="500 mg")
-    assert (await ravi.care_give("asha", "metformin", "2026-10-16 08:00")).get("needs_second_carer") is None      # not watched: nothing extra
+    await ravi.care_record("asha", "warfarin", dose_text="4 mg", at=int(time.time() * 1000) - 3 * 24 * 3_600_000)
+    await ravi.care_record("asha", "metformin", dose_text="500 mg", at=int(time.time() * 1000) - 3 * 24 * 3_600_000)
+    assert (await ravi.care_give("asha", "metformin", f"{day(-1)} 08:00")).get("needs_second_carer") is None      # not watched: nothing extra
     await ravi.care_watch("asha", "warfarin")
     assert await ravi.care_watched("asha") == ["warfarin"]
-    r = await ravi.care_give("asha", "warfarin", "2026-10-16 18:00")
+    r = await ravi.care_give("asha", "warfarin", f"{day(-1)} 18:00")
     assert r["given"] and r["needs_second_carer"]
     assert [g["needs_second_carer"] for g in await ravi.care_gives("asha") if g["drug"] == "warfarin"] == [True]
     with pytest.raises(ValueError):
-        await ravi.care_witness("asha", "warfarin", "2026-10-16 18:00")                     # not your own dose
+        await ravi.care_witness("asha", "warfarin", f"{day(-1)} 18:00")                     # not your own dose
     with pytest.raises(KeyError):
-        await meena.care_witness("asha", "warfarin", "2026-10-17 18:00")                    # nothing recorded for that slot
-    assert (await meena.care_witness("asha", "warfarin", "2026-10-16 18:00"))["by"] == "meena"
+        await meena.care_witness("asha", "warfarin", f"{day(0)} 18:00")                    # nothing recorded for that slot
+    assert (await meena.care_witness("asha", "warfarin", f"{day(-1)} 18:00"))["by"] == "meena"
     g = next(g for g in await ravi.care_gives("asha") if g["drug"] == "warfarin")
     assert g["witness"] == "meena" and g["needs_second_carer"] is False
     await ravi.care_watch("asha", "warfarin", False)

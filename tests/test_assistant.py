@@ -6,7 +6,7 @@ import pytest
 from carecircle import assistant
 from carecircle.checks import Checker
 from carecircle.safety import scan_advice
-from conftest import tid
+from conftest import day, tid
 
 H = 3_600_000
 
@@ -22,11 +22,11 @@ async def seeded(gm):
     t, c = await circle(gm, "ravi", "meena")
     now = int(time.time() * 1000)
     for d, dose, freq in (("atorvastatin", "20 mg", "at bedtime"), ("metformin", "500 mg", "twice daily")):
-        r = await c["ravi"].care_record("asha", d, dose_text=dose, freq_text=freq)
+        r = await c["ravi"].care_record("asha", d, dose_text=dose, freq_text=freq, at=now - 3 * 24 * H)
         await c["meena"].care_ack(r["id"])
     await c["meena"].care_record("asha", "clarithromycin", dose_text="500 mg", freq_text="twice daily", source_type="photo",
                                  quote="Clarithromycin 500 mg tablets", source_ref=await c["meena"].care_store_source("image", "x\nClarithromycin 500 mg tablets\ny"), at=now - 5 * H)
-    await c["ravi"].care_give("asha", "metformin", "2026-10-16 08:00")
+    await c["ravi"].care_give("asha", "metformin", f"{day(-1)} 08:00")
     return t, c, now
 
 
@@ -44,9 +44,9 @@ async def test_rule_answers_come_from_the_record_and_never_advise(gm):
     r = await say(c, "Are there any interactions?", now)
     assert "Atorvastatin + Clarithromycin: major (DDInter 2.0)" in r["answer"] and "no flag does not mean safe" in r["answer"]
     r = await say(c, "what changed recently", now)
-    assert r["answer"].startswith("Most recent: ") and "Ravi recorded Metformin as given for the 2026-10-16 08:00 slot." in r["answer"]
+    assert r["answer"].startswith("Most recent: ") and f"Ravi recorded Metformin as given for the {day(-1)} 08:00 slot." in r["answer"]
     r = await say(c, "who gave the doses?", now)
-    assert "Metformin for 2026-10-16 08:00 by Ravi" in r["answer"]
+    assert f"Metformin for {day(-1)} 08:00 by Ravi" in r["answer"]
     r = await say(c, "tell me about clarithromycin", now)
     assert "recorded by Meena" in r["answer"] and "read from a photo" in r["answer"] and "flag(s)" in r["answer"] and "Not yet seen by Ravi" in r["answer"]
     for q in ("who hasn't seen it", "what is on record", "interactions", "history", "help", "tell me about metformin"):
@@ -156,7 +156,7 @@ async def test_hindi_answers_come_from_the_record_and_never_advise(gm):
     r = await say(c, "हाल में क्या बदला", now)
     assert r["answer"].startswith("हाल के बदलाव") and "Clarithromycin" in r["answer"]
     r = await say(c, "खुराक किसने दी?", now)
-    assert "Metformin 2026-10-16 08:00 (Ravi ने)" in r["answer"]
+    assert f"Metformin {day(-1)} 08:00 (Ravi ने)" in r["answer"]
     r = await say(c, "what is on record", now, lang="hi")                       # the UI is in Hindi: the answer is in Hindi
     assert "रिकॉर्ड में" in r["answer"]
 

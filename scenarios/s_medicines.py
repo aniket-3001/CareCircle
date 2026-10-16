@@ -5,6 +5,12 @@ import time
 from harness import H, World, scenario
 
 NOW = lambda: int(time.time() * 1000)  # noqa: E731
+import datetime as _dt
+
+_Y = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=1)).date()          # dates are relative to the day the run happens: nothing here ages
+DAY = {"16": _Y.isoformat(), "17": (_Y + _dt.timedelta(days=1)).isoformat(), "18": (_Y + _dt.timedelta(days=2)).isoformat(), "10": (_Y - _dt.timedelta(days=6)).isoformat()}
+LONG_AGO = 3 * 24 * 3_600_000                                                       # entries are recorded this long ago, so every slot used here falls inside their time
+
 
 
 def regimen(u, c, **kw):
@@ -276,20 +282,20 @@ def d4(w: World, r):
 @scenario("G1", "Giving doses: once per slot, slot formats, and giving something that is not on record")
 def g1(w: World, r):
     priya, omar, mallory, c = w.team()
-    priya.ok(c, "care_record", person="mum", drug="metformin", dose_text="500 mg", freq_text="twice daily")
-    a = priya.ok(c, "care_give", person="mum", drug="metformin", slot="2026-10-16 08:00")
+    priya.ok(c, "care_record", person="mum", drug="metformin", dose_text="500 mg", freq_text="twice daily", at=NOW() - LONG_AGO)
+    a = priya.ok(c, "care_give", person="mum", drug="metformin", slot=f"{DAY['16']} 08:00")
     r.check(a["given"] is True, "the first give is recorded", a)
-    b = omar.ok(c, "care_give", person="mum", drug="metformin", slot="2026-10-16 08:00")
+    b = omar.ok(c, "care_give", person="mum", drug="metformin", slot=f"{DAY['16']} 08:00")
     r.check(b["given"] is False and b.get("already_given_by") == priya.agent.lower(), "the same slot from another carer says who already gave it", b)
-    r.check(priya.ok(c, "care_give", person="mum", drug="Metformin ", slot="2026-10-16 08:00")["given"] is False, "the same slot with the name typed differently is still the same dose")
-    r.check(omar.ok(c, "care_give", person="mum", drug="metformin", slot="2026-10-16 20:00")["given"] is True, "a different slot is a different dose")
-    for bad in ("garbage", "", "2026-13-45 08:00", "2026-10-16 25:99", "yesterday", "2026-10-16", "x" * 200):
+    r.check(priya.ok(c, "care_give", person="mum", drug="Metformin ", slot=f"{DAY['16']} 08:00")["given"] is False, "the same slot with the name typed differently is still the same dose")
+    r.check(omar.ok(c, "care_give", person="mum", drug="metformin", slot=f"{DAY['16']} 20:00")["given"] is True, "a different slot is a different dose")
+    for bad in ("garbage", "", "2026-13-45 08:00", f"{DAY['16']} 25:99", "yesterday", DAY["16"], "x" * 200):
         s, body = priya.op(c, "care_give", person="mum", drug="metformin", slot=bad)
         r.check(s in (400, 422), f"slot {bad[:20]!r} is refused (a typo should not become a 'dose given' record)", f"{s} {str(body)[:80]}")
-    s, body = priya.op(c, "care_give", person="mum", drug="neverrecorded", slot="2026-10-17 08:00")
+    s, body = priya.op(c, "care_give", person="mum", drug="neverrecorded", slot=f"{DAY['17']} 08:00")
     r.check(s in (400, 404, 409, 422), "giving a medicine that is not on record is refused", f"{s} {str(body)[:80]}")
     priya.ok(c, "care_record", person="mum", drug="metformin", action="stop")
-    s, body = priya.op(c, "care_give", person="mum", drug="metformin", slot="2026-10-18 08:00")
+    s, body = priya.op(c, "care_give", person="mum", drug="metformin", slot=f"{DAY['18']} 23:00")
     r.check(s in (400, 404, 409, 422), "giving a medicine after it was stopped is refused", f"{s} {str(body)[:80]}")
     gives = priya.ok(c, "care_gives", person="mum")
     r.check(len(gives) == 2 and {g["by"] for g in gives} == {priya.agent.lower(), omar.agent.lower()}, "the list holds exactly the two real doses, with who gave them", gives)
@@ -298,11 +304,11 @@ def g1(w: World, r):
 @scenario("G2", "Two carers give the same dose at the same moment: exactly one is recorded")
 def g2(w: World, r):
     priya, omar, mallory, c = w.team()
-    priya.ok(c, "care_record", person="mum", drug="warfarin", dose_text="4 mg", freq_text="daily")
+    priya.ok(c, "care_record", person="mum", drug="warfarin", dose_text="4 mg", freq_text="daily", at=NOW() - LONG_AGO)
     results = []
 
     def go(u):
-        results.append(u.op(c, "care_give", person="mum", drug="warfarin", slot="2026-10-16 18:00"))
+        results.append(u.op(c, "care_give", person="mum", drug="warfarin", slot=f"{DAY['16']} 18:00"))
 
     threads = [threading.Thread(target=go, args=(u,)) for u in (priya, omar) * 6]
     [t.start() for t in threads]
@@ -316,22 +322,22 @@ def g2(w: World, r):
 @scenario("G3", "Second-carer confirmation for a watched medicine")
 def g3(w: World, r):
     priya, omar, mallory, c = w.team()
-    priya.ok(c, "care_record", person="mum", drug="warfarin", dose_text="4 mg", freq_text="daily")
+    priya.ok(c, "care_record", person="mum", drug="warfarin", dose_text="4 mg", freq_text="daily", at=NOW() - LONG_AGO)
     priya.ok(c, "care_watch", person="mum", drug="warfarin", on=True)
     r.check(omar.ok(c, "care_watched", person="mum") == ["warfarin"], "the other carer sees it is watched")
-    g = priya.ok(c, "care_give", person="mum", drug="warfarin", slot="2026-10-16 18:00")
+    g = priya.ok(c, "care_give", person="mum", drug="warfarin", slot=f"{DAY['16']} 18:00")
     r.check(g["given"] and g.get("needs_second_carer"), "giving it asks for a second carer", g)
-    s, _ = priya.op(c, "care_witness", person="mum", drug="warfarin", slot="2026-10-16 18:00")
+    s, _ = priya.op(c, "care_witness", person="mum", drug="warfarin", slot=f"{DAY['16']} 18:00")
     r.check(s in (400, 403, 409, 422), "the giver cannot witness their own dose", s)
-    s, _ = mallory.op(c, "care_witness", person="mum", drug="warfarin", slot="2026-10-16 18:00")
+    s, _ = mallory.op(c, "care_witness", person="mum", drug="warfarin", slot=f"{DAY['16']} 18:00")
     r.check(s == 403, "an outsider cannot witness", s)
-    s, _ = omar.op(c, "care_witness", person="mum", drug="warfarin", slot="2026-10-10 08:00")
+    s, _ = omar.op(c, "care_witness", person="mum", drug="warfarin", slot=f"{DAY['10']} 08:00")
     r.check(s == 404, "witnessing a dose that was never given is a 404", s)
-    r.check(omar.op(c, "care_witness", person="mum", drug="warfarin", slot="2026-10-16 18:00")[0] == 200, "another carer witnesses it")
+    r.check(omar.op(c, "care_witness", person="mum", drug="warfarin", slot=f"{DAY['16']} 18:00")[0] == 200, "another carer witnesses it")
     gv = [x for x in priya.ok(c, "care_gives", person="mum") if x["drug"] == "warfarin"][0]
     r.check(gv["witness"] == omar.agent.lower() and gv["needs_second_carer"] is False, "it is now confirmed by two people", gv)
-    s, b = omar.op(c, "care_witness", person="mum", drug="warfarin", slot="2026-10-16 18:00")
+    s, b = omar.op(c, "care_witness", person="mum", drug="warfarin", slot=f"{DAY['16']} 18:00")
     r.check(s in (200, 409) and [x for x in priya.ok(c, "care_gives", person="mum")][0]["witness"] == omar.agent.lower(), "witnessing twice does not change who witnessed", f"{s} {b}")
     priya.ok(c, "care_watch", person="mum", drug="warfarin", on=False)
     r.check(priya.ok(c, "care_watched", person="mum") == [], "unwatching works")
-    r.check("needs_second_carer" not in priya.ok(c, "care_give", person="mum", drug="warfarin", slot="2026-10-17 18:00") or priya.ok(c, "care_give", person="mum", drug="warfarin", slot="2026-10-18 18:00").get("needs_second_carer") in (None, False), "an unwatched medicine asks for nothing extra")
+    r.check("needs_second_carer" not in priya.ok(c, "care_give", person="mum", drug="warfarin", slot=f"{DAY['17']} 18:00") or priya.ok(c, "care_give", person="mum", drug="warfarin", slot=f"{DAY['18']} 18:00").get("needs_second_carer") in (None, False), "an unwatched medicine asks for nothing extra")

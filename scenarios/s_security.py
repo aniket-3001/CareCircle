@@ -71,11 +71,12 @@ def n3(w: World, r):
 @scenario("N4", "Many people acknowledging and giving at once")
 def n4(w: World, r):
     priya, omar, mallory, c = w.team()
-    e = priya.ok(c, "care_record", person="mum", drug="metformin", dose_text="500 mg", freq_text="twice daily")
+    e = priya.ok(c, "care_record", person="mum", drug="metformin", dose_text="500 mg", freq_text="twice daily", at=NOW() - 3 * 24 * H)
     res = parallel([lambda: omar.op(c, "care_ack", dose_id=e["id"]) for _ in range(15)])
     r.check(all(not isinstance(x, Exception) and x[0] == 200 for x in res), "fifteen acknowledgements at once are all fine", [x if isinstance(x, Exception) else x[0] for x in res])
     r.check(omar.ok(c, "care_divergence", person="mum")["carers"][omar.agent]["unacknowledged"] == [], "he is up to date, once")
-    slots = [f"2026-10-16 {h:02d}:00" for h in range(6, 22)]
+    yesterday = time.strftime("%Y-%m-%d", time.gmtime(time.time() - 86400))                          # relative to the day of the run, inside the entry's time
+    slots = [f"{yesterday} {h:02d}:00" for h in range(6, 22)]
     res = parallel([(lambda s=s, u=u: u.op(c, "care_give", person="mum", drug="metformin", slot=s)) for s in slots for u in (priya, omar)])
     r.check(len(priya.ok(c, "care_gives", person="mum", limit=100)) == len(slots), "32 gives across 16 slots: exactly one record per slot", len(priya.ok(c, "care_gives", person="mum", limit=100)))
 

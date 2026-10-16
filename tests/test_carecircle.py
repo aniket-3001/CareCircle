@@ -1,4 +1,4 @@
-import json, math, pytest
+import json, math, pytest, time
 from carecircle import risk, reference
 from carecircle.checks import Checker
 
@@ -40,7 +40,7 @@ def test_control_unrelated_and_unknown_drug(chk):
 
 # ---- circle graph (tenant-scoped, real FalkorDB) ----
 import asyncio
-from conftest import tid
+from conftest import day, tid
 
 H = 3_600_000
 
@@ -89,8 +89,8 @@ async def test_check_staleness_and_nudges_once(gm):
 
 async def test_double_dose_race_has_one_winner(gm):
     t, c = await circle(gm, "ravi", "meena")
-    await c["ravi"].care_record("mum", "metformin", dose_text="500 mg")                 # a dose can only be given of a medicine that is on the record
-    res = await asyncio.gather(*[c["ravi" if i % 2 else "meena"].care_give("mum", "metformin", "2026-10-16 08:00") for i in range(10)])
+    await c["ravi"].care_record("mum", "metformin", dose_text="500 mg", at=int(time.time() * 1000) - 3 * 24 * 3_600_000)      # a dose can only be given of a medicine that is on the record
+    res = await asyncio.gather(*[c["ravi" if i % 2 else "meena"].care_give("mum", "metformin", f"{day(-1)} 08:00") for i in range(10)])
     assert sum(x["given"] for x in res) == 1
     assert all(x["given"] or x["already_given_by"] in ("ravi", "meena") for x in res)
 
@@ -304,7 +304,7 @@ def test_speech_decodes_a_telegram_style_opus_voice_note():
 async def _regimen_with_conflict(gm):
     t, c = await circle(gm, "ravi", "meena")
     for d in ("atorvastatin", "amlodipine", "metformin"):
-        await c["ravi"].care_record("asha", d, dose_text="10 mg", freq_text="once daily")
+        await c["ravi"].care_record("asha", d, dose_text="10 mg", freq_text="once daily", at=int(time.time() * 1000) - 3 * 24 * 3_600_000)
     r = await c["meena"].care_record("asha", "clarithromycin", dose_text="500 mg", freq_text="twice daily", source_type="photo",
                                      quote="Clarithromycin 500 mg tablets", source_ref=await c["meena"].care_store_source("image", "DEMO\nClarithromycin 500 mg tablets\nTake one"))
     return t, c, r
@@ -349,7 +349,7 @@ async def test_care_graph_text_never_advises_and_history_is_optional(gm):
 async def test_timeline_reads_as_sentences(gm):
     t, c, r = await _regimen_with_conflict(gm)
     await c["ravi"].care_ack(r["id"])
-    await c["ravi"].care_give("asha", "metformin", "2026-10-16 08:00")
+    await c["ravi"].care_give("asha", "metformin", f"{day(-1)} 08:00")
     tl = await c["ravi"].care_timeline("asha")
     texts = [e["text"] for e in tl]
     assert any("Meena recorded Clarithromycin 500 mg twice daily, read from a photo" in x for x in texts)
@@ -375,7 +375,7 @@ async def test_forget_entry_leaves_a_receipt_and_no_content(gm):
 
 async def test_forget_person_needs_the_name_and_removes_everything(gm):
     t, c, r = await _regimen_with_conflict(gm)
-    await c["ravi"].care_give("asha", "metformin", "2026-10-16 08:00")
+    await c["ravi"].care_give("asha", "metformin", f"{day(-1)} 08:00")
     with pytest.raises(ValueError):
         await c["ravi"].care_forget_person("asha", confirm="nope")
     out = await c["ravi"].care_forget_person("asha", confirm="Asha")
