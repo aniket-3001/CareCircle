@@ -281,10 +281,11 @@ class TenantMemory(CareMixin, CareViewMixin, CareTrackMixin, CarePlanMixin, Care
             prov = await self._q(
                 """MATCH (f:Fact) WHERE f.id IN $ids
                    OPTIONAL MATCH (f)-[:EXTRACTED_FROM]->(e:Episode)
-                   RETURN f.id, e.id, e.session, e.seq, e.agent, e.ts, e.redacted""",
+                   RETURN f.id, e.id, e.session, e.seq, e.agent, e.ts, e.redacted, f.agent""",
                 {"ids": [i["id"] for i in items]}, scope="read", checked=True)
             by = {i["id"]: i for i in items}
             for r in prov:
+                by[r[0]]["agent"] = r[7]                      # which agent wrote this fact: shared memory says who it came from
                 if r[1] is not None:
                     by[r[0]]["provenance"].append(dict(episode=r[1], session=r[2], seq=r[3], agent=r[4], ts=r[5],
                                                        redacted=r[6]))
