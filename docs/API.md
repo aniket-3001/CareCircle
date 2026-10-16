@@ -88,6 +88,10 @@ Content-Type: application/json
 | `care_forget_person` | write | `person`*, `confirm` | Remove everything about the person cared for (entries, dose slots, reminders). Needs the person's name typed as `confirm`. |
 | `care_receipts` | read | none | Receipts of everything that was removed for good (hash, who, when), newest first. |
 | `care_export_fhir` | read | `person`* | The regimen as a FHIR R4 Bundle of MedicationStatement resources (free text only). |
+| `care_followup_suggest` | read | `person`*, `now` | Suggested follow-ups from the record as it is now, minus any already on the list. Read-only: nothing is written until a person approves. |
+| `care_followup_add` | write | `person`*, `items`* | Write the follow-ups a person approved (each one: key, text, kind, basis = entry ids). A key already on the list is not added twice. |
+| `care_followups` | read | `person`* | The list, open first. `stale` means an entry it was written from has since been replaced or stopped: look again before doing it. |
+| `care_followup_done` | write | `followup_id`*, `dismiss` | Mark a follow-up done (or dismissed). Who and when are kept. |
 | `care_chat_ask` | write | `person`*, `question`*, `now`, `daily_limit`, `lang` | Ask the helper assistant about this circle. Both sides of the exchange are stored for the asking carer, so the chat is there on any device. |
 | `care_chat_history` | read | `limit` | This carer's conversation with the helper assistant, oldest first. |
 | `care_chat_clear` | write | none | Delete this carer's conversation with the helper assistant. |
