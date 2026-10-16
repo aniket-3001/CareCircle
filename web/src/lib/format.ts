@@ -19,6 +19,13 @@ export function when(ms: number): string {
   return new Date(ms).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
+/** The viewer's own local date and time, with the zone named ("16 Oct, 10:26 pm IST"): a family in India should not read UTC. */
+export function whenLocal(ms: number): string {
+  const d = new Date(ms);
+  const zone = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' }).formatToParts(d).find((p) => p.type === 'timeZoneName')?.value ?? '';
+  return `${d.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} ${zone}`.trim();
+}
+
 export const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 
 export const pct = (x: number): string => `${Math.round(x * 100)}%`;
