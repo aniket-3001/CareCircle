@@ -69,3 +69,17 @@ OCR/ASR accuracy at scale or on home-quality photos and varied accents, interact
 | E batches of 20 | 5,299 events/s (3,862-6,146) | |
 
 Read the ranges, not only the medians: throughput moved by up to 30% between identical runs on this laptop (a shared machine with Docker Desktop), so differences smaller than that are noise. These are laptop figures, not capacity planning for the live server.
+
+## B4b Intake on 150 rendered labels at three levels of damage (`bench/intake_bench.py`)
+
+The B4 sample above is five photos. This is the same pipeline (RapidOCR, then the rule-based reader, no model) on 150 medicine names drawn at random from the reference graph (seed 7), each printed on a synthetic label with a strength, a frequency line and distracting text, in random fonts, then damaged at three levels (moderate: slight tilt, blur, noise, JPEG 60; harsh: tilt up to 8 degrees, half-resolution, heavy blur and noise, JPEG 35). 450 images.
+
+| Damage | Right medicine first | Right medicine in top 3 | Strength copied right | Strength left blank | A different number | Nothing proposed | Wrong extra suggestions |
+|---|---|---|---|---|---|---|---|
+| None | 150/150 | 150/150 | 145/150 | 5 | 0 | 0 | 0 |
+| Moderate | 150/150 | 150/150 | 150/150 | 0 | 0 | 0 | 0 |
+| Harsh | 139/150 | 140/150 | 129/150 | 10 | 1 | 10 | 0 |
+
+What it showed. The first run found a real bug: a strength read with a stray full stop or colon from OCR (`40:mg`, `50.mg`) was dropped, leaving the strength blank; the reader now accepts that punctuation (`tests/test_carecircle.py`), which moved the moderate level from 148 to 150 of 150. The remaining blanks are a strength OCR split over lines (`0.5 / mg`), and at the harsh level a strength whose digits were lost (`TSmcg` for `75mcg`). One harsh image read `05mg` for 0.5 mg (the decimal point lost): a different number. **Every proposal is still shown to the person with its quoted line and needs their confirmation**, so these are cases where the person types the strength or corrects it, not silent errors; but a lost decimal point is exactly the kind of mistake a reader must catch, and this benchmark cannot show how often it happens on real labels.
+
+What it does not show. The labels are synthetic, flat, horizontal, generic-name only and in Latin script: no brand names, curved bottles, glare, handwriting, other languages or hands. Real photographs will do worse, and the 5-photo B4 sample is still the only real-photo evidence. Speech was not repeated at scale.
