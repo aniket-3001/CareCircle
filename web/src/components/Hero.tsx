@@ -46,7 +46,7 @@ export function Hero({ check, chips }: { check: CheckResult; chips: Chip[] }): R
         </div>
         <div>
           <h2 id="hero-title" className="hero-level">
-            {t(noData ? 'Nothing to check yet' : onlyDuplicates ? 'Possible duplicate flagged' : HEAD[sev])}
+            {t(noData ? 'Nothing to check yet' : onlyDuplicates ? 'Possible duplicate flagged' : (j.state === 'partial' && j.headline) || HEAD[sev])}
           </h2>
           <p className="hero-line">{j.statement}</p>
         </div>

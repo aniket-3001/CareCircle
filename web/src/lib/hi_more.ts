@@ -92,6 +92,7 @@ export const HI_MORE: Record<string, string> = {
   'is on record more than once': 'एक से अधिक बार दर्ज है', 'possible duplicate': 'संभावित दोहराव', 'entered as the medicine itself': 'सीधे दवा के नाम से दर्ज',
   'It may be the same medicine from two sources. Discuss with a prescriber or pharmacist.': 'यह दो स्रोतों से एक ही दवा हो सकती है। डॉक्टर या फ़ार्मासिस्ट से चर्चा करें।',
   'Possible duplicate flagged': 'संभावित दोहराव चिह्नित', 'as': 'के रूप में',
+  'Part of the list was not checked': 'सूची का एक हिस्सा जाँचा नहीं गया', 'No rated flags': 'कोई दर्जा-प्राप्त चेतावनी नहीं',
   'Your circles': 'आपके सर्कल', 'You are not in a circle yet. Create one or join with a code below.': 'आप अभी किसी सर्कल में नहीं हैं। नीचे नया बनाएँ या कोड से जुड़ें।', 'Telegram': 'टेलीग्राम',
   'Add medicines by sending a photo, a voice note or text to the bot, and get reminders in the chat. It uses this account and the circle you pick.': 'बॉट को फ़ोटो, आवाज़ या टेक्स्ट भेजकर दवाएँ जोड़ें और चैट में रिमाइंडर पाएँ। यह इस खाते और आपके चुने सर्कल का उपयोग करता है।',
   'Unlink Telegram': 'टेलीग्राम अलग करें', 'Open': 'खोलें', 'Link Telegram': 'टेलीग्राम जोड़ें', 'Session': 'सत्र', 'Sign out': 'साइन आउट', 'Reset demo data': 'डेमो डेटा रीसेट करें',

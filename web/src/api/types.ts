@@ -81,6 +81,7 @@ export interface EnzymePath {
 }
 
 export interface Judgement {
+  headline?: string;
   state: 'no_data' | 'partial' | 'flags' | 'no_known_conflict';
   reasons: string[];
   statement: string;

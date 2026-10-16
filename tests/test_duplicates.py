@@ -56,3 +56,16 @@ async def test_unseen_changes_are_tracked_per_product_so_one_cannot_hide_the_oth
 async def test_intake_marks_the_product_a_combination_ingredient_came_from():
     props = intake.rule_proposals("Telma-AM 40 mg once daily", Checker())
     assert {p["combination"] for p in props} == {"Telma-AM"} and [p["drug_candidates"][0]["name"] for p in props] == ["telmisartan", "amlodipine"]
+
+
+def test_the_verdict_tells_apart_unrated_pairs_and_medicines_that_were_not_checked():
+    """A warning that is always on is ignored. Pairs listed without a severity are a quiet line; a medicine nobody checked is its own, plainer message."""
+    from carecircle.safety import judgement
+    base = {"regimen": [{"drug": "a"}], "direct": [], "enzyme_paths": [], "unrated": [], "not_in_reference": [], "duplicates": []}
+    only_unrated = judgement({**base, "unrated": [{"drugs": ["a", "b"]}] * 5})
+    assert only_unrated["state"] == "partial" and only_unrated["headline"] == "No rated flags" and "not the same as safe" in only_unrated["statement"]
+    unchecked = judgement({**base, "not_in_reference": ["becosules"]})
+    assert unchecked["headline"] == "Part of the list was not checked" and "nothing was checked for them" in unchecked["statement"]
+    both = judgement({**base, "not_in_reference": ["becosules"], "unrated": [{"drugs": ["a", "b"]}]})
+    assert both["headline"] == "Part of the list was not checked"                     # the more serious gap leads
+    assert judgement(base)["state"] == "no_known_conflict" and "not a statement of safety" in judgement(base)["statement"]

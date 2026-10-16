@@ -70,7 +70,11 @@ def judgement(check: dict) -> dict:
         names = ", ".join(d["ingredient"] for d in check["duplicates"])
         return {"state": "flags", "reasons": reasons + [f"the same ingredient is on record more than once: {names}"],
                 "statement": "A possible duplicate was found: discuss with a prescriber or pharmacist."}
-    if reasons:
-        return {"state": "partial", "reasons": reasons, "statement": "Not enough information to judge everything. Ask a pharmacist."}
+    if check["not_in_reference"]:
+        return {"state": "partial", "reasons": reasons, "headline": "Part of the list was not checked",
+                "statement": "Some medicines are not in our data, so nothing was checked for them. Ask a pharmacist."}
+    if reasons:                                                    # only pairs the source lists without a severity: quiet, not an alarm that is always on
+        return {"state": "partial", "reasons": reasons, "headline": "No rated flags",
+                "statement": "Nothing rated as a concern was found. Some pairs are listed without a severity, which is not the same as safe."}
     return {"state": "no_known_conflict", "reasons": [],
             "statement": "No known conflict in our data. This is not a statement of safety."}
