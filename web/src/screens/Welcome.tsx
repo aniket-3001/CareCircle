@@ -1,3 +1,5 @@
+import { PasswordInput } from '../components/PasswordInput';
+import { isEmail, suggestEmail } from '../lib/email';
 import { ArrowLeft, KeyRound, Mail, Play, ShieldCheck, UserPlus, Users } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
@@ -63,7 +65,14 @@ export function Welcome({ onSession, request }: { onSession: (s: Session) => voi
     }
     return false;
   });
+  /** Stop a mistyped address before anything is sent to it: the code would go nowhere and the person would wait for it. */
+  const checkEmail = (): void => {
+    const hint = suggestEmail(email);
+    if (hint) throw new Error(`That address looks mistyped. Did you mean ${hint}?`);
+    if (!isEmail(email)) throw new Error('That email address looks incomplete. It needs a name, an @ and a domain such as gmail.com.');
+  };
   const doSignUp = () => run(async () => {
+    checkEmail();
     if (client) {
       await client.signUp(email.trim(), password);
       setNote(`We emailed a code to ${email.trim()}.`);
@@ -77,6 +86,7 @@ export function Welcome({ onSession, request }: { onSession: (s: Session) => voi
     await cognitoSignIn();
   });
   const doForgot = () => run(async () => {
+    checkEmail();
     await client!.forgotPassword(email.trim());
     setNote(`If ${email.trim()} has an account, we emailed a code.`);
     setView('reset');
@@ -92,7 +102,7 @@ export function Welcome({ onSession, request }: { onSession: (s: Session) => voi
 
   const emailField = <label className="field">{t('Email')}<input type="email" value={email} autoComplete="email" inputMode="email" required onChange={(e) => setEmail(e.target.value)} /></label>;
   const nameField = <label className="field">{t('Your name')}<input type="text" value={name} autoComplete="name" onChange={(e) => setName(e.target.value)} placeholder="How other carers see you" /></label>;
-  const pwField = (label: string, ac: string) => <label className="field">{t(label)}<input type="password" value={password} autoComplete={ac} required onChange={(e) => setPassword(e.target.value)} /></label>;
+  const pwField = (label: string, ac: string) => <label className="field">{t(label)}<PasswordInput value={password} autoComplete={ac} required onChange={setPassword} /></label>;
   const codeField = <label className="field">{t('The code we emailed you')}<input value={code} inputMode="numeric" autoComplete="one-time-code" required onChange={(e) => setCode(e.target.value)} /></label>;
   const messages = (
     <>
@@ -171,6 +181,7 @@ export function Welcome({ onSession, request }: { onSession: (s: Session) => voi
                 {codeField}
                 {messages}
                 <button type="submit" className="btn" disabled={busy}>{busy ? 'Confirming…' : 'Confirm'}</button>
+                <button type="button" className="btn btn--ghost btn--sm" style={{ justifySelf: 'start' }} onClick={() => { setView('signup'); setProblem(undefined); setNote(undefined); setCode(''); }} data-testid="wrong-email">{t('Wrong email? Change it')}</button>
                 <button type="button" className="btn btn--ghost btn--sm" style={{ justifySelf: 'start' }} onClick={() => { void client?.resendCode(email.trim()).then(() => setNote('We emailed you a new code.'), (e) => setProblem(tidy(e))); }}>{t('Send a new code')}</button>
               </form>
             )}
