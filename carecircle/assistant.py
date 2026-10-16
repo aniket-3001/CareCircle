@@ -35,7 +35,9 @@ ADVICE_Q = re.compile(
     r"|\b(is|are|would|will)\s+(it|this|that|they|these|those)\b[^?]{0,30}\b(safe|ok|okay|fine|dangerous|harmful|ok to)\b|\bsafe (to|with|together)\b|\bok(ay)? to\b"
     r"|\bside effects?\b|\bdiagnos\w*|\bsymptoms?\b|\bwhat should i do\b|\bwhich is better\b|\balternative\b|\bsubstitute\b|\binstead of\b"
     r"|\b(ok|okay|fine|alright|all right|allowed|acceptable)\s+(with|if|to)\b|\bwhether to\b|\b(worry|worried|harm|hurt|risky|dangerous|too much|too many)\b|\bmax(imum)? (dose|amount|i can)\b"
-    r"|\b(forgot|forgotten|missed)\b[^?]{0,30}\b(dose|pill|tablet|medicine)s?\b|\bwhat (now|happens if|if)\b|\b(carry on|stopping|doubling|skipping|halving)\b|\brecommend\w*|\b(alcohol|wine|beer|grapefruit)\b|\b(problem|issue) to\b|\bwould you say\b", re.I)
+    r"|\b(forgot|forgotten|missed)\b[^?]{0,30}\b(dose|pill|tablet|medicine)s?\b|\bwhat (now|happens if|if)\b|\b(carry on|stopping|doubling|skipping|halving)\b|\brecommend\w*|\b(alcohol|wine|beer|grapefruit)\b|\b(problem|issue) to\b|\bwould you say\b"
+    r"|\b(dizz\w*|nause\w*|vomit\w*|rash|bleed\w*|bruis\w*|swell\w*|swollen|faint\w*|headache|migraine|fever|cough\w*|itch\w*|diarrh\w*|drows\w*|confus\w*|shak\w*|tremor\w*|cramp\w*|constipat\w*|palpitation\w*|sweat\w*)\b"
+    r"|\b(feel|feels|feeling|felt)\s+(sick|unwell|ill|weird|strange|odd|worse|bad|off|funny|tired|weak)\b|\b(crush|split|chew|dissolve|swallow whole|open the capsule)\b|\b(empty stomach|with food|before bed|at what time|what time of day)\b", re.I)
 
 UNSEEN = re.compile(r"\b(not (yet )?seen|haven'?t seen|hasn'?t seen|unseen|unacknowledged|acknowledg\w*|out of date|behind|who (has|hasn'?t|have|knows)|kept in the loop|know about)\b", re.I)
 FLAGS = re.compile(r"\b(interact\w*|flag\w*|conflict\w*|clash\w*|major|moderate|enzyme|cyp\w*|why .*(flag|warn|red)|warning|combin\w*|together)\b", re.I)
