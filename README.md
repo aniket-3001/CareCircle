@@ -144,6 +144,10 @@ cc_ref also has  (:Cached {url, at, body})  public lookups, by medicine name onl
 | Direct interactions in a regimen | `MATCH (x:Drug)-[m:INTERACTS]-(y:Drug) WHERE x.name IN $d AND y.name IN $d` | `carecircle/checks.py` |
 | Enzyme path | `(x)-[:INHIBITS\|INDUCES]->(e:Enzyme)<-[:SUBSTRATE_OF]-(y)` | `carecircle/checks.py` |
 | Hub medicines | `CALL algo.pageRank('Drug','HAZARD')` | `carecircle/algos.py hub_drugs` |
+| Shortest path between two records | `WITH shortestPath((a)-[*..8]-(b)) AS p RETURN nodes(p), relationships(p)` | `graphmem/graph_algos.py graph_path` |
+| What the record hangs on | `CALL algo.pageRank($label, null)` or `CALL algo.betweenness({nodeLabels: ...})` on the tenant's own graph | `graph_algos.py graph_influence` |
+| What belongs together | `CALL algo.WCC(...)` or `CALL algo.labelPropagation(...)`, grouped and counted | `graph_algos.py graph_communities` |
+| Everything near one record | level-by-level `MATCH (a)-[r]-(b) WHERE id(a) IN $frontier`, nearest first, capped | `graph_algos.py graph_neighbourhood` |
 | Hazard clusters | `CALL algo.WCC({nodeLabels:['Drug'], relationshipTypes:['HAZARD']})` | `algos.py clusters` |
 | Most hazard-connected in this regimen | degree and summed weight inside the induced `HAZARD` subgraph | `algos.py regimen_hubs` |
 | Change history / as-of | `valid_from <= $t AND (valid_to IS NULL OR valid_to > $t)` over `SUPERSEDES` chains | `graphmem/care.py care_regimen` |
@@ -152,8 +156,13 @@ cc_ref also has  (:Cached {url, at, body})  public lookups, by medicine name onl
 | Reminder once | `MERGE (n:Nudge {key:$k}) ON CREATE SET n.fresh=true` | `care.py care_nudges` |
 | Isolation and revocation | `(Agent)-[:GRANTED]->(Tenant)` checked on every query | `graphmem/policy.py` |
 
-Each flag and each hub list shown in the app carries the query or path that produced it. FalkorDB features used: multiple graphs (one per circle),
-indexes, unique constraints, variable-length paths, `FOREACH`, `UNWIND` bulk loads, `algo.pageRank`, `algo.WCC`, read-only queries (`GRAPH.RO_QUERY`),
+Each flag and each hub list shown in the app carries the query or path that produced it.
+
+**Algorithms as agent tools.** The four `graph_*` rows above (plus `graph_schema`, which lists what a graph holds) are ordinary read-only operations, so an agent calls them over HTTP or MCP
+(`graph_path`, `graph_influence`, `graph_communities`, `graph_neighbourhood`) instead of writing traversals. They run on the caller's own tenant graph through `GRAPH.RO_QUERY`, need read scope
+only, take labels as parameters checked against the labels that exist, clamp every size and hop count, and return the Cypher they ran. The Graph tab's "Ask the graph" cards use the same operations.
+Limits: they run on one tenant graph at a time, and on a graph with few links PageRank and betweenness say little (a medicine record has few). Timing on a 2,200-node graph was 5 to 30 ms per call (one run, one machine). FalkorDB features used: multiple graphs (one per circle),
+indexes, unique constraints, variable-length paths, `FOREACH`, `UNWIND` bulk loads, `algo.pageRank`, `algo.betweenness`, `algo.WCC`, `algo.labelPropagation`, `shortestPath`, read-only queries (`GRAPH.RO_QUERY`),
 `GRAPH.COPY` (memory forks), full-text and vector indexes (optional recall), append-only persistence.
 
 ## Safety by design

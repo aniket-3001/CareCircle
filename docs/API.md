@@ -48,6 +48,11 @@ Content-Type: application/json
 | `check_plan` | read | `plan_id`* | Is any input of this plan outdated? Walks DERIVED_FROM then SUPERSEDES* to the current value. |
 | `rebase_plan` | write | `plan_id`*, `steps` | Create a revised plan re-derived from the current versions of every input. Returns the diff. |
 | `resume` | read | `task_id`* | Everything a receiving agent needs: task, handoff chain, latest plan + staleness, plan inputs. |
+| `graph_schema` | read | none | What this graph holds: node labels and relationship types, each with a count. |
+| `graph_path` | read | `source`*, `target`*, `max_hops`, `source_label`, `target_label` | Shortest path between two nodes, ignoring edge direction: the nodes on it and the relationship between each pair. |
+| `graph_influence` | read | `metric`, `label`, `top` | The most influential nodes: metric 'pagerank' (many well-connected nodes point here) or 'betweenness' (many shortest paths go through here). |
+| `graph_communities` | read | `method`, `label`, `top` | Groups of nodes that belong together: method 'wcc' (connected components) or 'labelpropagation' (communities inside a connected graph). |
+| `graph_neighbourhood` | read | `ref`*, `depth`, `label`, `limit` | Everything within `depth` hops of one node, ignoring direction, nearest first (at most `limit` nodes). |
 | `care_record` | write | `person`*, `drug`*, `action`, `dose_text`, `freq_text`, `source_type`, `quote`, `source_text`, `confirm`, `at`, `edited` | A change to what `person` takes. action 'set' (start/change) or 'stop'. The previous current entry is closed and linked |
 | `care_confirm` | write | `dose_id`* | A person confirms a pending entry (after looking at the quote beside the source). Makes it current. |
 | `care_regimen` | read | `person`*, `as_of` | What `person` takes now, or at `as_of` (ms): confirmed 'set' entries valid at that time. |
