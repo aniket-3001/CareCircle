@@ -1,0 +1,21 @@
+name: next-engine
+# The same test suite on FalkorDB 6.0.2 (the Rust engine), so we know whether a move from the pinned 4.22.1 would break anything.
+# It does not deploy and is not the engine production runs; see "Version pinning" in the README before changing anything.
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test-on-6:
+    runs-on: ubuntu-latest
+    services:
+      falkordb:
+        image: falkordb/falkordb@sha256:107455e862a824e45e8e9f5a7fbfdf5e00a08b14e13eae2577c72fd9e3f59ba6   # FalkorDB 6.0.2
+        ports: ["6379:6379"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements.txt -r requirements-integrations.txt
+      - run: python scripts/fetch_reference.py && python -c "from carecircle import reference as r; print(r.load())"
+      - run: CC_LLM=0 CC_EXPECT_DB_VERSION=60002 python -m pytest -q tests

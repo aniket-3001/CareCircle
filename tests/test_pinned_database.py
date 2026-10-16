@@ -1,5 +1,6 @@
 """Production, CI and local development must run the same FalkorDB. `latest` moved between builds (4.22.1 on the server, 6.0.2 on a laptop) and three bugs
 hid in the gap, so every compose file and the CI workflow name one image by digest, and the database a test run talks to must be that version."""
+import os
 import pathlib
 import re
 
@@ -31,5 +32,6 @@ def test_every_file_names_the_same_database_image_by_digest():
 async def test_the_database_under_test_is_the_pinned_version():
     mods = await Db().client.execute_command("MODULE", "LIST")
     ver = next(m["ver"] for m in mods if m["name"] == "graph")
-    assert ver == PINNED_VERSION, (f"this database is graph module {ver}, the project is pinned to {PINNED_VERSION}: "
+    expected = int(os.getenv("CC_EXPECT_DB_VERSION", PINNED_VERSION))          # only .github/workflows/compat.yml sets this: the suite on the next engine
+    assert ver == expected, (f"this database is graph module {ver}, the project is pinned to {PINNED_VERSION}: "
                                    f"start the pinned image (see docker-compose.yml) instead of whatever `latest` is today")
