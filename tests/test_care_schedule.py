@@ -169,3 +169,32 @@ async def test_a_read_only_key_cannot_set_a_schedule_or_give_a_slot_but_can_read
             await ops.invoke(gm, "sc-ro", t, op, args)
     assert (await ops.invoke(gm, "sc-ro", t, "care_today", {"person": "asha"}))["items"]
     assert (await ops.invoke(gm, "sc-ro", t, "care_schedule_suggest", {"freq_text": "BD"}))["times"] == ["08:00", "20:00"]
+
+
+async def test_the_bot_delivers_a_due_slot_to_each_linked_carer_once(gm):
+    from carecircle.checks import Checker
+    from carecircle.telegram import Bot
+
+    class Api:
+        def __init__(self):
+            self.out = []
+
+        def send(self, chat, text, buttons=None):
+            self.out.append((chat, text))
+
+    t, a, b, ro = await circle(gm)
+    day = date(2026, 10, 17)
+    met = await entry(a)
+    await a.care_schedule_set(met, ["08:00"])
+    await a.care_ack(met)
+    await b.care_ack(met)
+    ka, kb = await gm.issue_key("sc-a"), await gm.issue_key("sc-b")
+    api = Api()
+    bot = Bot(gm, api, Checker())
+    await bot.handle({"message": {"chat": {"id": 91}, "text": f"/link {ka} {t}"}})
+    await bot.handle({"message": {"chat": {"id": 92}, "text": f"/link {kb} {t}"}})
+    api.out.clear()
+    n = await bot.deliver_nudges(now=at(day, "08:10"))
+    assert n == 2 and sorted(c for c, _ in api.out) == [91, 92] and all("08:00: due now" in x for _, x in api.out)
+    assert "advice" not in " ".join(x for _, x in api.out).lower()
+    assert await bot.deliver_nudges(now=at(day, "08:15")) == 0                         # once

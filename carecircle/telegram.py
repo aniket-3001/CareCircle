@@ -266,7 +266,7 @@ class Bot:
         for circle, members in circles.items():
             mem = self.gm.open(sorted(members)[0], circle)
             for person in (await mem.care_people())["patients"]:
-                for n in await mem.care_nudges(person, now=now, hold=hold):
+                for n in [*await mem.care_nudges(person, now=now, hold=hold), *await mem.care_slot_nudges(person, now=now, hold=hold)]:
                     text = n["message"]["text"]
                     for chat in chats.get(n["notify"], []):
                         await self.api.send(chat, text)
