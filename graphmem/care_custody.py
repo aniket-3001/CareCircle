@@ -42,7 +42,8 @@ class CareCustodyMixin:
         return {"witnessed": True, "by": me}
 
     async def care_handover(self, person: str, text: str) -> dict:
-        text = " ".join(text.split())[:400]
+        from .textcheck import fit
+        text = fit(text, 400, "a handover note")
         if not text:
             raise ValueError("a handover note needs some text")
         hid = new_id("hand")

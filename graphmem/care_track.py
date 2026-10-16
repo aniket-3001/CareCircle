@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Optional
 
 from .db import new_id, norm, now_ms
+from .textcheck import fit
 
 H = 3_600_000
 D = 24 * H
@@ -42,6 +43,9 @@ class CareTrackMixin:
         unit = unit or units[0]
         if unit not in units:
             raise ValueError(f"{label} is recorded in {' or '.join(units)}")
+        note = fit(note, 120, "the note")
+        if isinstance(value, bool):
+            raise ValueError("the reading must be a number")
         try:
             v = float(value)
         except (TypeError, ValueError):
@@ -56,7 +60,7 @@ class CareTrackMixin:
         await self._q(
             """MERGE (p:Person {id:$p}) ON CREATE SET p.role='patient'
                CREATE (m:Measurement {id:$id, kind:$k, value:$v, unit:$u, at:$t, by:$by, note:$n})-[:FOR]->(p)""",
-            {"p": norm(person), "id": mid, "k": kind, "v": v, "u": unit, "t": t, "by": norm(self.agent), "n": note[:120]})
+            {"p": norm(person), "id": mid, "k": kind, "v": v, "u": unit, "t": t, "by": norm(self.agent), "n": note})
         return {"id": mid, "kind": kind, "value": v, "unit": unit, "at": t}
 
     async def care_measures(self, person: str, kind: str = "", limit: int = 200) -> list[dict]:

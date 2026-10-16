@@ -27,6 +27,15 @@ def check_text(value: Any, where: str = "arguments") -> None:
             check_text(v, where)
 
 
+def fit(value: Any, limit: int, what: str) -> str:
+    """Tidy the spaces in a piece of text and refuse it if it is too long. Never cuts it short: a record that quietly drops the end of what someone
+    wrote (a dose instruction, a handover note) is worse than one that asks them to shorten it."""
+    v = " ".join(str(value if value is not None else "").split())
+    if len(v) > limit:
+        raise ValueError(f"{what} is limited to {limit} characters (this is {len(v)}): shorten it, or split it in two")
+    return v
+
+
 class Clean(BaseModel):
     """Base for every request body: all its text is checked once it has parsed."""
 

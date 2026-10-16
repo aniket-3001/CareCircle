@@ -13,6 +13,7 @@ import asyncio
 from typing import Optional
 
 from .db import new_id, norm, now_ms
+from .textcheck import fit
 
 H = 3_600_000
 # A short, hand-written list of common allergy groups -> medicines that belong to them. Deliberately small and labelled as such: a miss is possible,
@@ -31,7 +32,9 @@ ALLERGY_GROUPS = {
 class CarePlanMixin:
     # ------------------------------------------------------------------ appointments
     async def care_appoint(self, person: str, title: str, at: int, place: str = "", who: str = "", bring: str = "") -> dict:
-        title = " ".join(title.split())[:80]
+        title = fit(title, 80, "the title")
+        place, bring = fit(place, 100, "the place"), fit(bring, 200, "what to bring")
+        who = fit(who, 40, "who goes")
         if not title:
             raise ValueError("an appointment needs a title")
         if at < now_ms() - 366 * 24 * H or at > now_ms() + 5 * 366 * 24 * H:
@@ -40,7 +43,7 @@ class CarePlanMixin:
         await self._q(
             """MERGE (p:Person {id:$p}) ON CREATE SET p.role='patient'
                CREATE (a:Appointment {id:$id, title:$t, at:$at, place:$pl, who:$w, bring:$b, status:'planned', by:$by, created:$c})-[:FOR]->(p)""",
-            {"p": norm(person), "id": aid, "t": title, "at": int(at), "pl": place[:100], "w": norm(who)[:40], "b": bring[:200], "by": norm(self.agent), "c": now_ms()})
+            {"p": norm(person), "id": aid, "t": title, "at": int(at), "pl": place, "w": norm(who), "b": bring, "by": norm(self.agent), "c": now_ms()})
         return {"id": aid}
 
     async def care_appointments(self, person: str, now: Optional[int] = None) -> list[dict]:
@@ -63,7 +66,7 @@ class CarePlanMixin:
         """Change an appointment's details. Only what is sent changes; who edited it and when is kept."""
         sets, p = ["a.edited_by=$by", "a.edited_at=$now"], {"id": appointment_id, "by": norm(self.agent), "now": now_ms()}
         if title:
-            sets.append("a.title=$t"); p["t"] = " ".join(title.split())[:80]
+            sets.append("a.title=$t"); p["t"] = fit(title, 80, "the title")
         if at is not None:
             if at < now_ms() - 366 * 24 * H or at > now_ms() + 5 * 366 * 24 * H:
                 raise ValueError("that date is not within a sensible range")
@@ -100,7 +103,7 @@ class CarePlanMixin:
 
     # ------------------------------------------------------------------ conditions and allergies
     async def care_condition_add(self, person: str, name: str) -> dict:
-        name = " ".join(name.split())[:80]
+        name = fit(name, 80, "a condition")
         if not name:
             raise ValueError("a condition needs a name")
         cid = new_id("cond")
@@ -109,7 +112,7 @@ class CarePlanMixin:
         return {"id": cid}
 
     async def care_allergy_add(self, person: str, text: str) -> dict:
-        text = " ".join(text.split())[:80]
+        text = fit(text, 80, "the text")
         if not text:
             raise ValueError("an allergy needs a name")
         from .care import checker
@@ -127,7 +130,7 @@ class CarePlanMixin:
 
     async def care_profile_edit(self, item_id: str, text: str) -> dict:
         """Reword a condition or an allergy. An allergy is matched to a medicine name again, so the cross-check follows the new wording."""
-        text = " ".join(text.split())[:80]
+        text = fit(text, 80, "the text")
         if not text:
             raise ValueError("it needs some text")
         rows = await self._q("MATCH (n) WHERE (n:Condition OR n:Allergy) AND n.id = $id RETURN labels(n)[0]", {"id": item_id})

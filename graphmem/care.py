@@ -23,6 +23,7 @@ from carecircle.safety import judgement, reword
 from carecircle.verify import quote_in_source
 
 from .db import new_id, norm, now_ms
+from .textcheck import fit
 
 _checker: Optional[Checker] = None
 _algos: Optional[Algos] = None
@@ -79,6 +80,7 @@ class CareMixin:
         d, ts, did = norm(drug), (now_ms() if at is None else at), new_id("dose")
         if not d or len(d) > 80:
             raise ValueError("a medicine name is 1 to 80 characters")
+        dose_text, freq_text = fit(dose_text, 80, "the dose"), fit(freq_text, 80, "how often")
         cur = await self._q("MATCH (o:Dose {cur:true, drug:$d})-[:FOR]->(:Person {id:$p}) RETURN o.id, o.dose_text, o.freq_text, o.valid_from LIMIT 1",
                             {"d": d, "p": norm(person)}, scope="read")
         if action == "stop" and not cur:
@@ -101,7 +103,7 @@ class CareMixin:
                             source_type:$src, quote:$q, verified:$v, by:$by, at:$ts, created_at:$now, edited:$ed})
             CREATE (x)-[:FOR]->(p) CREATE (x)-[:OF]->(dr)
             RETURN x.id""",
-            {"p": norm(person), "d": d, "id": did, "dt": dose_text[:80], "ft": freq_text[:80], "ts": ts, "now": now_ms(), "a": action, "st": status,
+            {"p": norm(person), "d": d, "id": did, "dt": dose_text, "ft": freq_text, "ts": ts, "now": now_ms(), "a": action, "st": status,
              "src": source_type, "q": quote[:200], "v": verified, "by": norm(self.agent), "ed": ",".join(sorted({x for x in edited.split(",") if x in ("drug", "dose", "freq")}))})
         if status == "confirmed":
             await self._care_activate(did)
