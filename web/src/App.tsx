@@ -95,6 +95,16 @@ export function App(): React.JSX.Element {
   }, [acct, reset]);
   useEffect(() => { void refreshProfile(); }, [refreshProfile]);
 
+  // any request that comes back 401 means this session is over (signed out on another device, password changed, expired): back to sign-in, with a word about why
+  useEffect(() => {
+    const onEnded = (): void => {
+      try { window.sessionStorage.setItem('cc-notice', 'Your session has ended. Please sign in again.'); } catch { /* private window */ }
+      reset();
+    };
+    window.addEventListener('cc-session-ended', onEnded);
+    return () => window.removeEventListener('cc-session-ended', onEnded);
+  }, [reset]);
+
   const start = useCallback((s: Session) => { persist(s); setProfile(null); setWarp(0); go('today'); }, [persist, go]);
   const selectCircle = useCallback((id: string) => {
     const c = profile?.circles.find((x) => x.id === id);

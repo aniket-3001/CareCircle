@@ -33,6 +33,12 @@ export function Welcome({ onSession, request }: { onSession: (s: Session) => voi
   useEffect(() => { authConfig().then(setConfig, () => setProblem('Could not reach the server. Check your connection and reload.')); }, []);
   // the header's Sign in / Create account buttons open the matching form
   useEffect(() => { if (request) { setView(request.view); setProblem(undefined); setNote(undefined); setCode(''); } }, [request]);
+  useEffect(() => {                                                    // sent back here because the session ended: say so
+    try {
+      const n = window.sessionStorage.getItem('cc-notice');
+      if (n) { window.sessionStorage.removeItem('cc-notice'); setNote(n); }
+    } catch { /* private window */ }
+  }, []);
   const client: CognitoClient | null = config?.cognito ? cognito(config.cognito) : null;
   const go = (v: View) => { setView(v); setProblem(undefined); setNote(undefined); setCode(''); };
   const tidy = (e: unknown) => (e instanceof AuthError || e instanceof ApiError || e instanceof Error ? e.message : 'Something went wrong. Try again in a moment.');
@@ -107,7 +113,7 @@ export function Welcome({ onSession, request }: { onSession: (s: Session) => voi
   const messages = (
     <>
       {problem && <div className="banner banner--bad" role="alert">{problem}</div>}
-      {note && <div className="banner" role="status">{note}</div>}
+      {note && <div className="banner" role="status">{t(note)}</div>}
     </>
   );
   const submit = (fn: () => Promise<void>) => (e: React.FormEvent) => { e.preventDefault(); void fn(); };

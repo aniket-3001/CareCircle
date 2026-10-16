@@ -19,9 +19,14 @@ async function parse<T>(r: Response): Promise<T> {
 }
 
 const bearer = (token: string) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
-const get = <T>(path: string, token: string) => fetch(path, { headers: bearer(token) }).then((r) => parse<T>(r));
+/** A 401 on a request that carried a token means the session has ended (signed out elsewhere, password changed, expired): tell the app once, so it can go back to sign-in. */
+const ended = (r: Response): Response => {
+  if (r.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new Event('cc-session-ended'));
+  return r;
+};
+const get = <T>(path: string, token: string) => fetch(path, { headers: bearer(token) }).then((r) => parse<T>(ended(r)));
 const send = <T>(method: string, path: string, token: string, body?: unknown) =>
-  fetch(path, { method, headers: bearer(token), body: body === undefined ? undefined : JSON.stringify(body) }).then((r) => parse<T>(r));
+  fetch(path, { method, headers: bearer(token), body: body === undefined ? undefined : JSON.stringify(body) }).then((r) => parse<T>(ended(r)));
 
 /** The circle operations for one signed-in carer: every call carries that carer's token, so the server checks their grants on each query. */
 export function apiFor(s: Session) {
