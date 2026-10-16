@@ -329,3 +329,28 @@ async def test_quiet_hours_are_saved_validated_and_per_account(client):
     assert (await client.get("/v1/account/quiet", headers=auth(token))).json()["from"] == 22
     assert (await client.put("/v1/account/quiet", json={"tz": 0}, headers=auth(token))).json()["from"] is None             # off
     assert (await client.get("/v1/account/quiet")).status_code == 401
+
+
+async def test_one_telegram_chat_per_account_the_newest_replaces_the_old(client, gm):
+    from carecircle.checks import Checker
+    from carecircle.telegram import Bot
+
+    class Api:
+        def __init__(self): self.out = []
+        def send(self, chat, text, buttons=None): self.out.append((chat, text))
+
+    token, acct = await account(client)
+    c1 = (await client.post("/v1/account/circles", json={"name": "Asha", "person": "Asha"}, headers=auth(token))).json()["id"]
+    api = Api()
+    bot = Bot(gm, api, Checker())
+    for chat in (41, 42):
+        code = (await client.post("/v1/account/telegram-code", headers=auth(token))).json()["code"]
+        await bot.handle({"message": {"chat": {"id": chat}, "text": f"/link {code}"}})
+    assert (await client.get("/v1/account", headers=auth(token))).json()["telegram"] == [{"chat": 42, "circle": c1}]
+    assert any(c == 41 and "unlinked" in t for c, t in api.out)                               # the old chat is told, not silently dropped
+    await bot.handle({"message": {"chat": {"id": 41}, "text": "/regimen"}})
+    assert "link this chat first" in api.out[-1][1].lower()                                   # and it no longer works
+    code = (await client.post("/v1/account/telegram-code", headers=auth(token))).json()["code"]
+    await bot.handle({"message": {"chat": {"id": 42}, "text": f"/link {code}"}})               # linking the same chat again changes nothing
+    assert (await client.get("/v1/account", headers=auth(token))).json()["telegram"] == [{"chat": 42, "circle": c1}]
+    assert (await client.request("DELETE", "/v1/account/telegram", headers=auth(token))).status_code == 200      # leave nothing linked behind

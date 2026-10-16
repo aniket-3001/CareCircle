@@ -136,7 +136,12 @@ class Bot:
                 return self.api.send(chat, "Your account has no circle yet. Create one in the app, then link again.")
             want = parts[2].lower() if len(parts) > 2 else ""
             pick = next((c for c in circles if c["id"] == want or c["name"].lower() == want), circles[0])
+            # one chat per account: linking a new one replaces the old one, which is told
+            old = [r[0] for r in (await g.query("MATCH (c:TgChat {agent:$a}) WHERE c.chat <> $c RETURN c.chat", {"a": agent, "c": chat})).result_set]
+            await g.query("MATCH (c:TgChat {agent:$a}) WHERE c.chat <> $c DELETE c", {"a": agent, "c": chat})
             await g.query("MERGE (c:TgChat {chat:$c}) SET c.agent=$a, c.circle=$t", {"c": chat, "a": agent, "t": pick["id"]})
+            for o in old:
+                self.api.send(o, "This chat was unlinked: the account now uses another Telegram chat. Link again from the Account page if you want it back.")
             return self.api.send(chat, f"Linked to {pick['name']}. Send a photo, voice note or text about a medicine. /circles lists your circles.")
         if len(parts) < 3:
             return self.api.send(chat, "Usage: /link <key> <circle>")
