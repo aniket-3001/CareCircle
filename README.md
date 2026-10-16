@@ -56,15 +56,14 @@ Every number and flag says where it came from, and when the sources disagree or 
 The three graphs, the data model, every Cypher query and algorithm, and the test that checks each one follow: [Why the graph is the product](#why-the-graph-is-the-product), [Three graphs, on purpose](#three-graphs-on-purpose), [Graph data model](#graph-data-model), [Queries and algorithms](#queries-and-algorithms). To look at the graphs yourself in FalkorDB Browser: [`docs/EXPLORE.md`](docs/EXPLORE.md).
 
 ## Why the graph is the product
-Remove FalkorDB and nothing is left: the reference knowledge (about 218,000 interaction pairs, enzyme links), every circle's history, the
-carer-acknowledgement state, the dose-slot guard and the access grants all live in it, and the checks are graph traversals and algorithms.
+The reference knowledge (about 218,000 interaction pairs, enzyme links), every circle's history, the carer-acknowledgement state, the dose-slot guard and the access grants all live in FalkorDB, and the interaction checks are graph traversals. Not everything needs a graph: the table below says which features lean on one and what a plain table could do instead.
 
 | Feature | What the graph does | Without it |
 |---|---|---|
 | Interaction check | `(a:Drug)-[:INTERACTS {level}]-(b:Drug)` over the regimen, plus a 2-hop enzyme path `(x)-[:INHIBITS]->(:Enzyme)<-[:SUBSTRATE_OF]-(y)` | no shared knowledge to check against |
-| Who has not seen a change | `(:Carer)-[:ACKED]->(:Dose)` absence per carer; age-weighted divergence | a log that only tracks each carer's latest change is right in 4/40 test circles; the graph query is right in 40/40. A log with a separate acknowledgements table can do the same job, so this is correctness, not a claim that only a graph can do it |
+| Who has not seen a change | `(:Carer)-[:ACKED]->(:Dose)` absence per carer; age-weighted divergence | a simple baseline that only remembers each carer's latest change misses unseen changes in most of the 40 generated circles (it is exact in 4/40); the graph query matches an independent oracle in 40/40. A table of acknowledgements does the same job, so this is correctness, not a claim that only a graph can do it |
 | History, "what did we know then?" | `Dose -[:SUPERSEDES]-> Dose` with `valid_from/valid_to`; as-of queries | overwrites lose the past |
-| No double dose | one `MERGE (:Give {key})` claim per slot, single atomic query | two carers both think they gave it (exactly one winner in 100/100 races of 10 concurrent claims) |
+| No double dose | one `MERGE (:Give {key})` claim per slot, single atomic query | two carers both think they gave it (one winner in each of 100 test rounds of 10 concurrent claims on one engine; a database-level atomic claim, not a proof) |
 | Verified intake | each entry keeps `source_type` and the exact `quote` from the OCR/transcript | an unexplained entry |
 | Hubs | `algo.pageRank` over the interaction graph; degree inside the regimen | no way to rank which medicine matters most |
 | Privacy | one graph per circle (`mem__<circle>`), grants on every query | rows in a shared table |
@@ -240,8 +239,8 @@ card with a big number and a face, white hairline cards, dashed add tiles, a flo
 
 ## Measured (one laptop; B-series and load test repeated 7 times each, see `docs/BENCHMARKS.md`)
 - **Enzyme-path rule vs DDInter:** of 38 pairs flagged through FDA substrates, 31 are also in DDInter, all moderate/major; the rule recovers 61 of 145 moderate/major pairs between the same drug sets (42%): precise but narrow, so it supplements the direct lookup.
-- **Carer staleness (graph query vs independent oracle):** exact in 40/40 generated circles; "last change only" baseline 4/40.
-- **Double-dose guard:** one winner in 100/100 rounds of 10 concurrent claims.
+- **Carer staleness (graph query vs independent oracle):** exact in 40/40 generated circles; a "last change only" baseline is exact in 4/40 (it is the simplest log, not the best possible non-graph design).
+- **Double-dose guard:** one winner in 100 of 100 test rounds of 10 concurrent claims (single process, one engine).
 
 - **Interaction check latency:** 16 ms median (range 12-18 over 7 runs) and 20 ms at the 95th percentile (range 16-24), for a 10-medicine regimen (direct pairs, enzyme paths and combined weight in three reads), warm, one process, FalkorDB 4.22.1 (`bench/care_bench.py`, B5). The exact results (B1-B3) were identical in all 7 runs.
 - **Intake on real input:** 5 real bottle photos and 1 spoken note (browser microphone to Whisper): drug found in 6/6, with one wrong extra candidate; see `docs/BENCHMARKS.md` (B4).
@@ -267,7 +266,7 @@ FalkorDB is snapshotted to a private S3 bucket every 6 hours, CloudWatch alarms 
 FalkorDB itself has no query time or memory limit, so the app sets one on first connect (15 s default, 60 s ceiling, 1 GiB per query; tunable with `GRAPHMEM_QUERY_TIMEOUT_MS`, `GRAPHMEM_QUERY_TIMEOUT_MAX_MS`, `GRAPHMEM_QUERY_MEM_BYTES`, `0` = off). A query that hits a cap is stopped, a write inside it is rolled back, and the caller gets a 503 that says to ask for less. `GET /admin/db` (admin key) shows the caps in force, graph counts, memory and the slowest queries with every string value removed.
 One graph per circle costs memory: on the development database, 481 graphs use about 1.1 MB each on average (shared reference graph included, so a rough guide). Plan roughly 1 GB per thousand circles and watch `/admin/db`.
 
-FalkorDB is **pinned by digest** (4.22.1) in `docker-compose.yml`, `deploy/docker-compose.prod.yml` and the CI workflow, and `tests/test_pinned_database.py` fails if those differ or if the database a test run talks to is another version. `latest` is a moving tag: it was 4.22.1 on the server and 6.0.2 on a laptop, and three bugs hid in that gap. 4.22.1 is the newest release of the 4.x line (15 Oct 2026); 6.x is a different engine (Rust) for which FalkorDB documents no supported upgrade from 4.x yet, so moving is a deliberate migration, not a version bump. A second workflow (`.github/workflows/compat.yml`) runs the whole test suite on 6.0.2 on every push; it passes today (328 tests), so the code is ready, and the open question is moving the data. To upgrade, change the digest in all three files and `PINNED_VERSION` in that test together, after running the suite on the new image.
+FalkorDB is **pinned by digest** (4.22.1) in `docker-compose.yml`, `deploy/docker-compose.prod.yml` and the CI workflow, and `tests/test_pinned_database.py` fails if those differ or if the database a test run talks to is another version. `latest` is a moving tag: it was 4.22.1 on the server and 6.0.2 on a laptop, and three bugs hid in that gap. 4.22.1 is the newest release of the 4.x line (15 Oct 2026); 6.x is a different engine (Rust) for which FalkorDB documents no supported upgrade from 4.x yet, so moving is a deliberate migration, not a version bump. A second workflow (`.github/workflows/compat.yml`) runs the whole test suite on 6.0.2 on every push; it passes on every push, so the code is ready, and the open question is moving the data. To upgrade, change the digest in all three files and `PINNED_VERSION` in that test together, after running the suite on the new image.
 
 ## Limits, stated plainly
 - Interaction severity weights (minor .1, moderate .3, major .7; enzyme strong .7, moderate .3; staleness half-life 72 h) are **assumptions**, not clinical values.
