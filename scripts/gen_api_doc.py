@@ -20,7 +20,7 @@ Content-Type: application/json
 ```
 
 - The body is the operation's arguments as a JSON object; the reply is `{"result": ...}`.
-- `{circle}` is the circle's id (shown in Account). Authorisation is checked inside the engine on every query: a read-scope key cannot call a write operation.
+- `{circle}` is the circle's id (the page does not show it; `GET /v1/account/circles` lists yours). Authorisation is checked inside the engine on every query: a read-scope key cannot call a write operation.
 - Arguments are bound against the real method signature; unknown or missing ones are rejected before the graph is touched.
 - The same table backs the MCP server (`python -m graphmem.mcp_server`).
 - Care Circle records and cross-checks; none of these operations returns advice.

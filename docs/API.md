@@ -13,7 +13,7 @@ Content-Type: application/json
 ```
 
 - The body is the operation's arguments as a JSON object; the reply is `{"result": ...}`.
-- `{circle}` is the circle's id (shown in Account). Authorisation is checked inside the engine on every query: a read-scope key cannot call a write operation.
+- `{circle}` is the circle's id (the page does not show it; `GET /v1/account/circles` lists yours). Authorisation is checked inside the engine on every query: a read-scope key cannot call a write operation.
 - Arguments are bound against the real method signature; unknown or missing ones are rejected before the graph is touched.
 - The same table backs the MCP server (`python -m graphmem.mcp_server`).
 - Care Circle records and cross-checks; none of these operations returns advice.
@@ -21,6 +21,8 @@ Content-Type: application/json
 | Operation | Scope | Arguments (* required) | What it does |
 |---|---|---|---|
 | `add_episode` | write | `session`*, `role`*, `content`*, `agent`, `at` | Append an immutable event to a session. Ordering (seq + NEXT edge) is assigned atomically in-graph. |
+| `add_episodes` | write | `session`*, `items`*, `agent` | Append several events to one session in a single write: one authorisation, one query, and a contiguous block of sequence numbers with |
+| `assert_facts` | write | `facts`* | Assert several facts with one authorisation. Each item takes the arguments of assert_fact (subject, predicate, obj, and optionally |
 | `ingest` | write | `session`*, `role`*, `content`* | Store a message as an episode, extract facts from it, and link each fact to that episode. |
 | `history` | read | `session`*, `limit`, `before_seq` | Persistent conversation history, oldest first, newest `limit` turns (optionally before a seq). |
 | `sessions` | read | `limit` |  |
@@ -37,7 +39,7 @@ Content-Type: application/json
 | `skill_runs` | read | `skill`*, `limit` |  |
 | `create_task` | write | `title`*, `payload` |  |
 | `claim_task` | write | `task_id`*, `expected_version` | Atomic claim: succeeds for exactly one caller even if many race (guard is in the WHERE clause). |
-| `handoff` | write | `task_id`*, `to_agent`*, `note`, `plan_id`, `expected_version` | Owner hands the task to another agent. Fails (False) if the caller is not the owner or state moved on. |
+| `handoff` | write | `task_id`*, `to_agent`*, `note`, `plan_id`, `expected_version` | Owner hands the task to another agent. Fails (False) if the caller is not the owner or state moved on. The receiver must be able to |
 | `accept` | write | `task_id`* |  |
 | `complete` | write | `task_id`*, `result` |  |
 | `get_task` | read | `task_id`* |  |
