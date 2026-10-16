@@ -26,35 +26,36 @@ from pydantic import BaseModel
 
 from . import accounts_api, branch, ops, spaces
 from .db import Db, Overloaded
+from .textcheck import Clean
 from .policy import GraphMem, PermissionDenied
 
 
-class AgentBody(BaseModel):
+class AgentBody(Clean):
     agent: str
 
 
-class GrantBody(BaseModel):
+class GrantBody(Clean):
     agent: str
     tenant: str
     scopes: list[str] = ["read", "write"]
 
 
-class MemberBody(BaseModel):
+class MemberBody(Clean):
     agent: str
     space: str
     scopes: list[str] = ["read"]
 
 
-class ForkBody(BaseModel):
+class ForkBody(Clean):
     label: str = ""
 
 
-class MergeBody(BaseModel):
+class MergeBody(Clean):
     apply: bool = False
     on_conflict: str = "skip"
 
 
-class PublishBody(BaseModel):
+class PublishBody(Clean):
     tenant: str
     fact_ids: list[str]
 

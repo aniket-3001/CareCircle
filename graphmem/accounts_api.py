@@ -18,64 +18,65 @@ from typing import Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from carecircle import cognito as cog
 from carecircle import demo
 from carecircle.accounts import DEMO_ACCOUNTS, DEMO_PASSWORD, Accounts, AuthProblem
+from .textcheck import Clean
 from .policy import GraphMem, PermissionDenied
 
 
-class SignUp(BaseModel):
+class SignUp(Clean):
     email: str = Field(max_length=254)
     password: str = Field(max_length=200)
     name: str = Field(default="", max_length=80)
 
 
-class SignIn(BaseModel):
+class SignIn(Clean):
     email: str = Field(max_length=254)
     password: str = Field(max_length=200)
 
 
-class Exchange(BaseModel):
+class Exchange(Clean):
     name: str = Field(default="", max_length=80)
 
 
-class Quiet(BaseModel):
+class Quiet(Clean):
     start: Optional[int] = None
     end: Optional[int] = None
     tz: int = 0
 
 
-class Profile(BaseModel):
+class Profile(Clean):
     name: str = Field(max_length=80)
 
 
-class Password(BaseModel):
+class Password(Clean):
     old: str = Field(max_length=200)
     new: str = Field(max_length=200)
 
 
-class NewCircle(BaseModel):
+class NewCircle(Clean):
     name: str = Field(max_length=80)
     person: str = Field(max_length=60)
 
 
-class Rename(BaseModel):
+class Rename(Clean):
     name: str = Field(max_length=80)
 
 
-class Join(BaseModel):
+class Join(Clean):
     code: str = Field(max_length=40)
 
 
-class PushSub(BaseModel):
+class PushSub(Clean):
     endpoint: str = Field(max_length=1000)
     p256dh: str = Field(max_length=200)
     auth: str = Field(max_length=100)
 
 
-class Delete(BaseModel):
+class Delete(Clean):
     confirm: str = Field(max_length=254)
 
 

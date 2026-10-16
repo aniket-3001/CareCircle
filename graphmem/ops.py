@@ -10,6 +10,7 @@ import inspect
 from typing import Any
 
 from . import spaces
+from .textcheck import check_text
 from .memory import TenantMemory
 from .policy import GraphMem
 
@@ -55,6 +56,7 @@ async def invoke_space(gm: GraphMem, agent: str, space: str, op: str, args: dict
         raise KeyError(f"unknown space operation {op!r}")
     if not isinstance(args, dict):
         raise TypeError("arguments must be an object")
+    check_text(args)
     fn = getattr(spaces.open_space(gm, agent, space), op)
     try:
         inspect.signature(fn).bind(**args)
@@ -71,6 +73,7 @@ async def invoke(gm: GraphMem, agent: str, tenant: str, op: str, args: dict[str,
         raise KeyError(f"unknown operation {op!r}")
     if not isinstance(args, dict):
         raise TypeError("arguments must be an object")
+    check_text(args)
     if op == "forget_fact":  # must also delete copies published to shared spaces
         try:
             inspect.signature(TenantMemory.forget_fact).bind(None, **args)
