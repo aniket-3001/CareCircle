@@ -176,6 +176,32 @@ async def test_demo_accounts_are_seeded_once_and_work_like_any_other(client, gm,
             await ctl.query("MATCH (g:Agent) WHERE g.id STARTS WITH $p DETACH DELETE g", {"p": email.split("@")[0].split(".")[0] + "-"})
 
 
+async def test_the_shared_demo_accounts_cannot_be_renamed_or_have_their_password_changed(client, gm):
+    """Everyone is given the demo password on the sign-in page; if one visitor could change it or rename the account, the next visitor would be locked out."""
+    from carecircle import demo
+    accs = accmod.Accounts(gm)
+    try:
+        await demo.seed_shared(gm, accs)
+        cfg = (await client.get("/v1/auth/config")).json()
+        d = cfg["demo_accounts"][0]
+        tok = (await client.post("/v1/auth/signin", json={"email": d["email"], "password": d["password"]})).json()["token"]
+        assert (await client.patch("/v1/account", json={"name": "Hacked"}, headers=auth(tok))).status_code == 403
+        r = await client.post("/v1/account/password", json={"old": d["password"], "new": "something-else-1"}, headers=auth(tok))
+        assert r.status_code == 403
+        assert (await client.get("/v1/account", headers=auth(tok))).json()["name"] != "Hacked"
+        again = await client.post("/v1/auth/signin", json={"email": d["email"], "password": d["password"]})
+        assert again.status_code == 200                                         # the published password still works for the next visitor
+        mine, _ = await account(client)                                         # an ordinary account can still do both
+        assert (await client.patch("/v1/account", json={"name": "Renamed"}, headers=auth(mine))).status_code == 200
+    finally:
+        await gm.db.drop_tenant(accmod.SHARED_CIRCLE)
+        ctl = await gm._ctl()
+        await ctl.query("MATCH (t:Tenant {id:$c}) DETACH DELETE t", {"c": accmod.SHARED_CIRCLE})
+        for email, _ in accmod.DEMO_ACCOUNTS:
+            await ctl.query("MATCH (a:Account {email:$e}) OPTIONAL MATCH (a)<-[:OF]-(s:Session) DETACH DELETE s, a", {"e": email})
+            await ctl.query("MATCH (g:Agent) WHERE g.id STARTS WITH $p DETACH DELETE g", {"p": email.split("@")[0].split(".")[0] + "-"})
+
+
 # ---------------------------------------------------------------- Cognito
 def _rsa():
     from cryptography.hazmat.primitives.asymmetric import rsa

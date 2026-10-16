@@ -73,7 +73,7 @@ export const HI_MORE: Record<string, string> = {
   'Point in time': 'समय का बिंदु', 'Remove this entry for good?': 'क्या यह प्रविष्टि हमेशा के लिए हटाएँ?',
   // Account
   'Leave the demo': 'डेमो छोड़ें', 'Profile': 'प्रोफ़ाइल', 'Your name (other carers see it)': 'आपका नाम (दूसरे देखभालकर्ता देखते हैं)', 'Save': 'सहेजें',
-  'The demo accounts are shared by everyone, so their circle and name can be changed by anyone who uses them.': 'डेमो खाते सबके साझा हैं, इसलिए उनका सर्कल और नाम कोई भी बदल सकता है।',
+  'The demo accounts are shared by everyone, so their name and password cannot be changed. Create your own account to do that.': 'डेमो खाते सबके साझा हैं, इसलिए उनका नाम और पासवर्ड नहीं बदला जा सकता। ऐसा करने के लिए अपना खाता बनाएँ।',
   'Your circles': 'आपके सर्कल', 'You are not in a circle yet. Create one or join with a code below.': 'आप अभी किसी सर्कल में नहीं हैं। नीचे नया बनाएँ या कोड से जुड़ें।', 'Telegram': 'टेलीग्राम',
   'Add medicines by sending a photo, a voice note or text to the bot, and get reminders in the chat. It uses this account and the circle you pick.': 'बॉट को फ़ोटो, आवाज़ या टेक्स्ट भेजकर दवाएँ जोड़ें और चैट में रिमाइंडर पाएँ। यह इस खाते और आपके चुने सर्कल का उपयोग करता है।',
   'Unlink Telegram': 'टेलीग्राम अलग करें', 'Open': 'खोलें', 'Link Telegram': 'टेलीग्राम जोड़ें', 'Session': 'सत्र', 'Sign out': 'साइन आउट', 'Reset demo data': 'डेमो डेटा रीसेट करें',

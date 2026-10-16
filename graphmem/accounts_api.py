@@ -180,13 +180,21 @@ def mount(app: FastAPI, gm: GraphMem, agent_id, demo_on: bool) -> Accounts:
     async def get_account(agent: str = Depends(agent_id)):
         return await profile(agent)
 
+    async def not_shared_demo(agent: str, what: str) -> None:
+        """The demo accounts are shared and their password is printed on the sign-in page: one visitor changing it would lock the next one out."""
+        row = await acc.by_agent(agent)
+        if row and row.get("demo"):
+            raise AuthProblem(f"The demo accounts are shared, so {what} is switched off for them. Create your own account to do that.", 403)
+
     @app.patch("/v1/account")
     async def patch_account(b: Profile, agent: str = Depends(agent_id)):
+        await not_shared_demo(agent, "renaming")
         await acc.update(agent, b.name)
         return await profile(agent)
 
     @app.post("/v1/account/password")
     async def password(b: Password, agent: str = Depends(agent_id), authorization: Optional[str] = Header(None)):
+        await not_shared_demo(agent, "changing the password")
         await acc.change_password(agent, b.old, b.new, _bearer(authorization))
         return {"ok": True}
 

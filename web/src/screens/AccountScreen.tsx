@@ -86,12 +86,12 @@ export function AccountScreen(): React.JSX.Element {
           <section className="card" aria-labelledby="prof-title">
             <div className="row"><UserRound size={20} strokeWidth={1.75} aria-hidden="true" /><h2 id="prof-title">{tr('Profile')}</h2>{p.demo && <Pill tone="info">demo account</Pill>}</div>
             <label className="field">{tr('Your name (other carers see it)')}
-              <input type="text" value={name ?? p.name} onChange={(e) => setName(e.target.value)} maxLength={60} />
+              <input type="text" value={name ?? p.name} onChange={(e) => setName(e.target.value)} maxLength={60} disabled={!!p.demo} />
             </label>
             <div className="row">
-              <button type="button" className="btn btn--sm" disabled={name === null || !name.trim() || name === p.name} onClick={() => void save()}><Check size={16} aria-hidden="true" /> {tr('Save')}</button>
+              <button type="button" className="btn btn--sm" disabled={!!p.demo || name === null || !name.trim() || name === p.name} onClick={() => void save()}><Check size={16} aria-hidden="true" /> {tr('Save')}</button>
             </div>
-            {p.demo && <p className="muted small">{tr('The demo accounts are shared by everyone, so their circle and name can be changed by anyone who uses them.')}</p>}
+            {p.demo && <p className="muted small">{tr('The demo accounts are shared by everyone, so their name and password cannot be changed. Create your own account to do that.')}</p>}
           </section>
 
           <PushToggle />
