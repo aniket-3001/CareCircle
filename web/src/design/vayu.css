@@ -361,3 +361,8 @@ code, .code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: 
 :root[data-theme='dark'] .flag--path { border-color: #34507a; }
 :root[data-theme='dark'] .skeleton i { background: linear-gradient(90deg, var(--line), #232f3c, var(--line)); background-size: 200% 100%; }
 :root[data-theme='dark'] .tabbar { box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.7); }
+
+.pw-wrap { position: relative; display: block; }
+.pw-wrap input { width: 100%; padding-right: 46px; }
+.pw-eye { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.pw-eye:hover { color: var(--text); }
