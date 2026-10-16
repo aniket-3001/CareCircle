@@ -10,6 +10,7 @@ Design notes
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import random
 import re
@@ -20,6 +21,8 @@ from typing import Optional
 
 from falkordb.asyncio import FalkorDB
 from redis.asyncio import BlockingConnectionPool
+
+log = logging.getLogger("graphmem.db")
 
 TENANT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,47}$")
 CTL_GRAPH = "ctl"
@@ -38,6 +41,16 @@ CTL_INDEXES = [("Tenant", "id"), ("Agent", "id"), ("ApiKey", "hash"), ("Fork", "
 # create two Entities with one key, two Tasks with one id, two keys with one hash.
 TENANT_UNIQUE = [("Entity", "key"), ("Task", "id"), ("Session", "id"), ("Episode", "id"), ("Plan", "id")]
 CTL_UNIQUE = [("Tenant", "id"), ("Agent", "id"), ("ApiKey", "hash"), ("Fork", "id"), ("Account", "email"), ("Account", "agent"), ("Throttle", "key")]
+
+
+# Caps FalkorDB enforces on every query (its own defaults are "no limit"): a runaway traversal or a huge result must not hold the
+# single writer of a graph for ever or exhaust memory. A cap is set only when the server has none, so an operator's own setting wins.
+# Each can be changed (or switched off with 0) through the environment variable named here.
+QUERY_LIMITS = [
+    ("TIMEOUT_MAX", "GRAPHMEM_QUERY_TIMEOUT_MAX_MS", 60_000),      # no request may ask for more than a minute
+    ("TIMEOUT_DEFAULT", "GRAPHMEM_QUERY_TIMEOUT_MS", 15_000),      # a query that names no time may run for 15 seconds
+    ("QUERY_MEM_CAPACITY", "GRAPHMEM_QUERY_MEM_BYTES", 1 << 30),   # one query may use 1 GiB
+]
 
 
 def now_ms() -> int:
@@ -62,6 +75,14 @@ class Overloaded(Exception):
     """FalkorDB kept rejecting queries because its queue was full (MAX_QUEUED_QUERIES). Map to HTTP 503."""
 
 
+class QueryLimit(Exception):
+    """One query ran past the time or memory cap the database enforces (see Db.apply_limits). Map to HTTP 503; never retried."""
+
+
+# What FalkorDB answers when a cap stops a query (the query is abandoned and, for a write, rolled back).
+_LIMIT_MESSAGES = ("timed out", "mem consumption")
+
+
 class RetryingGraph:
     """Wraps a FalkorDB graph handle. FalkorDB answers 'Max pending queries exceeded' *before* executing a query, so
     retrying exactly that error is safe even for writes. Retries use exponential backoff with jitter; after the
@@ -84,7 +105,10 @@ class RetryingGraph:
             try:
                 return await call(q, params, **kw)
             except Exception as e:
-                if "max pending queries" not in str(e).lower():
+                msg = str(e).lower()
+                if any(m in msg for m in _LIMIT_MESSAGES):
+                    raise QueryLimit("that was too heavy for the database to answer in time; ask for less") from e
+                if "max pending queries" not in msg:
                     raise
                 if attempt == self.ATTEMPTS - 1:
                     raise Overloaded("database queue full; retry shortly") from e
@@ -109,6 +133,29 @@ class Db:
         self._ro_ready = False
         self._ready: dict[str, asyncio.Future] = {}
         self._lock = asyncio.Lock()
+        self._limits_set = False
+
+    async def apply_limits(self) -> dict:
+        """Give the database its query time and memory caps (once per process). Returns what is in force. A server that refuses
+        the setting (a managed service) is left as it is, with a warning: the app still works, only the cap is missing."""
+        if self._limits_set:
+            return {}
+        async with self._lock:
+            if self._limits_set:
+                return {}
+            out = {}
+            for key, env, default in QUERY_LIMITS:
+                try:
+                    want = int(os.getenv(env, default))
+                    now = int((await self.client.execute_command("GRAPH.CONFIG", "GET", key))[1])
+                    if want > 0 and now == 0:
+                        await self.client.execute_command("GRAPH.CONFIG", "SET", key, want)
+                        now = want
+                    out[key] = now
+                except Exception as e:  # noqa: BLE001
+                    log.warning("could not set %s: %s", key, e)
+            self._limits_set = True
+            return out
 
     @staticmethod
     def graph_name(tenant: str) -> str:
@@ -137,6 +184,8 @@ class Db:
 
     async def graph(self, name: str):
         """Return a graph handle, creating indexes exactly once per process."""
+        if not self._limits_set:
+            await self.apply_limits()
         if name not in self._ready:
             async with self._lock:
                 if name not in self._ready:

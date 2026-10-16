@@ -25,7 +25,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 from . import accounts_api, branch, ops, spaces
-from .db import Db, Overloaded
+from .db import Db, Overloaded, QueryLimit
 from .textcheck import Clean
 from .policy import GraphMem, PermissionDenied
 
@@ -126,6 +126,10 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
     @app.exception_handler(Overloaded)
     async def _busy(_: Request, e: Overloaded):
         return JSONResponse({"error": str(e)}, status_code=503, headers={"Retry-After": "1"})
+
+    @app.exception_handler(QueryLimit)
+    async def _too_heavy(_: Request, e: QueryLimit):
+        return JSONResponse({"error": str(e)}, status_code=503)
 
     @app.exception_handler(KeyError)
     async def _missing(_: Request, e: KeyError):
