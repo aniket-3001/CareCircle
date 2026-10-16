@@ -52,7 +52,7 @@ class CareFollowupsMixin:
         """Write the follow-ups a person approved (each one: key, text, kind, basis = entry ids). A key already on the list is not added twice."""
         if not isinstance(items, list) or not items or len(items) > 20:
             raise ValueError("send between 1 and 20 follow-ups")
-        p = norm(person)
+        p = await self._known_person(person)
         added = []
         for it in items:
             key, text = fit(it.get("key", ""), 120, "a follow-up key"), fit(it.get("text", ""), 200, "a follow-up")

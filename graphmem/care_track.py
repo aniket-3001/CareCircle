@@ -57,6 +57,7 @@ class CareTrackMixin:
         if t > now_ms() + H:
             raise ValueError("a reading cannot be from the future")
         mid = new_id("meas")
+        person = await self._known_person(person)
         await self._q(
             """MERGE (p:Person {id:$p}) ON CREATE SET p.role='patient'
                CREATE (m:Measurement {id:$id, kind:$k, value:$v, unit:$u, at:$t, by:$by, note:$n})-[:FOR]->(p)""",

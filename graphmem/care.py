@@ -11,6 +11,7 @@ Interaction flags come from the shared reference graph (carecircle.checks) and a
 from __future__ import annotations
 
 import asyncio
+import difflib
 import os
 import re
 from datetime import datetime, timezone
@@ -65,6 +66,26 @@ def parse_slot(slot: str) -> tuple[str, int]:
 
 class CareMixin:
     # ------------------------------------------------------------------ record / confirm
+    async def _known_person(self, person: str) -> str:
+        """The person's id, refused if it is a near miss of someone already in the circle ("ashaa" for "asha"): a slip of the keyboard would otherwise start a second
+        patient with an empty record, and the real one would look as if the medicine had never been entered. A genuinely different name is fine."""
+        p = norm(person)
+        have = [r[0] for r in await self._q("MATCH (q:Person {role:'patient'}) RETURN q.id", scope="read")]
+        if p in have or not have:
+            return p
+        close = difflib.get_close_matches(p, have, n=1, cutoff=0.8)
+        if close:
+            raise ValueError(f"'{p}' looks like '{close[0]}', who is already in this circle. Use that name; if they really are two people, add '{p}' first with care_add_person.")
+        return p
+
+    async def care_add_person(self, person: str) -> dict:
+        """Add another person to the circle on purpose (a name close to someone already there is otherwise refused as a likely typing slip)."""
+        p = norm(person)
+        if not p or len(p) > 60:
+            raise ValueError("a person's name is 1 to 60 characters")
+        await self._q("MERGE (q:Person {id:$p}) ON CREATE SET q.role='patient'", {"p": p})
+        return {"person": p}
+
     async def care_record(self, person: str, drug: str, action: str = "set", dose_text: str = "", freq_text: str = "",
                           source_type: str = "typed", quote: str = "", source_text: str = "", confirm: bool = True,
                           at: Optional[int] = None, edited: str = "") -> dict:
@@ -81,6 +102,7 @@ class CareMixin:
         if not d or len(d) > 80:
             raise ValueError("a medicine name is 1 to 80 characters")
         dose_text, freq_text = fit(dose_text, 80, "the dose"), fit(freq_text, 80, "how often")
+        person = await self._known_person(person)
         cur = await self._q("MATCH (o:Dose {cur:true, drug:$d})-[:FOR]->(:Person {id:$p}) RETURN o.id, o.dose_text, o.freq_text, o.valid_from LIMIT 1",
                             {"d": d, "p": norm(person)}, scope="read")
         if action == "stop" and not cur:

@@ -40,6 +40,7 @@ class CarePlanMixin:
         if at < now_ms() - 366 * 24 * H or at > now_ms() + 5 * 366 * 24 * H:
             raise ValueError("that date is not within a sensible range")
         aid = new_id("appt")
+        person = await self._known_person(person)
         await self._q(
             """MERGE (p:Person {id:$p}) ON CREATE SET p.role='patient'
                CREATE (a:Appointment {id:$id, title:$t, at:$at, place:$pl, who:$w, bring:$b, status:'planned', by:$by, created:$c})-[:FOR]->(p)""",
@@ -107,6 +108,7 @@ class CarePlanMixin:
         if not name:
             raise ValueError("a condition needs a name")
         cid = new_id("cond")
+        person = await self._known_person(person)
         await self._q("MERGE (p:Person {id:$p}) ON CREATE SET p.role='patient' CREATE (:Condition {id:$id, name:$n, by:$by, at:$t})-[:FOR]->(p)",
                       {"p": norm(person), "id": cid, "n": name, "by": norm(self.agent), "t": now_ms()})
         return {"id": cid}
@@ -119,6 +121,7 @@ class CarePlanMixin:
         cands = await asyncio.to_thread(checker().resolve, text, 1)
         drug = cands[0]["name"] if cands and cands[0]["score"] >= 0.9 else ""
         aid = new_id("alg")
+        person = await self._known_person(person)
         await self._q("MERGE (p:Person {id:$p}) ON CREATE SET p.role='patient' CREATE (:Allergy {id:$id, text:$t, drug:$d, by:$by, at:$n})-[:FOR]->(p)",
                       {"p": norm(person), "id": aid, "t": text, "d": drug, "by": norm(self.agent), "n": now_ms()})
         return {"id": aid, "resolved_to": drug}
