@@ -256,6 +256,7 @@ class CareViewMixin:
         await self._q("MATCH (g:Give {person:$p}) DELETE g", {"p": p})
         await self._q("MATCH (h:Handover {person:$p}) DELETE h", {"p": p})
         await self._q("MATCH (w:Watch) WHERE w.key STARTS WITH $k DELETE w", {"k": p + "|"})
+        await self._q("MATCH (f:Followup {person:$p}) DETACH DELETE f", {"p": p})
         for lab in ("Measurement", "Appointment", "Condition", "Allergy"):
             await self._q(f"MATCH (m:{lab})-[:FOR]->(:Person {{id:$p}}) DETACH DELETE m", {"p": p})
         if ids:

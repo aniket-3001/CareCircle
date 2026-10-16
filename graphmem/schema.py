@@ -10,6 +10,7 @@ MIGRATIONS: list[tuple[int, str, list[tuple]]] = [
     (1, "baseline: Care Circle labels", [("index", "Dose", "id"), ("index", "Give", "key"), ("index", "Person", "id")]),
     (2, "readings over time", [("index", "Measurement", "id"), ("index", "Measurement", "kind")]),
     (3, "appointments, conditions and allergies", [("index", "Appointment", "id"), ("index", "Condition", "id"), ("index", "Allergy", "id")]),
+    (4, "follow-up checklist", [("index", "Followup", "id"), ("index", "Followup", "person")]),
 ]
 CURRENT = MIGRATIONS[-1][0]
 
