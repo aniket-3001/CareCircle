@@ -1,0 +1,1 @@
+langchain-core         # integrations/langchain_tools.py (not needed by the server)

@@ -115,13 +115,14 @@ card with a big number and a face, white hairline cards, dashed add tiles, a flo
 
 ## Connect your agent stack
 
-The memory engine is not tied to the web app: any agent can use the same graph through the door it already speaks. Each of these is covered by a test that does exactly what is shown (`tests/test_mcp_http.py`, `tests/test_api.py`, `tests/test_track02.py`).
+The memory engine is not tied to the web app: any agent can use the same graph through the door it already speaks. Each of these is covered by a test that does exactly what is shown (`tests/test_mcp_http.py`, `tests/test_langchain_tools.py`, `tests/test_api.py`, `tests/test_track02.py`).
 
 | You use | How it connects | Notes |
 |---|---|---|
 | **An MCP client** (an editor, a desktop assistant, an agent framework with MCP support) | `POST https://<host>/mcp`, streamable HTTP, header `Authorization: Bearer <key>` | The same tools as the stdio server: `call(tenant, op, args_json)` for any of the ~90 operations, `remember`, `recall`, forks, shared spaces. Stateless: no MCP session is kept on the server. Same grants, scopes and rate limits as the REST API; a wrong key is a 401. Off with `CC_MCP_HTTP=0` |
 | **MCP over stdio** (a local process) | `GRAPHMEM_API_KEY=gm_... python -m graphmem.mcp_server` | For a client that starts its server itself |
-| **Anything that can send HTTP** (LangChain, LlamaIndex, a script) | `POST /v1/tenants/{tenant}/{op}` with a JSON body; `GET /v1/ops` lists every operation with its arguments | `docs/API.md` is generated from the code. Wrap an operation as a tool in two lines in any framework |
+| **LangChain** (agents, LangGraph tool nodes, `bind_tools`) | `graphmem_tools(url, key, tenant)` in `integrations/langchain_tools.py` returns one tool per operation, built from `GET /v1/ops` | `pip install -r requirements-integrations.txt` (`langchain-core`; the server needs nothing extra). Tested against a real server: sync and async calls, a tool-call message in and a `ToolMessage` out, refusals returned to the model as text. Pass `include=["graph_path", "recall", ...]` to expose only some |
+| **Anything else that can send HTTP** (LlamaIndex, a script) | `POST /v1/tenants/{tenant}/{op}` with a JSON body; `GET /v1/ops` lists every operation with its arguments | `docs/API.md` is generated from the code. Wrap an operation as a tool in two lines in any framework |
 | **A key** | a signed-in person's session token works as the bearer for their own circles; an agent key (`gm_...`) comes from the admin plane | A key sees only the tenants it was granted, with the scopes it was granted |
 
 ```python
