@@ -281,6 +281,47 @@ class Accounts:
             await self.gm.grant(nxt, circle, ("read", "write", "admin"))
         return {"deleted_circle": False}
 
+    async def delete_circle(self, agent: str, circle: str, confirm: str) -> dict:
+        """The owner removes a whole circle and everything in it (records, chat, invitations). Typing the circle's name guards against a slip."""
+        if await self.role(agent, circle) != "owner":
+            raise PermissionDenied("only the owner can delete a circle")
+        rows = await self._q("MATCH (t:Tenant {id:$c}) RETURN t.name, t.demo", {"c": circle})
+        if not rows:
+            raise AuthProblem("No such circle.", 404)
+        if rows[0][1]:
+            raise AuthProblem("The demo circle is shared and cannot be deleted.", 403)
+        if " ".join(confirm.split()).lower() != " ".join((rows[0][0] or circle).split()).lower():
+            raise AuthProblem("Type the circle's name to confirm.")
+        await self.gm.db.drop_tenant(circle)
+        await self._q("MATCH (c:TgChat {circle:$c}) DELETE c", {"c": circle})
+        await self._q("MATCH (i:Invite {circle:$c}) DELETE i", {"c": circle})
+        await self._q("MATCH (t:Tenant {id:$c}) DETACH DELETE t", {"c": circle})
+        return {"deleted_circle": True}
+
+    async def sign_out_everywhere(self, agent: str) -> dict:
+        """End every session of this account, on every device (the one making the request included)."""
+        rows = await self._q("MATCH (a:Account {agent:$ag})<-[:OF]-(s:Session) WITH s, s AS x DETACH DELETE s RETURN count(x)", {"ag": agent})
+        return {"signed_out": int(rows[0][0]) if rows else 0}
+
+    async def export_account(self, agent: str) -> dict:
+        """Everything held for this account in one JSON document: profile, and for each circle the record, readings, appointments, notes and follow-ups."""
+        row = await self.by_agent(agent)
+        if not row:
+            raise AuthProblem("No such account.", 404)
+        out = {"exported_at": int(time.time() * 1000), "account": self.public(row), "circles": []}
+        for c in await self.circles(agent):
+            tm, p = self.gm.open(agent, c["id"]), c["person"]
+            item = {"circle": c}
+            for key, call in (("regimen", tm.care_regimen(p)), ("timeline", tm.care_timeline(p, limit=2000)), ("doses_given", tm.care_gives(p, limit=2000)),
+                              ("readings", tm.care_measures(p)), ("appointments", tm.care_appointments(p)), ("profile", tm.care_profile(p)),
+                              ("handover_notes", tm.care_handovers(p, limit=2000)), ("follow_ups", tm.care_followups(p)), ("receipts", tm.care_receipts())):
+                try:
+                    item[key] = await call
+                except Exception as e:                      # one part failing must not hide the rest
+                    item[key] = {"error": type(e).__name__}
+            out["circles"].append(item)
+        return out
+
     async def delete_account(self, agent: str, confirm: str) -> dict:
         row = await self.by_agent(agent)
         if not row:

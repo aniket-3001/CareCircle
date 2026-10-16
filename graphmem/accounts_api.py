@@ -190,6 +190,18 @@ def mount(app: FastAPI, gm: GraphMem, agent_id, demo_on: bool) -> Accounts:
             raise AuthProblem("The demo accounts are shared and cannot be deleted. Create your own account.", 403)
         return await acc.delete_account(agent, b.confirm)
 
+    @app.post("/v1/account/signout-all")
+    async def signout_all(agent: str = Depends(agent_id)):
+        return await acc.sign_out_everywhere(agent)
+
+    @app.get("/v1/account/export")
+    async def export_account(agent: str = Depends(agent_id)):
+        return await acc.export_account(agent)
+
+    @app.delete("/v1/circles/{circle}")
+    async def delete_circle(circle: str, b: Delete, agent: str = Depends(agent_id)):
+        return await acc.delete_circle(agent, circle, b.confirm)
+
     @app.get("/v1/account/circles")
     async def my_circles(agent: str = Depends(agent_id)):
         return await acc.circles(agent)

@@ -277,3 +277,41 @@ async def test_members_count_as_carers_from_the_moment_they_join_and_stop_when_t
     await client.post(f"/v1/circles/{cid}/leave", headers=auth(b))
     div = (await client.post(f"/v1/tenants/{cid}/care_divergence", json={"person": "mum"}, headers=auth(a))).json()["result"]
     assert [k.split("-")[0] for k in div["carers"]] == ["ana"]
+
+
+async def test_owner_can_delete_a_circle_with_its_name_and_others_cannot(client, gm):
+    a, _ = await account(client, "own@tt.test", "Own")
+    b, _ = await account(client, "car@tt.test", "Car")
+    cid = (await client.post("/v1/account/circles", json={"name": "Nani's meds", "person": "Nani"}, headers=auth(a))).json()["id"]
+    await client.post("/v1/join", json={"code": (await client.post(f"/v1/circles/{cid}/invites", headers=auth(a))).json()["code"]}, headers=auth(b))
+    assert (await client.request("DELETE", f"/v1/circles/{cid}", json={"confirm": "Nani's meds"}, headers=auth(b))).status_code == 403      # a carer, not the owner
+    assert (await client.request("DELETE", f"/v1/circles/{cid}", json={"confirm": "wrong"}, headers=auth(a))).status_code == 400
+    assert cid in await gm.db.list_tenant_graphs()
+    r = await client.request("DELETE", f"/v1/circles/{cid}", json={"confirm": "nani's  MEDS"}, headers=auth(a))
+    assert r.status_code == 200 and r.json() == {"deleted_circle": True}
+    assert cid not in await gm.db.list_tenant_graphs()
+    assert (await client.get("/v1/account/circles", headers=auth(b))).json() == []                 # gone for the other carer too
+
+
+async def test_sign_out_everywhere_ends_every_session(client):
+    token, _ = await account(client, "multi@tt.test", "Multi")
+    other = (await client.post("/v1/auth/signin", json={"email": "multi@tt.test", "password": PW})).json()["token"]
+    assert (await client.get("/v1/account", headers=auth(other))).status_code == 200
+    r = await client.post("/v1/account/signout-all", headers=auth(token))
+    assert r.status_code == 200 and r.json()["signed_out"] == 2
+    assert (await client.get("/v1/account", headers=auth(token))).status_code == 401
+    assert (await client.get("/v1/account", headers=auth(other))).status_code == 401
+
+
+async def test_account_export_holds_the_record_and_nothing_secret(client):
+    token, _ = await account(client, "exp@tt.test", "Exp")
+    cid = (await client.post("/v1/account/circles", json={"name": "Mum", "person": "Mum"}, headers=auth(token))).json()["id"]
+    await client.post(f"/v1/tenants/{cid}/care_record", json={"person": "mum", "drug": "warfarin", "dose_text": "4 mg", "freq_text": "daily"}, headers=auth(token))
+    r = await client.get("/v1/account/export", headers=auth(token))
+    assert r.status_code == 200
+    doc = r.json()
+    assert doc["account"]["email"] == "exp@tt.test" and len(doc["circles"]) == 1
+    c = doc["circles"][0]
+    assert [x["drug"] for x in c["regimen"]] == ["warfarin"] and c["timeline"] and "readings" in c and "appointments" in c
+    assert "hash" not in r.text and "salt" not in r.text and PW not in r.text
+    assert (await client.get("/v1/account/export")).status_code == 401
