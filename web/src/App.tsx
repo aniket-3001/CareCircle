@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Profile, Session } from './api/types';
 import { Assistant } from './components/Assistant';
 import { Fabs } from './components/Fabs';
+import { Help } from './components/Help';
 import { Skeleton } from './components/Pill';
 import { Sheet } from './components/Sheet';
 import { TabBar } from './components/TabBar';
@@ -209,6 +210,10 @@ export function App(): React.JSX.Element {
           </div>
 
           <Sheet open={about} title={t('About and safety')} onClose={() => setAbout(false)}>
+            <section>
+              <h3>{t('Help')}</h3>
+              <Help />
+            </section>
             <section>
               <h3>{t('What this is')}</h3>
               <p>{t("A shared record of a person's medicines for the people who look after them. It records what carers add, cross-checks it against public data, and shows who has not seen a change.")}</p>
