@@ -422,3 +422,23 @@ async def test_reminder_preview_never_uses_up_a_reminder(gm):
     assert len(claimed) == 2
     assert all(d["delivered"] for d in await c["ravi"].care_reminders("asha", now=later))
     assert await c["ravi"].care_nudges("asha", now=later) == []
+
+
+def test_quiet_hours_window_including_one_through_midnight():
+    from carecircle.accounts import in_quiet
+    h = lambda utc_hour: utc_hour * 3_600_000                                    # an instant at that UTC hour (day 0)
+    assert in_quiet(22, 7, 0, h(23)) and in_quiet(22, 7, 0, h(3)) and not in_quiet(22, 7, 0, h(12))      # runs through midnight
+    assert in_quiet(13, 15, 0, h(14)) and not in_quiet(13, 15, 0, h(15))                                   # end hour is outside
+    assert in_quiet(22, 7, 330, h(17)) and not in_quiet(22, 7, 330, h(5))                                  # India: 17:00 UTC is 22:30 there
+    assert not in_quiet(None, None, 0, h(3)) and not in_quiet(8, 8, 0, h(8))                                # off, or an empty window
+
+
+async def test_a_reminder_held_for_quiet_hours_is_still_sent_afterwards(gm):
+    t, c = await circle(gm, "ravi", "meena")
+    r, mn = c["ravi"], c["meena"]
+    await mn.care_ack((await mn.care_record("mum", "metformin"))["id"])
+    await r.care_record("mum", "simvastatin")                                   # meena has not seen this
+    later = int(__import__("time").time() * 1000) + 20 * H
+    assert await r.care_nudges("mum", now=later, hold={"meena", "ravi"}) == []   # everyone quiet: nothing claimed
+    sent = await r.care_nudges("mum", now=later)                                 # quiet hours over: it goes out, once
+    assert sent and await r.care_nudges("mum", now=later) == []

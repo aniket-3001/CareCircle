@@ -41,6 +41,12 @@ class Exchange(BaseModel):
     name: str = Field(default="", max_length=80)
 
 
+class Quiet(BaseModel):
+    start: Optional[int] = None
+    end: Optional[int] = None
+    tz: int = 0
+
+
 class Profile(BaseModel):
     name: str = Field(max_length=80)
 
@@ -189,6 +195,14 @@ def mount(app: FastAPI, gm: GraphMem, agent_id, demo_on: bool) -> Accounts:
         if row and row.get("demo"):
             raise AuthProblem("The demo accounts are shared and cannot be deleted. Create your own account.", 403)
         return await acc.delete_account(agent, b.confirm)
+
+    @app.get("/v1/account/quiet")
+    async def get_quiet(agent: str = Depends(agent_id)):
+        return await acc.quiet_hours(agent)
+
+    @app.put("/v1/account/quiet")
+    async def put_quiet(b: Quiet, agent: str = Depends(agent_id)):
+        return await acc.set_quiet_hours(agent, b.start, b.end, b.tz)
 
     @app.post("/v1/account/signout-all")
     async def signout_all(agent: str = Depends(agent_id)):

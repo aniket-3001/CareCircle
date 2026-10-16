@@ -166,7 +166,8 @@ class CareMixin:
         return {"carers": out, "most_out_of_date": worst if worst and out[worst]["divergence"] > 0 else None,
                 "half_life_hours": risk.HALF_LIFE_HOURS, "weights_are_assumptions": True}
 
-    async def care_nudges(self, person: str, now: Optional[int] = None, remind_after_h: float = 4, escalate_after_h: float = 12) -> list[dict]:
+    async def care_nudges(self, person: str, now: Optional[int] = None, remind_after_h: float = 4, escalate_after_h: float = 12,
+                          hold: Optional[set] = None) -> list[dict]:
         """Reminders due: unacknowledged changes older than remind_after_h -> 'remind' that carer; older than escalate_after_h ->
         'escalate' to the other carers. Each (kind, carer, dose, recipient) is produced once: claiming it is a conditional write."""
         t = now_ms() if now is None else now
@@ -178,6 +179,8 @@ class CareMixin:
                 if u["age_hours"] >= escalate_after_h:
                     todo += [("escalate", o) for o in div["carers"] if o != carer]
                 for kind, to in todo:
+                    if hold and to.lower() in hold:          # quiet hours: leave it unclaimed, it is sent when they end
+                        continue
                     key = f"{kind}|{carer}|{u['dose']}|{to}"
                     r = await self._q("MERGE (n:Nudge {key:$k}) ON CREATE SET n.at=$t, n.fresh=true "
                                       "WITH n, n.fresh AS fresh SET n.fresh=false RETURN fresh", {"k": key, "t": t}, checked=True)

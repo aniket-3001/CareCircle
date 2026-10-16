@@ -317,3 +317,15 @@ async def test_account_export_holds_the_record_and_nothing_secret(client):
     assert [x["drug"] for x in c["regimen"]] == ["warfarin"] and c["timeline"] and "readings" in c and "appointments" in c
     assert "hash" not in r.text and "salt" not in r.text and PW not in r.text
     assert (await client.get("/v1/account/export")).status_code == 401
+
+
+async def test_quiet_hours_are_saved_validated_and_per_account(client):
+    token, _ = await account(client, "q@tt.test", "Quin")
+    assert (await client.get("/v1/account/quiet", headers=auth(token))).json() == {"from": None, "to": None, "tz": 0}
+    r = await client.put("/v1/account/quiet", json={"start": 22, "end": 7, "tz": 330}, headers=auth(token))
+    assert r.json() == {"from": 22, "to": 7, "tz": 330}
+    assert (await client.put("/v1/account/quiet", json={"start": 25, "end": 7, "tz": 0}, headers=auth(token))).status_code == 400
+    assert (await client.put("/v1/account/quiet", json={"start": 22, "tz": 0}, headers=auth(token))).status_code == 400      # needs both
+    assert (await client.get("/v1/account/quiet", headers=auth(token))).json()["from"] == 22
+    assert (await client.put("/v1/account/quiet", json={"tz": 0}, headers=auth(token))).json()["from"] is None             # off
+    assert (await client.get("/v1/account/quiet")).status_code == 401

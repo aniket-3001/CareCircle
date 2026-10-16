@@ -238,10 +238,12 @@ class Bot:
                 if agent in subbed:
                     circles.setdefault(circle, set()).add(agent)
         sent = 0
+        from .accounts import Accounts
+        hold = await Accounts(self.gm).quiet_now(now if now is not None else int(time.time() * 1000))
         for circle, members in circles.items():
             mem = self.gm.open(sorted(members)[0], circle)
             for person in (await mem.care_people())["patients"]:
-                for n in await mem.care_nudges(person, now=now):
+                for n in await mem.care_nudges(person, now=now, hold=hold):
                     text = n["message"]["text"]
                     for chat in chats.get(n["notify"], []):
                         self.api.send(chat, text)

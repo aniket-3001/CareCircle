@@ -33,6 +33,14 @@ DEMO_ACCOUNTS = (("ravi@demo.carecircle.app", "Ravi"), ("meena@demo.carecircle.a
 SHARED_CIRCLE = "demo-shared"
 
 
+def in_quiet(quiet_from: Optional[int], quiet_to: Optional[int], tz_min: int, now: int) -> bool:
+    """Is it inside this person's quiet hours? `tz_min` is their offset from UTC in minutes (India: 330). A window like 22 to 7 runs through midnight."""
+    if quiet_from is None or quiet_to is None or quiet_from == quiet_to:
+        return False
+    hour = ((now // 60_000 + tz_min) % 1440) // 60
+    return quiet_from <= hour < quiet_to if quiet_from < quiet_to else hour >= quiet_from or hour < quiet_to
+
+
 class AuthProblem(Exception):
     """A failure with words a person can act on. `status` is the HTTP status to send."""
 
@@ -150,6 +158,28 @@ class Accounts:
             raise AuthProblem("A name cannot be empty.")
         await self._q("MATCH (a:Account {agent:$ag}) SET a.name=$n", {"ag": agent, "n": name})
         return await self.by_agent(agent)  # type: ignore[return-value]
+
+    async def quiet_hours(self, agent: str) -> dict:
+        rows = await self._q("MATCH (a:Account {agent:$ag}) RETURN a.quiet_from, a.quiet_to, a.tz", {"ag": agent})
+        r = rows[0] if rows else (None, None, 0)
+        return {"from": r[0], "to": r[1], "tz": int(r[2] or 0)}
+
+    async def set_quiet_hours(self, agent: str, start: Optional[int], end: Optional[int], tz: int) -> dict:
+        """Hours (0 to 23) during which reminders are held back, not dropped: they go out when the window ends. Both None turns it off."""
+        if (start is None) != (end is None):
+            raise AuthProblem("Give both a start and an end hour, or neither.")
+        for h in (start, end):
+            if h is not None and not 0 <= h <= 23:
+                raise AuthProblem("Hours are 0 to 23.")
+        if not -840 <= tz <= 840:
+            raise AuthProblem("That time zone is not valid.")
+        await self._q("MATCH (a:Account {agent:$ag}) SET a.quiet_from=$f, a.quiet_to=$t, a.tz=$z", {"ag": agent, "f": start, "t": end, "z": int(tz)})
+        return await self.quiet_hours(agent)
+
+    async def quiet_now(self, now: int) -> set[str]:
+        """Accounts (lower-case agent ids) that are inside their quiet hours at `now`."""
+        rows = await self._q("MATCH (a:Account) WHERE a.quiet_from IS NOT NULL RETURN a.agent, a.quiet_from, a.quiet_to, a.tz")
+        return {r[0].lower() for r in rows if in_quiet(r[1], r[2], int(r[3] or 0), now)}
 
     async def change_password(self, agent: str, old: str, new: str, keep_token: str = "") -> None:
         row = await self.by_agent(agent)
