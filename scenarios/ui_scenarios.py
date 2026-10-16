@@ -410,6 +410,41 @@ def u12(w, b, r):
     ctx.close()
 
 
+@scenario("U13", "Today's doses: set the times from the label, mark one given, and a second carer is told who did")
+def u13(w, b, r):
+    errs = []
+    ctx, pg = new_page(b, errs=errs)
+    email = f"u13-{rid()}@scenario.test"
+    ui_signup(pg, "Dosey", email)
+    ui_circle(pg, "Mum's medicines", "Mum")
+    expect(pg.get_by_text("Nothing on record yet")).to_be_visible()
+    u = api_user(w, email)
+    c = circle_of(u)
+    u.ok(c, "care_record", person="mum", drug="metformin", dose_text="500 mg", freq_text="twice daily")
+    pg.reload()
+    expect(pg.get_by_test_id("unscheduled")).to_be_visible(timeout=20000)
+    r.check("The label says twice a day" in pg.get_by_test_id("unscheduled").inner_text(), "a medicine with no times says what its label says", pg.get_by_test_id("unscheduled").inner_text())
+    pg.get_by_test_id("set-times").first.click()
+    inputs = pg.get_by_test_id("time-input")
+    r.check(inputs.count() == 2 and inputs.nth(0).input_value() == "08:00" and inputs.nth(1).input_value() == "20:00", "the suggested times are offered, editable", inputs.count())
+    inputs.nth(1).fill("21:00")
+    pg.get_by_test_id("save-times").click()
+    expect(pg.get_by_test_id("slot")).to_have_count(2, timeout=15000)
+    r.check(pg.get_by_test_id("slot").nth(1).inner_text().startswith("21:00") or "21:00" in pg.get_by_test_id("slot").nth(1).inner_text(), "the times a person confirmed are the ones on the checklist")
+    r.check(pg.get_by_test_id("slot").nth(0).get_attribute("data-state") in ("given", "due", "not_marked", "upcoming"), "each slot says where it stands")
+    pg.get_by_test_id("give-slot").first.click()
+    expect(pg.get_by_test_id("slot").first).to_have_attribute("data-state", "given", timeout=15000)
+    reg = u.ok(c, "care_today", person="mum")
+    r.check([i["state"] for i in reg["items"]].count("given") == 1, "exactly one slot is recorded as given", reg["counts"])
+    first = reg["items"][0]
+    again = u.ok(c, "care_give_slot", person="mum", dose_id=first["dose_id"], time=first["time"])
+    r.check(again["given"] is False and again.get("already_given_by"), "a second try on the same slot is refused and names who gave it", again)
+    pg.reload()
+    expect(pg.get_by_test_id("checklist")).to_be_visible(timeout=20000)
+    r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
+    ctx.close()
+
+
 def main():
     w = World()
     total = failed = 0
