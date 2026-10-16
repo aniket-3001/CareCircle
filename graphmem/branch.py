@@ -20,12 +20,14 @@ task/handoff, not per tiny action; forking is refused above MAX_FORK_NODES and p
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+import random
 import uuid
 from typing import Optional
 
-from .db import new_id, norm, now_ms, validate_tenant
+from .db import Overloaded, new_id, norm, now_ms, validate_tenant
 from .memory import TenantMemory
 from .policy import GraphMem, PermissionDenied
 
@@ -35,6 +37,23 @@ MAX_FORK_NODES = int(os.getenv("GRAPHMEM_MAX_FORK_NODES", "500000"))
 
 class ForkError(Exception):
     pass
+
+
+async def copy_graph(client, src: str, dst: str, attempts: int = 6) -> None:
+    """GRAPH.COPY forks the database process, and the operating system can refuse a fork for a moment (memory pressure, another save
+    running). Nothing has been copied when it does, so asking again is safe; after a few tries the caller is told to come back shortly."""
+    delay = 0.1
+    for attempt in range(attempts):
+        try:
+            await client.execute_command("GRAPH.COPY", src, dst)
+            return
+        except Exception as e:  # noqa: BLE001
+            if "could not fork" not in str(e).lower():
+                raise
+            if attempt == attempts - 1:
+                raise Overloaded("the database could not take a copy just now; try again shortly") from e
+            await asyncio.sleep(delay * (0.5 + random.random()))
+            delay *= 2
 
 
 async def _need(gm: GraphMem, agent: str, tenant: str, scope: str) -> None:
@@ -67,7 +86,7 @@ async def fork(gm: GraphMem, agent: str, tenant: str, label: str = "") -> dict:
     fid = uuid.uuid4().hex[:12]
     name = gm.db.fork_graph_name(tenant, fid)
     snap_ts = now_ms()                                    # taken before the copy: writes at/after this are "since the fork"
-    await gm.db.client.execute_command("GRAPH.COPY", gm.db.graph_name(tenant), name)
+    await copy_graph(gm.db.client, gm.db.graph_name(tenant), name)
     fork_ts = now_ms()                                    # taken after the copy: items stamped >= this were made in the fork
     await ctl.query("CREATE (:Fork {id:$id, tenant:$t, graph:$g, snap_ts:$s, fork_ts:$f, status:'open', owner:$o, label:$l, at:$f})",
                     {"id": fid, "t": tenant, "g": name, "s": snap_ts, "f": fork_ts, "o": agent, "l": label[:120]})

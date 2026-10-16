@@ -112,3 +112,39 @@ async def test_permissions_limits_discard(gm, monkeypatch):
             await branch.fork(gm, "tt-a", t)
     finally:
         await cleanup(gm, f["id"])
+
+
+class FakeClient:
+    def __init__(self, refusals, msg="GRAPH.COPY failed, could not fork"):
+        self.calls, self.refusals, self.msg = 0, refusals, msg
+
+    async def execute_command(self, *a):
+        self.calls += 1
+        if self.calls <= self.refusals:
+            raise Exception(self.msg)
+
+
+async def test_a_refused_fork_is_retried_then_succeeds():
+    from graphmem.branch import copy_graph
+    c = FakeClient(2)
+    await copy_graph(c, "a", "b")
+    assert c.calls == 3
+
+
+async def test_a_fork_refused_every_time_is_a_busy_signal_not_a_crash():
+    import pytest
+    from graphmem import Overloaded
+    from graphmem.branch import copy_graph
+    c = FakeClient(99)
+    with pytest.raises(Overloaded):
+        await copy_graph(c, "a", "b", attempts=3)
+    assert c.calls == 3
+
+
+async def test_other_copy_errors_are_not_retried():
+    import pytest
+    from graphmem.branch import copy_graph
+    c = FakeClient(99, "ERR invalid graph")
+    with pytest.raises(Exception, match="invalid graph"):
+        await copy_graph(c, "a", "b")
+    assert c.calls == 1
