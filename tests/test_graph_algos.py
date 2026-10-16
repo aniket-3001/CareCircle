@@ -57,8 +57,10 @@ async def test_influence_ranks_the_hub_first(gm):
     hc = await m.graph_influence("harmonic", label="Task", top=10)
     assert [r["ref"] for r in hc["rows"]] == ["p", "q", "r", "s"]                 # along p -> q -> r -> s the start reaches the rest fastest, the end reaches nothing
     assert hc["rows"][-1]["score"] == 0 and "HarmonicCentrality" in hc["cypher"]
-    with pytest.raises(ValueError, match="betweenness is not offered"):
-        await m.graph_influence("betweenness")                                    # FalkorDB 4.22's version of it is not reliable, so it is refused, not answered
+    bt = await m.graph_influence("betweenness", label="Task", top=10)               # exact, computed by the server: along p -> q -> r -> s the two middle records carry the paths
+    scores = {r["ref"]: r["score"] for r in bt["rows"]}
+    assert scores == {"p": 0, "q": 2, "r": 2, "s": 0} and {r["ref"] for r in bt["rows"][:2]} == {"q", "r"}
+    assert "Brandes" in bt["computed_by"] and "MATCH" in bt["cypher"]
 
 
 async def test_communities_find_the_islands(gm):
@@ -94,8 +96,7 @@ async def test_an_empty_graph_gives_empty_answers(gm):
 
 
 @pytest.mark.parametrize("call,msg", [
-    (lambda m: m.graph_influence(metric="degree"), "pagerank"),
-    (lambda m: m.graph_influence(metric="betweenness"), "not offered"),
+    (lambda m: m.graph_influence(metric="degree"), "betweenness"),
     (lambda m: m.graph_communities(method="louvain"), "wcc"),
     (lambda m: m.graph_influence(label="Nope"), "no node label"),
     (lambda m: m.graph_influence(label="Entity) DETACH DELETE (n"), "name of a node label"),
@@ -254,3 +255,81 @@ async def test_a_search_that_would_visit_too_much_stops_and_says_so(gm, monkeypa
     monkeypatch.setattr(graph_algos, "MAX_VISIT", 10)
     r = await m.graph_path("s", "e", max_hops=5)
     assert r["found"] is False and "stopped after" in r["reason"]
+
+
+# ---------------------------------------------------------------- exact betweenness
+import random  # noqa: E402
+
+from graphmem.graph_algos import brandes  # noqa: E402
+
+
+def naive_betweenness(nodes, edges):
+    """The definition, the slow way: all-pairs shortest-path counts, then for every (s, t) the share of s-t shortest paths through each other node."""
+    from collections import deque
+    adj = {v: set() for v in nodes}
+    for a, b in edges:
+        if a != b:
+            adj[a].add(b)
+    dist, sigma = {}, {}
+    for s in nodes:
+        d, sg, q = {s: 0}, {s: 1}, deque([s])
+        while q:
+            v = q.popleft()
+            for w in adj[v]:
+                if w not in d:
+                    d[w] = d[v] + 1
+                    q.append(w)
+                if d[w] == d[v] + 1:
+                    sg[w] = sg.get(w, 0) + sg[v]
+        dist[s], sigma[s] = d, sg
+    out = {v: 0.0 for v in nodes}
+    for s in nodes:
+        for t in nodes:
+            if s == t or t not in dist[s]:
+                continue
+            for v in nodes:
+                if v not in (s, t) and v in dist[s] and t in dist[v] and dist[s][v] + dist[v][t] == dist[s][t]:
+                    out[v] += sigma[s][v] * sigma[v][t] / sigma[s][t]
+    return out
+
+
+def test_betweenness_by_hand():
+    chain = brandes([1, 2, 3, 4, 5], [(1, 2), (2, 3), (3, 4), (4, 5)])
+    assert chain == {1: 0, 2: 3, 3: 4, 4: 3, 5: 0}                                  # node 3 lies on 1-4, 1-5, 2-4, 2-5
+    diamond = brandes(list("sabe"), [("s", "a"), ("s", "b"), ("a", "e"), ("b", "e")])
+    assert diamond == {"s": 0, "a": 0.5, "b": 0.5, "e": 0}                          # two equal routes share the credit
+    assert brandes(list("hxy"), [("h", "x"), ("h", "y")]) == {"h": 0, "x": 0, "y": 0}      # a hub that only points outward lies between nothing
+    assert brandes(list("ab"), [("a", "b"), ("a", "b"), ("a", "a")]) == {"a": 0, "b": 0}    # parallel and self links change nothing
+    assert brandes([], []) == {} and brandes(["only"], []) == {"only": 0}
+
+
+def test_betweenness_agrees_with_the_definition_on_random_graphs():
+    rng = random.Random(7)
+    for _ in range(60):
+        n = rng.randint(2, 9)
+        nodes = list(range(n))
+        edges = [(rng.randrange(n), rng.randrange(n)) for _ in range(rng.randint(0, 20))]
+        got, want = brandes(nodes, edges), naive_betweenness(nodes, edges)
+        assert all(abs(got[v] - want[v]) < 1e-9 for v in nodes), (nodes, edges, got, want)
+
+
+async def test_betweenness_is_repeatable_and_refuses_a_graph_too_large_for_an_exact_answer(gm, monkeypatch):
+    from graphmem import graph_algos
+    t, m = await world(gm)
+    first = await m.graph_influence("betweenness")
+    assert [await m.graph_influence("betweenness") for _ in range(5)] == [first] * 5                # the same every time, unlike FalkorDB 4.22's own
+    monkeypatch.setattr(graph_algos, "MAX_BETWEENNESS_WORK", 10)
+    with pytest.raises(ValueError, match="too large for exact betweenness"):
+        await m.graph_influence("betweenness")
+    assert (await m.graph_influence("betweenness", label="Skill"))["rows"]                         # narrowing by label brings it back under the limit
+
+
+async def test_a_graph_with_hardly_any_links_says_so(gm):
+    t = tid(gm, "ga-thin")
+    await gm.grant("ann", t, ("read", "write"))
+    m = gm.open("ann", t)
+    await m._q("UNWIND range(1, 6) AS i CREATE (:Entity {key: 'e' + toString(i)})")             # six records, no links at all
+    for r in (await m.graph_influence("pagerank"), await m.graph_influence("betweenness"), await m.graph_communities()):
+        assert "6 of 6 records are not linked" in r["note"]
+    rich = await world(gm, "ga-rich")                                                           # nine links among eleven records, two of them in a pair: not shallow
+    assert "note" not in await rich[1].graph_influence("pagerank") and "note" not in await rich[1].graph_communities()
