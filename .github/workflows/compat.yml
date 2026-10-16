@@ -17,5 +17,9 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: pip install -r requirements.txt -r requirements-integrations.txt
+      - uses: actions/cache@v4            # the DDInter portal is slow and sometimes down: keep the verified copy (scripts/fetch_reference.py checks it against its manifest)
+        with:
+          path: data/ref
+          key: reference-data-v1
       - run: python scripts/fetch_reference.py && python -c "from carecircle import reference as r; print(r.load())"
       - run: CC_LLM=0 CC_EXPECT_DB_VERSION=60002 python -m pytest -q tests
