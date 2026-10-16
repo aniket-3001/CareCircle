@@ -89,6 +89,7 @@ async def test_check_staleness_and_nudges_once(gm):
 
 async def test_double_dose_race_has_one_winner(gm):
     t, c = await circle(gm, "ravi", "meena")
+    await c["ravi"].care_record("mum", "metformin", dose_text="500 mg")                 # a dose can only be given of a medicine that is on the record
     res = await asyncio.gather(*[c["ravi" if i % 2 else "meena"].care_give("mum", "metformin", "2026-10-16 08:00") for i in range(10)])
     assert sum(x["given"] for x in res) == 1
     assert all(x["given"] or x["already_given_by"] in ("ravi", "meena") for x in res)
@@ -346,7 +347,7 @@ async def test_forget_entry_leaves_a_receipt_and_no_content(gm):
 
 async def test_forget_person_needs_the_name_and_removes_everything(gm):
     t, c, r = await _regimen_with_conflict(gm)
-    await c["ravi"].care_give("asha", "metformin", "slot-1")
+    await c["ravi"].care_give("asha", "metformin", "2026-10-16 08:00")
     with pytest.raises(ValueError):
         await c["ravi"].care_forget_person("asha", confirm="nope")
     out = await c["ravi"].care_forget_person("asha", confirm="Asha")

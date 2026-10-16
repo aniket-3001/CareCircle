@@ -16,6 +16,7 @@ async def _two(gm, name):
 async def test_watched_dose_needs_a_different_carer(gm):
     ravi, meena = await _two(gm, "cu")
     await ravi.care_record("asha", "warfarin", dose_text="4 mg")
+    await ravi.care_record("asha", "metformin", dose_text="500 mg")
     assert (await ravi.care_give("asha", "metformin", "2026-10-16 08:00")).get("needs_second_carer") is None      # not watched: nothing extra
     await ravi.care_watch("asha", "warfarin")
     assert await ravi.care_watched("asha") == ["warfarin"]
