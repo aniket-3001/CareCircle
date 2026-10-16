@@ -197,6 +197,12 @@ with sync_playwright() as p:
     pg.wait_for_timeout(1200)
     print("7 history ok")
 
+    pg.get_by_label("About and safety").click()                                  # help: plain answers to the first questions
+    pg.get_by_text("How do I add a medicine?").click()
+    expect(pg.get_by_text("Nothing is saved until you confirm")).to_be_visible(timeout=10000)
+    pg.locator("dialog[open] .icon-btn[aria-label=Close]").click()
+    print("7b help ok")
+
     # ---- helper, English then Hindi
     pg.get_by_test_id("open-assistant").click()
     pg.locator("#ask").fill("what is on record")
