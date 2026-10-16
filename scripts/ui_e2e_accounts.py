@@ -144,6 +144,14 @@ with sync_playwright() as p:
     pg.get_by_test_id("open-account").click()
     pg.get_by_test_id("display").get_by_label("Normal").dispatch_event("click")
     assert pg.evaluate("document.documentElement.dataset.text") == "normal"
+    q = pg.get_by_test_id("quiet-hours")                                         # quiet hours are saved on the server
+    q.get_by_label("From").select_option("22")
+    q.get_by_label("Until").select_option("7")
+    q.get_by_role("button", name="Save").click()
+    expect(pg.get_by_text("Quiet hours saved")).to_be_visible(timeout=10000)
+    pg.reload()
+    pg.get_by_test_id("open-account").click()
+    expect(pg.get_by_test_id("quiet-hours").get_by_label("From")).to_have_value("22", timeout=10000)
     pg.get_by_test_id("signout-all").click()                                    # signs out every device, this one included
     expect(pg.get_by_test_id("open-signin")).to_be_visible(timeout=15000)
     pg.get_by_test_id("open-signin").click()
