@@ -131,8 +131,8 @@ export function AddScreen(): React.JSX.Element {
             </section>
           )}
           {props.map((p, i) => (
-            <motion.div key={`${p.quote}-${i}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-              <ProposalCard p={p} kind={KINDS[result?.source.kind ?? 'typed'] ?? 'typed'} sourceText={result?.text ?? ''} sourceId={result?.source_id ?? ''} onDone={() => setProps((cur) => cur.filter((_, j) => j !== i))} />
+            <motion.div key={`${p.drug_candidates[0]?.name ?? ''}|${p.quote}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+              <ProposalCard p={p} kind={KINDS[result?.source.kind ?? 'typed'] ?? 'typed'} sourceText={result?.text ?? ''} sourceId={result?.source_id ?? ''} goToday={props.length <= 1} onDone={() => setProps((cur) => cur.filter((_, j) => j !== i))} />
             </motion.div>
           ))}
         </div>
@@ -141,10 +141,15 @@ export function AddScreen(): React.JSX.Element {
   );
 }
 
-export function ProposalCard({ p, kind, sourceText, sourceId = '', onDone }: { p: Proposal; kind: 'photo' | 'voice' | 'document' | 'typed'; sourceText: string; sourceId?: string; onDone: () => void }): React.JSX.Element {
+export function ProposalCard({ p, kind, sourceText, sourceId = '', goToday = true, onDone }: { p: Proposal; kind: 'photo' | 'voice' | 'document' | 'typed'; sourceText: string; sourceId?: string; goToday?: boolean; onDone: () => void }): React.JSX.Element {
   const app = useApp();
   const toast = useToast();
-  const [drug, setDrug] = useState(p.drug_candidates[0]?.name ?? '');
+  const [pick, setPick] = useState(p.drug_candidates[0]?.name ?? '');
+  const [typed, setTyped] = useState('');
+  const OTHER = '__other__';
+  const drug = pick === OTHER ? typed.trim().toLowerCase() : pick;
+  const picked = p.drug_candidates.find((c) => c.name === pick);
+  const unchecked = pick === OTHER || !!picked?.unchecked;
   const [dose, setDose] = useState(p.dose_text);
   const [freq, setFreq] = useState(p.freq_text);
   const [busy, setBusy] = useState(false);
@@ -158,7 +163,7 @@ export function ProposalCard({ p, kind, sourceText, sourceId = '', onDone }: { p
       toast(`Saved ${title(drug)}. ${r.warning ? `${r.warning} ` : ''}The other carers will be asked to acknowledge it.`);
       app.bump();
       onDone();
-      app.go('today');
+      if (goToday) app.go('today');                      // with more proposals waiting (the ingredients of a combination), stay and confirm the rest
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Could not save');
       setBusy(false);
@@ -169,16 +174,29 @@ export function ProposalCard({ p, kind, sourceText, sourceId = '', onDone }: { p
     <section className="card" data-testid="proposal">
       <div className="row row--wrap">
         {p.verified ? <Pill tone="ok">quote verified</Pill> : <Pill tone="warn">quote not found in source</Pill>}
-        <Pill>{p.method === 'bedrock' ? 'model-assisted' : 'rules'}</Pill>
+        <Pill>{p.method === 'bedrock' ? 'model-assisted' : p.method === 'brand list' ? 'brand list' : 'rules'}</Pill>
       </div>
+      {p.combination && (
+        <p className="muted small" data-testid="combination-note">
+          {tr('This is a combination product.')} <b>{p.combination}</b> {tr('usually contains')} {(p.combination_ingredients ?? []).map(title).join(' + ')}
+          {p.combination_strength ? ` (${tr('printed strength')}: ${p.combination_strength})` : ''}. {tr('Each ingredient is saved on its own, so confirm each one. From a hand-written list: check the pack.')}
+        </p>
+      )}
       <blockquote className="quote">“{p.quote}”</blockquote>
       <div className="grid-2">
         <label className="field">
           {tr('Medicine (pick the right one)')}
-          <select value={drug} onChange={(e) => setDrug(e.target.value)}>
-            {p.drug_candidates.map((c) => <option key={c.name} value={c.name}>{title(c.name)}</option>)}
+          <select value={pick} onChange={(e) => setPick(e.target.value)}>
+            {p.drug_candidates.map((c) => <option key={c.name} value={c.name}>{title(c.name)}{c.unchecked ? ` (${tr('not checked')})` : ''}</option>)}
+            <option value={OTHER}>{tr('Another medicine: type its name')}</option>
           </select>
         </label>
+        {pick === OTHER && (
+          <label className="field">
+            {tr('Medicine name')}
+            <input type="text" value={typed} maxLength={80} onChange={(e) => setTyped(e.target.value)} data-testid="other-drug" />
+          </label>
+        )}
         <label className="field">
           {tr('For')}
           <input type="text" value={app.session.person} readOnly aria-readonly="true" />
@@ -192,6 +210,7 @@ export function ProposalCard({ p, kind, sourceText, sourceId = '', onDone }: { p
           <input type="text" value={freq} onChange={(e) => setFreq(e.target.value)} />
         </label>
       </div>
+      {unchecked && <p className="muted small" data-testid="unchecked-note">{tr('If this medicine is not in our reference data it is recorded, but nothing is checked for it, and the verdict says so.')}</p>}
       <div className="row">
         <button type="button" className="btn" disabled={busy || !drug} onClick={() => void confirm()}>{tr('Confirm and save')}</button>
         <button type="button" className="btn btn--soft" onClick={onDone}>{tr('Discard')}</button>

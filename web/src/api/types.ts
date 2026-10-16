@@ -91,6 +91,9 @@ export interface Reminder extends Nudge {
 export interface Candidate {
   name: string;
   score: number;
+  /** Not in the reference data: it can be recorded, but nothing is checked for it. */
+  unchecked?: boolean;
+  via?: string;
 }
 
 export interface Proposal {
@@ -101,6 +104,10 @@ export interface Proposal {
   method: string;
   verified: boolean;
   needs_human: boolean;
+  /** Set when the text named a combination product (Telma-AM): one proposal is made for each ingredient. */
+  combination?: string;
+  combination_ingredients?: string[];
+  combination_strength?: string;
 }
 
 export interface IntakeResult {
