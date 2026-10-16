@@ -77,6 +77,9 @@ async def invoke(gm: GraphMem, agent: str, tenant: str, op: str, args: dict[str,
     if not isinstance(args, dict):
         raise TypeError("arguments must be an object")
     check_text(args)
+    mem = gm.open(agent, tenant)
+    if mem._guard:                                  # the scope the table above names is enforced here, once, for every operation: an operation that
+        await mem._guard(OPS[op])                   # writes through a path that skips the per-query check (a claim, a delete) cannot be reached with a read-only key
     if op == "forget_fact":  # must also delete copies published to shared spaces
         try:
             inspect.signature(TenantMemory.forget_fact).bind(None, **args)
@@ -86,7 +89,7 @@ async def invoke(gm: GraphMem, agent: str, tenant: str, op: str, args: dict[str,
     for key in ("limit", "n"):
         if key in args and (isinstance(args[key], bool) or not isinstance(args[key], int) or not 1 <= args[key] <= MAX_LIMIT):
             raise ValueError(f"{key} must be a whole number from 1 to {MAX_LIMIT}")
-    fn = getattr(gm.open(agent, tenant), op)
+    fn = getattr(mem, op)
     try:
         inspect.signature(fn).bind(**args)
     except TypeError as e:

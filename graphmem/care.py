@@ -224,6 +224,8 @@ class CareMixin:
                           hold: Optional[set] = None) -> list[dict]:
         """Reminders due: unacknowledged changes older than remind_after_h -> 'remind' that carer; older than escalate_after_h ->
         'escalate' to the other carers. Each (kind, carer, dose, recipient) is produced once: claiming it is a conditional write."""
+        if self._guard:                                  # it only lists what is due, but each reminder it returns is claimed (used up): that is a write
+            await self._guard("write")
         t = now_ms() if now is None else now
         div = await self.care_divergence(person, t)
         sent = []
