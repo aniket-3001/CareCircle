@@ -322,7 +322,7 @@ class CareViewMixin:
         A collection of one Patient and the statements. This tool does not assign RxNorm or other medicine codes, so receiving systems must not treat the text as coded."""
         p = norm(person)
         rows = await self._q(
-            """MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p})
+            """MATCH (x:Dose {status:'confirmed', action:'set'})-[:FOR]->(:Person {id:$p})
                RETURN x.id, x.drug, x.dose_text, x.freq_text, x.valid_from, x.valid_to, x.cur, x.source_type, x.quote, x.verified, x.by
                ORDER BY x.valid_from""", {"p": p}, scope="read")
         entries = [{"fullUrl": f"urn:uuid:patient-{p}", "resource": {"resourceType": "Patient", "id": p, "name": [{"text": _title(p)}],
