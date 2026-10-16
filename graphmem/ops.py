@@ -63,6 +63,9 @@ async def invoke_space(gm: GraphMem, agent: str, space: str, op: str, args: dict
     return await fn(**args)
 
 
+MAX_LIMIT = 5000
+
+
 async def invoke(gm: GraphMem, agent: str, tenant: str, op: str, args: dict[str, Any]) -> Any:
     if op not in OPS:
         raise KeyError(f"unknown operation {op!r}")
@@ -74,6 +77,9 @@ async def invoke(gm: GraphMem, agent: str, tenant: str, op: str, args: dict[str,
         except TypeError as e:
             raise TypeError(f"{op}: {e}") from None
         return await spaces.forget_fact(gm, agent, tenant, **args)
+    for key in ("limit", "n"):
+        if key in args and (isinstance(args[key], bool) or not isinstance(args[key], int) or not 1 <= args[key] <= MAX_LIMIT):
+            raise ValueError(f"{key} must be a whole number from 1 to {MAX_LIMIT}")
     fn = getattr(gm.open(agent, tenant), op)
     try:
         inspect.signature(fn).bind(**args)

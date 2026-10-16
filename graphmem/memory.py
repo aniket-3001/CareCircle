@@ -46,10 +46,16 @@ def _props(node) -> dict:
     return dict(node.properties) if hasattr(node, "properties") else node
 
 
+MAX_EPISODE_CHARS = 100_000
+MAX_FACT_PART_CHARS = 500
+ROLE_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
+
+
 class TenantMemory(CareMixin, CareViewMixin, CareTrackMixin, CarePlanMixin, CareFollowupsMixin, CareCustodyMixin):
     def __init__(self, db: Db, tenant: str, agent: str, guard: Optional[Guard] = None, graph: Optional[str] = None,
                  extractor=None):
         self.db, self.tenant, self.agent, self._guard, self._graph = db, tenant, agent, guard, graph
+        self.peer_scopes = None            # set by GraphMem.open: looks up what another agent may do in this tenant
         self.extractor = extractor or RuleExtractor()
 
     # ---------------------------------------------------------------- plumbing
@@ -69,6 +75,14 @@ class TenantMemory(CareMixin, CareViewMixin, CareTrackMixin, CarePlanMixin, Care
     async def add_episode(self, session: str, role: str, content: str, *, agent: Optional[str] = None,
                           at: Optional[int] = None) -> dict:
         """Append an immutable event to a session. Ordering (seq + NEXT edge) is assigned atomically in-graph."""
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("an episode needs some content")
+        if len(content) > MAX_EPISODE_CHARS:
+            raise ValueError(f"an episode is limited to {MAX_EPISODE_CHARS} characters; store long documents in pieces")
+        if not isinstance(session, str) or not 1 <= len(session) <= 120:
+            raise ValueError("a session id is 1 to 120 characters")
+        if not ROLE_RE.match(role or ""):
+            raise ValueError("role is a short lowercase label such as user, agent, assistant, system or tool")
         ts, eid = at or now_ms(), new_id("ep")
         rows = await self._q(
             """
@@ -158,6 +172,11 @@ class TenantMemory(CareMixin, CareViewMixin, CareTrackMixin, CarePlanMixin, Care
                           inferred_from: Iterable[str] = ()) -> dict:
         """Create-or-reinforce a fact. `exclusive` predicates (one value at a time, e.g. 'lives_in') supersede
         the previous current value instead of coexisting; the old fact is kept, closed, and linked via SUPERSEDES."""
+        for label, part in (("subject", subject), ("predicate", predicate), ("object", obj)):
+            if not isinstance(part, str) or not part.strip():
+                raise ValueError(f"a fact needs a {label}")
+            if len(part) > MAX_FACT_PART_CHARS:
+                raise ValueError(f"the {label} of a fact is limited to {MAX_FACT_PART_CHARS} characters")
         ts = at or now_ms()
         fid, skey, okey, pred = new_id("fct"), norm(subject), norm(obj), norm(predicate)
         rows = await self._q(
@@ -399,7 +418,12 @@ class TenantMemory(CareMixin, CareViewMixin, CareTrackMixin, CarePlanMixin, Care
 
     async def handoff(self, task_id: str, to_agent: str, note: str = "", *, plan_id: Optional[str] = None,
                       expected_version: Optional[int] = None) -> bool:
-        """Owner hands the task to another agent. Fails (False) if the caller is not the owner or state moved on."""
+        """Owner hands the task to another agent. Fails (False) if the caller is not the owner or state moved on. The receiver must be able to
+        write in this tenant: a task handed to an agent that cannot see it would be stranded."""
+        if self.peer_scopes is not None:
+            have = await self.peer_scopes(to_agent)
+            if not ({"write", "admin"} & have):
+                raise ValueError(f"{to_agent!r} has no write access to this tenant, so a task cannot be handed to them")
         rows = await self._q(
             """
             MATCH (t:Task {id:$tid})

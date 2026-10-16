@@ -111,7 +111,9 @@ class GraphMem:
             if not ok:
                 raise PermissionDenied(f"agent {agent!r} lacks {scope!r} on tenant {tenant!r}")
 
-        return TenantMemory(self.db, tenant, agent, guard, extractor=self.extractor)
+        tm = TenantMemory(self.db, tenant, agent, guard, extractor=self.extractor)
+        tm.peer_scopes = lambda other: self.scopes(other, tenant)
+        return tm
 
     async def forget_tenant(self, agent: str, tenant: str) -> None:
         if "admin" not in await self.scopes(agent, tenant):
