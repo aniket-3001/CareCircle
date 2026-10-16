@@ -49,7 +49,7 @@ def args_model(name: str, info: dict):
 
 
 def describe(name: str, info: dict) -> str:
-    return f"{info['doc'] or name} (memory operation, {info['scope']} access)"
+    return f"{info.get('help') or info['doc'] or name} (memory operation, {info['scope']} access)"
 
 
 def caller(base: str, headers: dict, tenant: str, name: str, transport=None, async_transport=None):

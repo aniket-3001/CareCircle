@@ -46,6 +46,7 @@ def describe() -> dict[str, dict]:
         fn = getattr(TenantMemory, name)
         params = [p for p in inspect.signature(fn).parameters.values() if p.name != "self"]
         out[name] = {"scope": scope, "doc": (inspect.getdoc(fn) or "").split("\n")[0],
+                     "help": " ".join((inspect.getdoc(fn) or "").split())[:700],          # the whole docstring, for a model that reads tool descriptions
                      "args": [{"name": p.name, "required": p.default is inspect.Parameter.empty} for p in params]}
     return out
 

@@ -114,7 +114,7 @@ class GraphAlgoMixin:
         return rows[0][0] if rows else None
 
     async def graph_schema(self) -> dict:
-        """What this graph holds: node labels and relationship types, each with a count."""
+        """What this graph holds: node labels and relationship types, each with a count. Call this first: the labels it lists are the only values the `label` arguments of the other graph_* operations accept."""
         nodes = await self._q("MATCH (n) WHERE NOT n:Schema RETURN labels(n)[0] AS l, count(n) AS c ORDER BY c DESC, l", scope="read")
         rels = await self._q("MATCH ()-[r]->() RETURN type(r) AS t, count(r) AS c ORDER BY c DESC, t", scope="read")
         return {"nodes": [{"label": r[0], "count": r[1]} for r in nodes], "relationships": [{"type": r[0], "count": r[1]} for r in rels],
@@ -122,7 +122,7 @@ class GraphAlgoMixin:
 
     async def graph_path(self, source: str, target: str, max_hops: int = 8, source_label: Optional[str] = None,
                          target_label: Optional[str] = None) -> dict:
-        """Shortest path between two nodes, ignoring edge direction: the nodes on it and the relationship between each pair."""
+        """Shortest path between two nodes, ignoring edge direction: the nodes on it and the relationship between each pair. `source` and `target` name a node by its id, key or name (for example a person's name or a medicine's name). `source_label` and `target_label` are optional node labels from graph_schema that narrow the match."""
         source, target = _ref(source, "source"), _ref(target, "target")
         hops = _clamp(max_hops, 1, MAX_HOPS, "max_hops")
         sl, tl = await self._label_arg(source_label), await self._label_arg(target_label)
@@ -160,7 +160,7 @@ class GraphAlgoMixin:
         return {"found": True, "length": len(types), "path": [shown[i] for i in ids], "relationships": types, "cypher": EXPAND}
 
     async def graph_influence(self, metric: str = "pagerank", label: Optional[str] = None, top: int = 10) -> dict:
-        """The most influential nodes: metric 'pagerank' (many well-connected nodes point here), 'harmonic' (how quickly a node reaches the rest of the graph, following the links' direction) or 'betweenness' (how many shortest paths between other nodes pass through it; exact, computed by this server)."""
+        """The most influential nodes: metric 'pagerank' (many well-connected nodes point here), 'harmonic' (how quickly a node reaches the rest of the graph, following the links' direction) or 'betweenness' (how many shortest paths between other nodes pass through it; exact, computed by this server). `label` is optional: a node label from graph_schema (such as Dose or Drug) to rank only those nodes; leave it out to rank every node. `top` is how many to return."""
         top = _clamp(top, 1, MAX_TOP, "top")
         lab = await self._label_arg(label)
         if metric == "pagerank":
@@ -209,7 +209,7 @@ class GraphAlgoMixin:
                 "cypher": f"{nq}  |  {eq}", **self._thin(*await self._unlinked(lab))}
 
     async def graph_communities(self, method: str = "wcc", label: Optional[str] = None, top: int = 10) -> dict:
-        """Groups of nodes that belong together: method 'wcc' (connected components) or 'labelpropagation' (communities inside a connected graph)."""
+        """Groups of nodes that belong together: method 'wcc' (connected components) or 'labelpropagation' (communities inside a connected graph). `label` is optional: a node label from graph_schema to group only those nodes. `top` is how many groups to return."""
         top = _clamp(top, 1, MAX_TOP, "top")
         lab = await self._label_arg(label)
         cfg = _cfg(lab)
@@ -232,7 +232,7 @@ class GraphAlgoMixin:
         return {"method": method, "label": lab, "groups": out, "nodes_in_graph": total, "cypher": cypher, **self._thin(*await self._unlinked(lab))}
 
     async def graph_neighbourhood(self, ref: str, depth: int = 2, label: Optional[str] = None, limit: int = 50) -> dict:
-        """Everything within `depth` hops of one node, ignoring direction, nearest first (at most `limit` nodes)."""
+        """Everything within `depth` hops of one node, ignoring direction, nearest first (at most `limit` nodes). `ref` names the node by its id, key or name; `label` is an optional node label from graph_schema that narrows the match."""
         ref = _ref(ref, "ref")
         depth = _clamp(depth, 1, 3, "depth")
         limit = _clamp(limit, 1, MAX_NEIGHBOURS, "limit")

@@ -333,3 +333,12 @@ async def test_a_graph_with_hardly_any_links_says_so(gm):
         assert "6 of 6 records are not linked" in r["note"]
     rich = await world(gm, "ga-rich")                                                           # nine links among eleven records, two of them in a pair: not shallow
     assert "note" not in await rich[1].graph_influence("pagerank") and "note" not in await rich[1].graph_communities()
+
+
+def test_the_catalogue_carries_the_whole_description_so_a_model_knows_what_each_argument_means():
+    listed = ops.describe()
+    for name in ("graph_schema", "graph_path", "graph_influence", "graph_communities", "graph_neighbourhood"):
+        assert "graph_schema" in listed[name]["help"] or name == "graph_schema"        # each says where its label values come from
+        assert listed[name]["help"].startswith(listed[name]["doc"][:40])
+    assert "id, key or name" in listed["graph_path"]["help"] and "optional node label" in listed["graph_path"]["help"]
+    assert all(len(v["help"]) <= 700 and "\n" not in v["help"] for v in listed.values())       # bounded, on one line, for every operation
