@@ -199,8 +199,9 @@ export interface CareGraph {
 
 export interface TimelineEvent {
   at: number;
-  kind: 'record' | 'stop' | 'ack' | 'give' | 'forget';
+  kind: 'record' | 'stop' | 'ack' | 'give' | 'forget' | 'mistake';
   dose?: string;
+  status?: 'confirmed' | 'pending' | 'mistake';
   who: string;
   text: string;
   quote: string;

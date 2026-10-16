@@ -74,6 +74,9 @@ export const HI_MORE: Record<string, string> = {
   // Account
   'Leave the demo': 'डेमो छोड़ें', 'Profile': 'प्रोफ़ाइल', 'Your name (other carers see it)': 'आपका नाम (दूसरे देखभालकर्ता देखते हैं)', 'Save': 'सहेजें',
   'The demo accounts are shared by everyone, so their name and password cannot be changed. Create your own account to do that.': 'डेमो खाते सबके साझा हैं, इसलिए उनका नाम और पासवर्ड नहीं बदला जा सकता। ऐसा करने के लिए अपना खाता बनाएँ।',
+  'Put it back': 'वापस रखें', 'Entered by mistake': 'गलती से दर्ज हुआ', 'Mark this entry as entered by mistake?': 'इस प्रविष्टि को गलती से दर्ज हुआ चिह्नित करें?',
+  'It comes off the current record and the entry before it counts again. It stays in the history, marked, with your name, and the owner or you can put it back.': 'यह मौजूदा रिकॉर्ड से हट जाती है और उससे पहले की प्रविष्टि फिर से मान्य हो जाती है। यह इतिहास में आपके नाम के साथ चिह्नित रहती है, और मालिक या आप इसे वापस रख सकते हैं।',
+  'Mark as entered by mistake': 'गलती से दर्ज हुआ चिह्नित करें',
   'Your circles': 'आपके सर्कल', 'You are not in a circle yet. Create one or join with a code below.': 'आप अभी किसी सर्कल में नहीं हैं। नीचे नया बनाएँ या कोड से जुड़ें।', 'Telegram': 'टेलीग्राम',
   'Add medicines by sending a photo, a voice note or text to the bot, and get reminders in the chat. It uses this account and the circle you pick.': 'बॉट को फ़ोटो, आवाज़ या टेक्स्ट भेजकर दवाएँ जोड़ें और चैट में रिमाइंडर पाएँ। यह इस खाते और आपके चुने सर्कल का उपयोग करता है।',
   'Unlink Telegram': 'टेलीग्राम अलग करें', 'Open': 'खोलें', 'Link Telegram': 'टेलीग्राम जोड़ें', 'Session': 'सत्र', 'Sign out': 'साइन आउट', 'Reset demo data': 'डेमो डेटा रीसेट करें',

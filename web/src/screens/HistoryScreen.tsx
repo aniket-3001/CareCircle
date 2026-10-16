@@ -1,4 +1,4 @@
-import { Download, Printer, ShieldCheck, Trash2 } from 'lucide-react';
+import { Download, Printer, RotateCcw, ShieldCheck, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Async } from '../components/Async';
 import { Hero } from '../components/Hero';
@@ -20,6 +20,9 @@ export function HistoryScreen(): React.JSX.Element {
   const [q, setQ] = useState('');
   const [kind, setKind] = useState<'all' | 'record' | 'ack' | 'give'>('all');
   const receipts = useLoad((a) => a.api.receipts());
+  const me = useLoad((a) => a.api.me());
+  const isOwner = !!me.data?.tenants[app.session.circle]?.includes('admin');      // only the owner can erase for good; the server enforces it too
+  const [mistake, setMistake] = useState<string | null>(null);
   const [asOf, setAsOf] = useState<number | null>(null);
   const [forgetting, setForgetting] = useState<string | null>(null);
   const [reason, setReason] = useState('');
@@ -30,6 +33,28 @@ export function HistoryScreen(): React.JSX.Element {
   const first = tl.data?.length ? Math.min(...tl.data.map((e) => e.at)) - 60_000 : t - 3_600_000;
   const at = asOf ?? t;
   const past = useLoad((a) => a.api.check(asOf ?? undefined), [asOf]);
+
+  async function doMistake(): Promise<void> {
+    if (!mistake) return;
+    try {
+      await app.api.markMistake(mistake, reason);
+      toast('Marked as entered by mistake. It stays in the history.');
+      setMistake(null); setReason('');
+      app.bump();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not mark it');
+    }
+  }
+
+  async function restore(id: string): Promise<void> {
+    try {
+      await app.api.restoreEntry(id);
+      toast('Put back on the record.');
+      app.bump();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not put it back');
+    }
+  }
 
   async function doForget(): Promise<void> {
     if (!forgetting) return;
@@ -99,7 +124,7 @@ export function HistoryScreen(): React.JSX.Element {
             <div className="row row--wrap">
               <button type="button" className="btn btn--soft" onClick={() => void exportFhir()}><Download size={18} aria-hidden="true" /> {tr('Export as FHIR (JSON)')}</button>
               <button type="button" className="btn btn--soft" onClick={() => window.print()}><Printer size={18} aria-hidden="true" /> {tr('Print a summary')}</button>
-              <button type="button" className="btn btn--soft" style={{ color: 'var(--danger)' }} onClick={() => setErase(true)}><Trash2 size={18} aria-hidden="true" /> Remove everything about {title(app.session.person)}</button>
+              {isOwner && <button type="button" className="btn btn--soft" style={{ color: 'var(--danger)' }} onClick={() => setErase(true)}><Trash2 size={18} aria-hidden="true" /> Remove everything about {title(app.session.person)}</button>}
             </div>
             <Async state={receipts}>
               {(r) => (r.length > 0 && (
@@ -134,8 +159,14 @@ export function HistoryScreen(): React.JSX.Element {
                         <div>{e.text}</div>
                         {e.quote && <div className="item__sub">“{e.quote}”</div>}
                         <div className="item__sub">{e.when} · {e.ago}</div>
-                        {(e.kind === 'record' || e.kind === 'stop') && e.dose && (
-                          <button type="button" className="btn btn--ghost btn--sm" style={{ color: 'var(--danger)', paddingInline: 0 }} onClick={() => setForgetting(e.dose!)}>{tr('Remove for good')}</button>
+                        {(e.kind === 'record' || e.kind === 'stop') && e.dose && e.status === 'mistake' && (
+                          <button type="button" className="btn btn--ghost btn--sm" style={{ paddingInline: 0 }} onClick={() => void restore(e.dose!)}><RotateCcw size={14} aria-hidden="true" /> {tr('Put it back')}</button>
+                        )}
+                        {(e.kind === 'record' || e.kind === 'stop') && e.dose && e.status !== 'mistake' && (
+                          <button type="button" className="btn btn--ghost btn--sm" style={{ paddingInline: 0 }} onClick={() => setMistake(e.dose!)} data-testid="mark-mistake">{tr('Entered by mistake')}</button>
+                        )}
+                        {isOwner && (e.kind === 'record' || e.kind === 'stop') && e.dose && (
+                          <button type="button" className="btn btn--ghost btn--sm" style={{ color: 'var(--danger)', paddingInline: 0, marginLeft: 12 }} onClick={() => setForgetting(e.dose!)}>{tr('Remove for good')}</button>
                         )}
                       </li>
                     ))}
@@ -153,6 +184,11 @@ export function HistoryScreen(): React.JSX.Element {
         <p>{tr('Its medicine, dose, quoted line, links and acknowledgements are deleted from the graph and cannot be brought back. A receipt with a hash of what was removed stays.')}</p>
         <label className="field">{tr('Reason (optional)')}<input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. entered by mistake" /></label>
         <button type="button" className="btn btn--danger" onClick={() => void doForget()}>{tr('Remove for good')}</button>
+      </Sheet>
+      <Sheet open={mistake !== null} title={tr('Mark this entry as entered by mistake?')} onClose={() => setMistake(null)}>
+        <p>{tr('It comes off the current record and the entry before it counts again. It stays in the history, marked, with your name, and the owner or you can put it back.')}</p>
+        <label className="field">{tr('Reason (optional)')}<input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. should have been 4 mg" /></label>
+        <button type="button" className="btn" onClick={() => void doMistake()}>{tr('Mark as entered by mistake')}</button>
       </Sheet>
       <Sheet open={erase} title={`Remove everything about ${title(app.session.person)}?`} onClose={() => setErase(false)}>
         <p>{tr('Every entry, dose record and reminder about this person is deleted. Type their name to confirm.')}</p>

@@ -112,6 +112,12 @@ with sync_playwright() as p:
     with pg.expect_download() as dl:
         pg.get_by_role("button", name="Export as FHIR (JSON)").click()
     assert dl.value.suggested_filename.endswith("-fhir.json")
+    # a carer's gentler way out: mark an entry as entered by mistake (it stays in the history), then put it back
+    pg.get_by_test_id("mark-mistake").first.click()
+    pg.get_by_role("dialog").get_by_role("button", name="Mark as entered by mistake").click()
+    expect(pg.get_by_text("marked as entered by mistake").first).to_be_visible(timeout=15000)
+    pg.get_by_role("button", name="Put it back").first.click()
+    expect(pg.get_by_role("button", name="Put it back")).to_have_count(0, timeout=15000)
     pg.get_by_role("button", name="Remove for good").first.click()
     pg.get_by_role("dialog").get_by_role("button", name="Remove for good").click()
     expect(pg.get_by_text("rcpt_", exact=False).first).to_be_visible(timeout=15000)
