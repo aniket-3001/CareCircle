@@ -26,6 +26,7 @@ services:
       CC_VAPID_PUBLIC: ${CC_VAPID_PUBLIC:-}         # browser notifications: both keys, or the feature is off
       CC_VAPID_PRIVATE: ${CC_VAPID_PRIVATE:-}
       CC_VAPID_SUBJECT: ${CC_VAPID_SUBJECT:-https://${DOMAIN}}   # who the push services can contact: the site, not a person
+      CC_PUBLIC_URL: ${CC_PUBLIC_URL:-https://${DOMAIN}}         # the host the MCP endpoint (/mcp) accepts
       AWS_REGION: ${AWS_REGION:-us-east-1}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     volumes: ["ref-data:/app/data/ref"]

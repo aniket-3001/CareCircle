@@ -25,7 +25,7 @@ from pathlib import Path
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 
-from . import accounts_api, branch, ops, spaces
+from . import accounts_api, branch, mcp_http, ops, spaces
 from .db import Db, Overloaded, QueryLimit
 from .dbstats import db_stats
 from .textcheck import Clean
@@ -95,6 +95,8 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
     app = FastAPI(title="graphmem", version="0.1")
     limiter = RateLimiter(rate_per_minute if rate_per_minute is not None else int(os.getenv("GRAPHMEM_RATE_PER_MIN", "600")))
     bad_auth = RateLimiter(30)                # unauthenticated attempts per client IP per minute
+
+    mcp_http.install(app, gm, limiter, bad_auth)             # the MCP server at /mcp, with the same keys and limits
 
     @app.on_event("startup")
     async def _telegram():                    # optional front door: set TELEGRAM_BOT_TOKEN to poll Telegram in this process
