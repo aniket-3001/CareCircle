@@ -47,6 +47,8 @@ def _props(node) -> dict:
 
 
 MAX_EPISODE_CHARS = 100_000
+MAX_BATCH = 500
+MAX_BATCH_CHARS = 1_000_000
 MAX_FACT_PART_CHARS = 500
 ROLE_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 
@@ -100,6 +102,49 @@ class TenantMemory(CareMixin, CareViewMixin, CareTrackMixin, CarePlanMixin, Care
             {"sid": session, "eid": eid, "role": role, "content": content, "agent": agent or self.agent, "ts": ts},
         )
         return {"id": rows[0][0], "seq": rows[0][1], "session": session}
+
+    async def add_episodes(self, session: str, items: list, *, agent: Optional[str] = None) -> dict:
+        """Append several events to one session in a single write: one authorisation, one query, and a contiguous block of sequence numbers with
+        the NEXT chain unbroken, however many agents are writing to the session at the same time. Each item is {role, content} (and optionally
+        `at`). All are checked first: if one is invalid, none is stored. At most MAX_BATCH items."""
+        if not isinstance(session, str) or not 1 <= len(session) <= 120:
+            raise ValueError("a session id is 1 to 120 characters")
+        if not isinstance(items, list) or not 1 <= len(items) <= MAX_BATCH:
+            raise ValueError(f"send between 1 and {MAX_BATCH} items")
+        rows, total, ts = [], 0, now_ms()
+        for i, it in enumerate(items):
+            if not isinstance(it, dict):
+                raise ValueError(f"item {i} must be an object with role and content")
+            content, role = it.get("content"), it.get("role")
+            if not isinstance(content, str) or not content.strip():
+                raise ValueError(f"item {i} needs some content")
+            if len(content) > MAX_EPISODE_CHARS:
+                raise ValueError(f"item {i} is over the {MAX_EPISODE_CHARS} character limit")
+            if not ROLE_RE.match(role or ""):
+                raise ValueError(f"item {i}: role is a short lowercase label such as user, agent, assistant, system or tool")
+            total += len(content)
+            if total > MAX_BATCH_CHARS:
+                raise ValueError(f"a batch is limited to {MAX_BATCH_CHARS} characters in total")
+            rows.append({"i": i, "id": new_id("ep"), "role": role, "content": content, "ts": int(it.get("at") or ts)})
+        out = await self._q(
+            """
+            MERGE (s:Session {id:$sid}) ON CREATE SET s.agent=$agent, s.started_at=$ts, s.n=0
+            WITH s, s.n AS base, s.last AS prev_id
+            SET s.n = base + $count, s.last = $last, s.last_at = $ts
+            WITH s, base, prev_id
+            UNWIND $items AS it
+            CREATE (e:Episode {id:it.id, seq:base + it.i + 1, session:$sid, role:it.role, content:it.content, agent:$agent, ts:it.ts, redacted:false})
+            CREATE (e)-[:IN_SESSION]->(s)
+            WITH prev_id, collect(e) AS es
+            OPTIONAL MATCH (prev:Episode {id:prev_id})
+            UNWIND range(0, size(es) - 1) AS k
+            WITH es[k] AS cur, k, CASE WHEN k = 0 THEN prev ELSE es[k - 1] END AS src
+            FOREACH (_ IN CASE WHEN src IS NULL THEN [] ELSE [1] END | CREATE (src)-[:NEXT]->(cur))
+            RETURN cur.id, cur.seq ORDER BY cur.seq
+            """,
+            {"sid": session, "agent": agent or self.agent, "ts": ts, "count": len(rows), "last": rows[-1]["id"], "items": rows})
+        return {"session": session, "count": len(rows), "episodes": [{"id": r[0], "seq": r[1]} for r in out]}
+
 
     async def ingest(self, session: str, role: str, content: str) -> dict:
         """Store a message as an episode, extract facts from it, and link each fact to that episode.
@@ -221,6 +266,22 @@ class TenantMemory(CareMixin, CareViewMixin, CareTrackMixin, CarePlanMixin, Care
                 """, {"fid": fid, "pred": pred, "ts": ts})
             superseded = [x[0] for x in r]
         return {"id": fid, "created": support == 1, "support": support, "superseded": superseded}
+
+    async def assert_facts(self, facts: list) -> dict:
+        """Assert several facts with one authorisation. Each item takes the arguments of assert_fact (subject, predicate, obj, and optionally
+        exclusive, conf, sources, at). All are checked first; if one is invalid none is stored. Applied in order, so a later item can supersede an
+        earlier one. At most MAX_BATCH items."""
+        if not isinstance(facts, list) or not 1 <= len(facts) <= MAX_BATCH:
+            raise ValueError(f"send between 1 and {MAX_BATCH} facts")
+        allowed = {"subject", "predicate", "obj", "sources", "conf", "exclusive", "valid_from", "at"}
+        for i, f in enumerate(facts):
+            if not isinstance(f, dict) or not {"subject", "predicate", "obj"} <= set(f) or set(f) - allowed:
+                raise ValueError(f"fact {i} must be an object with subject, predicate, obj (and optionally {', '.join(sorted(allowed - {'subject', 'predicate', 'obj'}))})")
+            for label in ("subject", "predicate", "obj"):
+                v = f[label]
+                if not isinstance(v, str) or not v.strip() or len(v) > MAX_FACT_PART_CHARS:
+                    raise ValueError(f"fact {i}: the {label} must be 1 to {MAX_FACT_PART_CHARS} characters")
+        return {"count": len(facts), "facts": [await self.assert_fact(**f) for f in facts]}
 
     async def recall(self, query: str, *, as_of: Optional[int] = None, hops: int = 2, limit: int = 10,
                      mode: str = "hybrid") -> list[dict]:

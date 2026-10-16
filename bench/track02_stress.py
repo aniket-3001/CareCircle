@@ -8,6 +8,7 @@ Phases (each prints throughput and p50/p95/p99 latency per operation, and checks
   B  mixed            readers and writers on the same tenant together; every read must see an unbroken history
   C  claim race       K agents claim one task; exactly one may win; then 1 task per agent in parallel
   D  many tenants     T tenants written at once; each must hold exactly its own data
+  E  batch writes     the same events one request each versus batches of 20 (add_episodes)
 """
 import argparse
 import asyncio
@@ -173,6 +174,37 @@ async def main(a):
     report(f"D many tenants ({a.tenants} tenants at once)", a.tenants * (a.per_agent + 1), dt, ["add_episode", "assert_fact"])
     print(f"  audit: tenants holding anything other than exactly their own data = {leaks}: {'PASS' if leaks == 0 else 'FAIL'}")
     bad += [] if leaks == 0 else ["D"]
+
+    # ---- E: the same events, one request each versus batches of 20
+    t = f"tt-stress-e-{run}"; made_tenants.append(t)
+    hs = [await api.agent(f"st{run}-e{i}", t) for i in range(a.agents // 3 or 1)]
+    per = max(40, a.per_agent * 4) // 20 * 20
+    for k in LAT:
+        LAT[k].clear()
+
+    async def single(h, i):
+        for j in range(per):
+            await api.call(h, t, "add_episode", session="one", role="agent", content=f"{i}-{j}")
+
+    async def batched(h, i):
+        for j in range(0, per, 20):
+            await api.call(h, t, "add_episodes", session="many", items=[{"role": "agent", "content": f"{i}-{j + k}"} for k in range(20)])
+
+    n_ev = len(hs) * per
+    t0 = time.perf_counter(); await asyncio.gather(*[single(h, i) for i, h in enumerate(hs)]); d1 = time.perf_counter() - t0
+    t0 = time.perf_counter(); await asyncio.gather(*[batched(h, i) for i, h in enumerate(hs)]); d2 = time.perf_counter() - t0
+    h1 = await api.call(hs[0], t, "history", session="one", limit=min(n_ev + 5, 5000))
+    h2 = await api.call(hs[0], t, "history", session="many", limit=min(n_ev + 5, 5000))
+    ok_e = [e["seq"] for e in h1] == list(range(1, n_ev + 1)) and [e["seq"] for e in h2] == list(range(1, n_ev + 1)) and len({e["content"] for e in h2}) == n_ev
+    print(f"\nE batch writes ({len(hs)} agents, {n_ev} events each way)")
+    print(f"  one request per event : {n_ev / d1:7.0f} events/s   ({n_ev} requests, {d1:.1f}s)")
+    print(f"  batches of 20         : {n_ev / d2:7.0f} events/s   ({n_ev // 20} requests, {d2:.1f}s)   = {d1 / d2:.1f}x faster")
+    for op in ("add_episode", "add_episodes"):
+        xs = LAT.get(op, [])
+        if xs:
+            print(f"  {op:<13} p50={pct(xs, .5):6.1f} ms  p95={pct(xs, .95):6.1f} ms  p99={pct(xs, .99):6.1f} ms")
+    print(f"  audit: both sessions hold all {n_ev} events, seq 1..{n_ev} unbroken, no duplicates: {'PASS' if ok_e else 'FAIL'}")
+    bad += [] if ok_e else ["E"]
 
     print(f"\nrequest errors: {api.errors}   result: {'ALL PASS' if not bad and api.errors == 0 else 'FAILED ' + ','.join(bad)}")
     if not a.url:                                                           # a throwaway local run leaves nothing behind

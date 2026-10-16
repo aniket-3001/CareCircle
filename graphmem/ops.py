@@ -15,7 +15,7 @@ from .policy import GraphMem
 
 OPS = {
     # episodic
-    "add_episode": "write", "ingest": "write", "history": "read", "sessions": "read", "search_episodes": "read", "search_text": "read",
+    "add_episode": "write", "add_episodes": "write", "assert_facts": "write", "ingest": "write", "history": "read", "sessions": "read", "search_episodes": "read", "search_text": "read",
     # semantic
     "assert_fact": "write", "recall": "read", "fact_history": "read", "embed_missing": "write", "forget_fact": "write",
     # procedural

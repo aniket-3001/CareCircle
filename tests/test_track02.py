@@ -408,3 +408,86 @@ async def test_6c_bad_input_is_a_clear_400_never_a_stored_blank_or_a_500(client,
     assert [e["content"] for e in await call(client, a, t, "history", session="s")] == ["héllo 🌍\nline \"q\" 'q' \ {} ; MATCH (n) DETACH DELETE n"] and ok["seq"] == 1
     big = await call(client, a, t, "add_episode", session="s", role="tool", content="y" * 100_000)         # exactly at the cap is fine
     assert big["seq"] == 2
+
+
+# ============================================================ batch writes
+async def test_7a_add_episodes_is_one_ordered_atomic_block(client, gm):
+    t = tid(gm, "batch")
+    (a, b) = await team(client, gm, t, ["alice", "bob"])
+    first = await call(client, a, t, "add_episode", session="s", role="user", content="before the batch")
+    r = await call(client, b, t, "add_episodes", session="s", items=[{"role": "agent", "content": f"step {i}"} for i in range(25)])
+    assert r["count"] == 25 and [e["seq"] for e in r["episodes"]] == list(range(2, 27))                  # a contiguous block continuing the session
+    after = await call(client, a, t, "add_episode", session="s", role="user", content="after the batch")
+    assert after["seq"] == 27                                                                            # a single write after it carries on
+    h = await call(client, a, t, "history", session="s", limit=100)
+    assert [e["content"] for e in h] == ["before the batch"] + [f"step {i}" for i in range(25)] + ["after the batch"]
+    assert {e["agent"] for e in h[1:26]} == {"t2-bob"}                                                   # the batch is attributed to who sent it
+    nxt = (await gm.open("t2-alice", t)._q("MATCH (a:Episode)-[:NEXT]->(b:Episode) RETURN a.seq, b.seq ORDER BY a.seq", scope="read"))
+    assert [tuple(x) for x in nxt] == [(i, i + 1) for i in range(1, 27)]                                  # the chain is one unbroken line across single and batch writes
+    assert first["seq"] == 1
+    stamped = await call(client, a, t, "add_episodes", session="s2", items=[{"role": "user", "content": "old", "at": 1_000}, {"role": "agent", "content": "new"}])
+    assert [e["seq"] for e in stamped["episodes"]] == [1, 2]
+
+
+async def test_7b_a_bad_item_stores_nothing_and_limits_hold(client, gm):
+    t = tid(gm, "batchbad")
+    (a,) = await team(client, gm, t, ["alice"])
+
+    async def refused(**args):
+        r = await client.post(f"/v1/tenants/{t}/add_episodes", json=args, headers=a)
+        assert r.status_code in (400, 422), (args, r.status_code, r.text[:100])
+
+    await refused(session="s", items=[{"role": "user", "content": "fine"}, {"role": "user", "content": ""}])        # one blank item
+    await refused(session="s", items=[{"role": "user", "content": "fine"}, {"role": "BAD ROLE", "content": "x"}])
+    await refused(session="s", items=[{"role": "user", "content": "fine"}, "not an object"])
+    await refused(session="s", items=[])
+    await refused(session="s", items=[{"role": "user", "content": "x"}] * 501)                                      # over the item limit
+    await refused(session="s", items=[{"role": "user", "content": "y" * 100_000}] * 11)                             # over the total size limit
+    await refused(session="", items=[{"role": "user", "content": "x"}])
+    assert await call(client, a, t, "history", session="s") == []                                                  # none of the above left anything behind
+    ok = await call(client, a, t, "add_episodes", session="s", items=[{"role": "user", "content": "x"}] * 500)      # exactly the limit is fine
+    assert ok["count"] == 500 and ok["episodes"][-1]["seq"] == 500
+
+
+async def test_7c_concurrent_batches_each_get_a_contiguous_block_and_nothing_is_lost(client, gm):
+    t = tid(gm, "batchconc")
+    hs = await team(client, gm, t, [f"b{i}" for i in range(20)])
+
+    async def work(h, i):
+        return [await call(client, h, t, "add_episodes", session="room", items=[{"role": "agent", "content": f"{i}-{j}-{k}"} for k in range(10)]) for j in range(5)]
+
+    runs = await asyncio.gather(*[work(h, i) for i, h in enumerate(hs)])
+    blocks = [[e["seq"] for e in r["episodes"]] for per in runs for r in per]
+    assert len(blocks) == 100 and all(b == list(range(b[0], b[0] + 10)) for b in blocks)                          # every batch is one unbroken run of numbers
+    assert sorted(s for b in blocks for s in b) == list(range(1, 1001))                                           # together they cover 1..1000 exactly once
+    hist = await call(client, hs[0], t, "history", session="room", limit=1000)
+    assert [e["seq"] for e in hist] == list(range(1, 1001)) and len({e["content"] for e in hist}) == 1000
+    for blk in blocks[:3]:
+        inside = [e["content"] for e in hist if e["seq"] in set(blk)]
+        assert len({c.rsplit("-", 1)[0] for c in inside}) == 1                                                     # a block holds one agent's one batch, never interleaved
+    nxt = (await gm.open("t2-b0", t)._q("MATCH ()-[r:NEXT]->() RETURN count(r)", scope="read"))[0][0]
+    assert nxt == 999
+
+
+async def test_7d_assert_facts_applies_in_order_checks_first_and_reinforces(client, gm):
+    t = tid(gm, "facts")
+    (a,) = await team(client, gm, t, ["alice"])
+    r = await call(client, a, t, "assert_facts", facts=[
+        {"subject": "Alice", "predicate": "lives_in", "obj": "Paris", "exclusive": True, "at": 1_000},
+        {"subject": "Alice", "predicate": "lives_in", "obj": "Berlin", "exclusive": True, "at": 2_000},               # a later item supersedes an earlier one
+        {"subject": "Bob", "predicate": "likes", "obj": "tea"}, {"subject": "Bob", "predicate": "likes", "obj": "tea"}])   # a repeat reinforces
+    assert r["count"] == 4 and r["facts"][1]["superseded"] == [r["facts"][0]["id"]] and r["facts"][3]["support"] == 2
+    assert [f["object"] for f in await call(client, a, t, "recall", query="alice") if f["predicate"] == "lives_in"] == ["Berlin"]
+    before = (await call(client, a, t, "stats"))["Fact"]
+    for bad in ([{"subject": "x", "predicate": "p", "obj": "o"}, {"subject": "", "predicate": "p", "obj": "o"}],
+                [{"subject": "x", "predicate": "p"}], [{"subject": "x", "predicate": "p", "obj": "o", "evil": 1}], []):
+        resp = await client.post(f"/v1/tenants/{t}/assert_facts", json={"facts": bad}, headers=a)
+        assert resp.status_code in (400, 422)
+    assert (await call(client, a, t, "stats"))["Fact"] == before                                                   # nothing from a rejected batch was stored
+
+
+async def test_7e_batch_writes_are_scope_checked_like_any_write(client, gm):
+    t = tid(gm, "batchscope")
+    (ro,) = await team(client, gm, t, ["reader"], scopes=("read",))
+    for op, args in (("add_episodes", {"session": "s", "items": [{"role": "user", "content": "x"}]}), ("assert_facts", {"facts": [{"subject": "a", "predicate": "b", "obj": "c"}]})):
+        assert (await client.post(f"/v1/tenants/{t}/{op}", json=args, headers=ro)).status_code == 403
