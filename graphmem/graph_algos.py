@@ -2,7 +2,7 @@
 
   graph_schema         what is in the graph: labels and relationship types with counts
   graph_path           shortest path between two nodes (breadth-first, any direction) (the "how is A connected to B" question)
-  graph_influence      PageRank or betweenness: which nodes everything else hangs on
+  graph_influence      PageRank or harmonic centrality: which nodes everything else points to, or reaches the rest of the graph fastest
   graph_communities    weakly connected components or label propagation: which nodes belong together
   graph_neighbourhood  everything within a few hops of one node
 
@@ -118,15 +118,17 @@ class GraphAlgoMixin:
         return {"found": True, "length": len(types), "path": [shown[i] for i in ids], "relationships": types, "cypher": EXPAND}
 
     async def graph_influence(self, metric: str = "pagerank", label: Optional[str] = None, top: int = 10) -> dict:
-        """The most influential nodes: metric 'pagerank' (many well-connected nodes point here) or 'betweenness' (many shortest paths go through here)."""
+        """The most influential nodes: metric 'pagerank' (many well-connected nodes point here) or 'harmonic' (how quickly a node reaches the rest of the graph, following the links' direction)."""
         top = _clamp(top, 1, MAX_TOP, "top")
         lab = await self._label_arg(label)
         if metric == "pagerank":
             call = "CALL algo.pageRank($label, null) YIELD node, score"
+        elif metric == "harmonic":
+            call = f"CALL algo.HarmonicCentrality({_cfg(lab)}) YIELD node, score"
         elif metric == "betweenness":
-            call = f"CALL algo.betweenness({_cfg(lab)}) YIELD node, score"
+            raise ValueError("betweenness is not offered: FalkorDB 4.22's algo.betweenness gave different answers for the same graph in testing. Use 'harmonic' (reach) or 'pagerank'")
         else:
-            raise ValueError("metric is 'pagerank' or 'betweenness'")
+            raise ValueError("metric is 'pagerank' or 'harmonic'")
         cypher = f"{call} WITH node, score WHERE NOT node:Schema WITH node, score ORDER BY score DESC LIMIT $top RETURN {SHOW.format(n='node')}, score"
         rows = await self._q(cypher, {"label": lab, "top": top}, scope="read")
         return {"metric": metric, "label": lab, "rows": [{**_node(r), "score": round(r[3], 5)} for r in rows], "cypher": cypher}

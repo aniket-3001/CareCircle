@@ -11,7 +11,7 @@ const show = (n: GNode): string => (n.title && n.title !== n.ref ? `${n.label} Â
 /** The graph-algorithm operations on this circle's own graph, asked in plain words. Every figure is computed by FalkorDB on the server; the Cypher that ran is printed under each. */
 export function AskGraph(): React.JSX.Element {
   const app = useApp();
-  const [metric, setMetric] = useState<'pagerank' | 'betweenness'>('pagerank');
+  const [metric, setMetric] = useState<'pagerank' | 'harmonic'>('pagerank');
   const [method, setMethod] = useState<'wcc' | 'labelpropagation'>('wcc');
   const influence = useLoad((a) => a.api.influence(metric), [metric]);
   const groups = useLoad((a) => a.api.communities(method), [method]);
@@ -42,9 +42,9 @@ export function AskGraph(): React.JSX.Element {
     <div className="layout layout--even" style={{ marginTop: 0 }} data-testid="ask-graph">
       <section className="card" aria-labelledby="ag-infl" style={{ alignContent: 'start' }}>
         <h2 id="ag-infl">{tr('What the record hangs on')}</h2>
-        <p className="muted small">{tr('PageRank: records that many others point to. Betweenness: records that sit on many of the shortest routes between others.')}</p>
+        <p className="muted small">{tr('PageRank: records that many others point to. Reach: records from which the rest of the graph can be reached fastest, following the links.')}</p>
         <Segmented name="ag-metric" label={tr('Measure')} value={metric} onChange={setMetric}
-          options={[{ value: 'pagerank', label: 'PageRank' }, { value: 'betweenness', label: tr('Betweenness') }]} />
+          options={[{ value: 'pagerank', label: 'PageRank' }, { value: 'harmonic', label: tr('Reach') }]} />
         <Async state={influence}>
           {(r) => (
             <>

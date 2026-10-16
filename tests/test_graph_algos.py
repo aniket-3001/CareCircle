@@ -54,11 +54,11 @@ async def test_influence_ranks_the_hub_first(gm):
     pr = await m.graph_influence("pagerank", label="Entity", top=3)
     assert pr["rows"][0]["ref"] == "hub" and pr["rows"][0]["score"] > pr["rows"][1]["score"]
     assert len(pr["rows"]) == 3 and "algo.pageRank" in pr["cypher"]
-    bt = await m.graph_influence("betweenness", label="Task", top=10)
-    top = {r["ref"] for r in bt["rows"][:2]}
-    assert top == {"q", "r"}                                                      # the middle of a chain carries the paths
-    ends = {r["ref"]: r["score"] for r in bt["rows"]}
-    assert ends["p"] == 0 and ends["s"] == 0
+    hc = await m.graph_influence("harmonic", label="Task", top=10)
+    assert [r["ref"] for r in hc["rows"]] == ["p", "q", "r", "s"]                 # along p -> q -> r -> s the start reaches the rest fastest, the end reaches nothing
+    assert hc["rows"][-1]["score"] == 0 and "HarmonicCentrality" in hc["cypher"]
+    with pytest.raises(ValueError, match="betweenness is not offered"):
+        await m.graph_influence("betweenness")                                    # FalkorDB 4.22's version of it is not reliable, so it is refused, not answered
 
 
 async def test_communities_find_the_islands(gm):
@@ -95,6 +95,7 @@ async def test_an_empty_graph_gives_empty_answers(gm):
 
 @pytest.mark.parametrize("call,msg", [
     (lambda m: m.graph_influence(metric="degree"), "pagerank"),
+    (lambda m: m.graph_influence(metric="betweenness"), "not offered"),
     (lambda m: m.graph_communities(method="louvain"), "wcc"),
     (lambda m: m.graph_influence(label="Nope"), "no node label"),
     (lambda m: m.graph_influence(label="Entity) DETACH DELETE (n"), "name of a node label"),
@@ -225,7 +226,7 @@ async def test_every_operation_works_as_the_read_only_database_user():
         assert (await m.graph_schema())["nodes"][0]["count"] == 3
         assert (await m.graph_path("a", "c"))["length"] == 2
         assert (await m.graph_influence("pagerank"))["rows"][0]["ref"] == "c"
-        assert (await m.graph_influence("betweenness"))["rows"][0]["ref"] == "b"
+        assert (await m.graph_influence("harmonic"))["rows"][0]["ref"] == "a"
         assert (await m.graph_communities("wcc"))["groups"][0]["size"] == 3
         assert (await m.graph_communities("labelpropagation"))["groups"]
         assert len((await m.graph_neighbourhood("b"))["nodes"]) == 2

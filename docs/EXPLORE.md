@@ -104,11 +104,11 @@ CALL algo.WCC({nodeLabels: ['Drug'], relationshipTypes: ['HAZARD']}) YIELD node,
 RETURN componentId, count(node) AS size ORDER BY size DESC LIMIT 5
 ```
 
-The same family of calls works on a memory graph; the app and agents reach them as the operations `graph_influence`, `graph_communities`, `graph_path` and `graph_neighbourhood` (README, "Graph data model"). Betweenness on the agent memory: which records sit on the most shortest paths.
+The same family of calls works on a memory graph; the app and agents reach them as the operations `graph_influence`, `graph_communities`, `graph_path` and `graph_neighbourhood` (README, "Graph data model"). Harmonic centrality on the agent memory: which records reach the rest of the graph fastest, following the links.
 
 ```cypher
 // graph: mem__explore-agents
-CALL algo.betweenness() YIELD node, score WHERE NOT node:Schema
+CALL algo.HarmonicCentrality({}) YIELD node, score WHERE NOT node:Schema
 RETURN labels(node)[0] AS kind, coalesce(node.name, node.title, node.summary, node.id) AS record, score ORDER BY score DESC LIMIT 5
 ```
 
