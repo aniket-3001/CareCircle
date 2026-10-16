@@ -219,6 +219,8 @@ code, .code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: 
 .item { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
 .item:first-child { border-top: 0; padding-top: 0; }
 .item:last-child { padding-bottom: 0; }
+.item > :first-child { min-width: 0; flex: 1 1 auto; }   /* a long title or place wraps inside its row, and the buttons beside it keep their size */
+.item > .row { flex: none; }
 .item__title { font-weight: 700; color: var(--head); }
 .item__sub { font-size: 13px; color: var(--muted); }
 .med { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }

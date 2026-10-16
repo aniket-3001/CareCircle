@@ -257,7 +257,7 @@ def u7(w, b, r):
     ui_circle(pg, "C" * 80, "P" * 60)
     u = api_user(w, email)
     c = circle_of(u)
-    person = "p" * 60
+    person = "p" * 40                                    # the longest name a circle can hold for the person (the form cuts it there)
     u.ok(c, "care_record", person=person, drug="d" * 80, dose_text="9" * 80, freq_text="f" * 80)
     u.ok(c, "care_handover", person=person, text="x" * 400)
     u.ok(c, "care_condition_add", person=person, name="c" * 80)
