@@ -16,7 +16,7 @@ import os
 import re
 from typing import Optional
 
-from .verify import quote_in_source
+from .verify import field_in_quote, quote_in_source
 
 DOSE_RE = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?)(?:[\s.:]?(?:mcg|µg|mg|ml|iu|units?)|\s?g)", re.I)   # OCR glues words: "Sodium5mgtablets"
 FREQ_RE = re.compile(r"\b((?:once|twice|thrice) (?:a day|daily|per day|weekly)|once|twice|thrice|daily|every \d+ ?(?:hours?|hrs?)|\d+ times (?:a|per) day|at bedtime|bedtime|(?:at|in the|every) (?:night|morning|evening|afternoon)|night|morning|evening|"
@@ -196,6 +196,9 @@ def propose(text: str, checker, image: Optional[bytes] = None, image_format: str
         named = p.pop("llm_drug")
         if not quote_in_source(named, p["quote"]):                # a quote that does not even contain the drug name proves nothing
             continue
+        for k in ("dose_text", "freq_text"):                      # a model may not put a dose or frequency on a line that does not say it: such a field is dropped,
+            if p[k] and not field_in_quote(p[k], p["quote"]):    # so the quote that is shown really contains everything shown beside it
+                p[k] = ""
         p["drug_candidates"] = checker.resolve(named, 3)
         p["verified"] = bool(text) and quote_in_source(p["quote"], text)
         if p["drug_candidates"]:

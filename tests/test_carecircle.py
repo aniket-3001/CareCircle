@@ -500,3 +500,24 @@ async def test_divergence_weighs_an_enzyme_flag_by_its_medicines_not_by_parsing_
     monkeypatch.setattr(type(c["ravi"]), "care_check", none_check)
     base = (await c["meena"].care_divergence("mum", now=1 + 20 * 3_600_000))["carers"]["meena"]["divergence"]
     assert plain > base                         # warfarin's 0.7 flag weight counted, instead of the default 0.3
+
+
+def test_a_model_cannot_attach_a_dose_the_quoted_line_does_not_say(monkeypatch):
+    """The quote was checked against the label, but the dose and frequency beside it were not checked against the quote: a model answer of
+    '1000 mg, three times daily' on the line 'METFORMIN 500 MG TABLETS' was shown as verified."""
+    text = "CITY PHARMACY\nMETFORMIN 500 MG TABLETS\nTake ONE tablet twice daily"
+    monkeypatch.setattr(intake, "llm_proposals", lambda t, image=None, image_format="png": [
+        {"llm_drug": "metformin", "dose_text": "1000 mg", "freq_text": "three times daily", "quote": "METFORMIN 500 MG TABLETS", "method": "bedrock"}])
+    p = intake.propose(text, Checker())
+    met = [x for x in p if x["drug_candidates"][0]["name"] == "metformin"]
+    assert len(met) == 1
+    assert met[0]["dose_text"].replace(" ", "").lower() == "500mg" and "1000" not in met[0]["dose_text"]     # the rule reading of the label won
+    assert "three" not in met[0]["freq_text"] and met[0]["verified"]
+    assert intake.quote_in_source(met[0]["quote"], text) and all(intake.field_in_quote(met[0][k], met[0]["quote"]) for k in ("dose_text",) if met[0][k])
+
+
+def test_field_in_quote_is_exact_about_numbers_and_short_units():
+    from carecircle.verify import field_in_quote
+    assert field_in_quote("500 mg", "METFORMIN 500 MG TABLETS") and field_in_quote("5g", "Take 5 g daily") and field_in_quote("OD", "Metformin 500 mg OD")
+    assert not field_in_quote("500 mg", "METFORMIN 1500 MG") and not field_in_quote("0.5 mg", "Risperidone 10.5 mg") and not field_in_quote("", "x")
+    assert not field_in_quote("twice daily", "Warfarin 5 mg at bedtime")
