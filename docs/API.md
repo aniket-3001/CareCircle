@@ -53,7 +53,7 @@ Content-Type: application/json
 | `care_resolve` | read | `text`*, `n` | Top-n drug name candidates for an OCR/voice string. Nothing is auto-accepted; a person chooses. |
 | `care_ack` | write | `dose_id`* | The calling carer says they have seen this change. |
 | `care_divergence` | read | `person`*, `now` | Per carer: confirmed changes they have not acknowledged and a [0,1] divergence score. Older unacknowledged changes count |
-| `care_nudges` | write | `person`*, `now`, `remind_after_h`, `escalate_after_h` | Reminders due: unacknowledged changes older than remind_after_h -> 'remind' that carer; older than escalate_after_h -> |
+| `care_nudges` | write | `person`*, `now`, `remind_after_h`, `escalate_after_h`, `hold` | Reminders due: unacknowledged changes older than remind_after_h -> 'remind' that carer; older than escalate_after_h -> |
 | `care_reminders` | read | `person`*, `now`, `remind_after_h`, `escalate_after_h` | Reminders that are due, as a read-only preview: nothing is claimed, so looking at them never uses them up (care_nudges claims and delivers). |
 | `care_give` | write | `person`*, `drug`*, `slot`* | Record that the calling carer gave `drug` for dose slot `slot` (e.g. '2026-10-16 08:00'). A slot can be claimed once: |
 | `care_gives` | read | `person`*, `limit` |  |
