@@ -17,7 +17,8 @@ they are shown as unrated, never as safe. Caveat: "also listed" cross-checks agr
 
 ## B2 Carer-staleness query vs an independent oracle
 40 generated circles (3 carers, 3-8 changes, random acknowledgements). The Cypher-based query returns exactly the oracle's set of
-unacknowledged changes for every carer in **40/40** circles. Baseline "only track each carer's most recent change" is exact in **0/40**.
+unacknowledged changes for every carer in **40/40** circles. Baseline "only track each carer's most recent change" is exact in **4/40**.
+The oracle states the rule independently of the code: a carer is behind on a medicine when the entry that stands now (by date) is someone else's and they have not seen it. Entries typed again unchanged record nothing, and a medicine can only be stopped once it is on the record. (The benchmark was re-run after the scenario fixes, which tightened these rules; it had gone out of date, and the oracle was brought in line with the rules as documented in `docs/SCENARIOS.md`, not with whatever the code returned.)
 This shows correctness of the graph query against an independently written oracle; it does not show clinical benefit.
 
 ## B3 Double-dose guard
@@ -41,3 +42,11 @@ shown beside a right one. n is tiny and these are clean product shots, not curve
 
 ## Not measured
 OCR/ASR accuracy at scale or on home-quality photos and varied accents, interaction-severity accuracy against clinical truth, any patient outcome.
+
+## Comparing two runs: `bench/gate.py`
+`python bench/care_bench.py --out run.json` writes the numbers with the seed, the parameters, a fingerprint of the machine, the FalkorDB version and the commit. `python bench/gate.py bench/baselines/care_bench.json run.json` then compares two such files and prints every check.
+
+- It **refuses** (exit 2, nothing judged) when the runs are not alike: a different benchmark, seed or parameters, or a metric present in only one.
+- Counts that come from the data or the design must be identical (`exact`); counts of things done right must not fall (`higher`); a latency may rise by 25% plus a 2 ms noise floor (`lower`), and is judged only when both runs ran on the same machine.
+- Exit 1 means something got worse. In CI the gate runs on every push with the B1 numbers skipped (they depend on the downloaded reference data) and latency skipped automatically (a different machine from the baseline).
+- Checked by breaking the code on purpose: letting a carer count their own entry as unseen turned B2 from 40/40 to 0/40 and the gate exited 1.

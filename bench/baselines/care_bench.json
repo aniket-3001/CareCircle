@@ -1,0 +1,82 @@
+{
+ "bench": "care_bench",
+ "meta": {
+  "falkordb": "8.10.2",
+  "git": "5875766",
+  "host": "3764ba8769",
+  "params": {
+   "circles": 40,
+   "claims_per_round": 10,
+   "regimen_runs": 200,
+   "rounds": 100
+  },
+  "seed": 7
+ },
+ "metrics": {
+  "B1.curated.listed_in_ddinter": {
+   "kind": "exact",
+   "value": 33
+  },
+  "B1.curated.moderate_or_major": {
+   "kind": "exact",
+   "value": 32
+  },
+  "B1.curated.path_pairs": {
+   "kind": "exact",
+   "value": 39
+  },
+  "B1.fda.listed_in_ddinter": {
+   "kind": "exact",
+   "value": 31
+  },
+  "B1.fda.moderate_or_major": {
+   "kind": "exact",
+   "value": 31
+  },
+  "B1.fda.path_pairs": {
+   "kind": "exact",
+   "value": 38
+  },
+  "B1.recall.ddinter_pairs": {
+   "kind": "exact",
+   "value": 145
+  },
+  "B1.recall.recovered": {
+   "kind": "exact",
+   "value": 61
+  },
+  "B2.baseline_last_change_only_exact": {
+   "kind": "info",
+   "value": 4
+  },
+  "B2.circles": {
+   "kind": "exact",
+   "value": 40
+  },
+  "B2.exact_match_with_oracle": {
+   "kind": "higher",
+   "value": 40
+  },
+  "B2.most_stale_carer_plausible": {
+   "kind": "higher",
+   "value": 40
+  },
+  "B3.rounds": {
+   "kind": "exact",
+   "value": 100
+  },
+  "B3.rounds_with_exactly_one_winner": {
+   "kind": "higher",
+   "value": 100
+  },
+  "B5.p50_ms": {
+   "kind": "lower",
+   "value": 8.0
+  },
+  "B5.p95_ms": {
+   "kind": "lower",
+   "value": 9.7
+  }
+ },
+ "schema": 1
+}

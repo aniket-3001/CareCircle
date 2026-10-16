@@ -47,7 +47,7 @@ python -m graphmem.api                                                      # ht
 python -m pytest -q tests                                                   # 112 tests against live FalkorDB
 (cd web && npm test)                                                        # UI unit tests; `npm run dev` for hot reload (proxies to :8000)
 PORT=8000 python scripts/ui_e2e.py && PORT=8000 python scripts/ui_e2e_accounts.py    # browser walk-throughs: demo, then accounts (need Chrome and `pip install playwright`)
-PYTHONPATH=. python bench/care_bench.py                                     # benchmarks below
+PYTHONPATH=. python bench/care_bench.py                                     # benchmarks below (`--out run.json`, then `python bench/gate.py bench/baselines/care_bench.json run.json` compares two runs)
 ```
 Optional: `CC_COGNITO_POOL_ID` / `CC_COGNITO_CLIENT_ID` (email sign-up through Amazon Cognito; unset = built-in accounts), `CC_ASSISTANT=0` (the helper answers from rules only), `CC_MODEL` / `AWS_REGION` + AWS credentials let Amazon Bedrock (default `us.amazon.nova-pro-v1:0`) structure what the OCR read;
 `CC_LLM=0` or no credentials falls back to rules. Set `TELEGRAM_BOT_TOKEN` to also run the Telegram bot in the server process (`/link <key> <circle>`, then send a photo, voice note or text).
@@ -166,10 +166,10 @@ indexes, unique constraints, variable-length paths, `FOREACH`, `UNWIND` bulk loa
 
 ## Measured (single runs on one laptop; `docs/BENCHMARKS.md`)
 - **Enzyme-path rule vs DDInter:** of 38 pairs flagged through FDA substrates, 31 are also in DDInter, all moderate/major; the rule recovers 61 of 145 moderate/major pairs between the same drug sets (42%): precise but narrow, so it supplements the direct lookup.
-- **Carer staleness (graph query vs independent oracle):** exact in 40/40 generated circles; "last change only" baseline 0/40.
+- **Carer staleness (graph query vs independent oracle):** exact in 40/40 generated circles; "last change only" baseline 4/40.
 - **Double-dose guard:** one winner in 100/100 rounds of 10 concurrent claims.
 
-- **Interaction check latency:** 7 ms median, 10 ms at the 95th percentile, for a 10-medicine regimen (direct pairs, enzyme paths and combined weight in three reads), warm, one process (`bench/care_bench.py`, B5).
+- **Interaction check latency:** 8 ms median, 10 ms at the 95th percentile, for a 10-medicine regimen (direct pairs, enzyme paths and combined weight in three reads), warm, one process (`bench/care_bench.py`, B5).
 - **Intake on real input:** 5 real bottle photos and 1 spoken note (browser microphone to Whisper): drug found in 6/6, with one wrong extra candidate; see `docs/BENCHMARKS.md` (B4).
 
 ## What runs, and how it is checked

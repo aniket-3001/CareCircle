@@ -37,6 +37,10 @@ jobs:
           for i in $(seq 1 30); do curl -sf localhost:8000/healthz && break; sleep 1; done
           SCENARIO_URL=http://localhost:8000 python scenarios/run.py || { tail -30 scen.log; exit 1; }
           SCENARIO_URL=http://localhost:8000 python scenarios/ui_scenarios.py || { tail -30 scen.log; exit 1; }
+      - name: Benchmark gate (same seed as the committed baseline, nothing may get worse)
+        run: |
+          PYTHONPATH=. CC_LLM=0 python bench/care_bench.py --out run.json > /dev/null
+          python bench/gate.py bench/baselines/care_bench.json run.json --skip B1
 
   # Every push to main that passes the tests is deployed to the live site. AWS access is by short-lived OIDC credentials
   # (no keys stored in GitHub): the role can only be assumed from this repo's main branch and can only run a command on one instance.
