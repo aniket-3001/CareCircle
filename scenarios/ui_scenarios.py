@@ -430,6 +430,7 @@ def u13(w, b, r):
     r.check("The label says twice a day" in pg.get_by_test_id("unscheduled").inner_text(), "a medicine with no times says what its label says", pg.get_by_test_id("unscheduled").inner_text())
     pg.get_by_test_id("set-times").first.click()
     inputs = pg.get_by_test_id("time-input")
+    expect(inputs).to_have_count(2, timeout=10000)                                    # the sheet fills its times a moment after it opens
     r.check(inputs.count() == 2 and inputs.nth(0).input_value() == "08:00" and inputs.nth(1).input_value() == "20:00", "the suggested times are offered, editable", inputs.count())
     inputs.nth(1).fill("21:00")
     pg.get_by_test_id("save-times").click()
