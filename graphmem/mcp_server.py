@@ -19,6 +19,13 @@ from .db import Db
 from .policy import GraphMem
 
 
+def _loads(value, default):
+    """Arguments arrive as a JSON string, but some clients (the MCP Inspector's command line, for one) parse it first and send the object. Take both."""
+    if isinstance(value, (dict, list)):
+        return value
+    return json.loads(value) if value else default
+
+
 def build(gm: GraphMem, agent: Union[str, Callable[[], str]]) -> MCPServer:
     """`agent` is the caller's id, or (for the HTTP endpoint, where each request has its own caller) a function that returns it."""
     def me() -> str:
@@ -41,10 +48,10 @@ def build(gm: GraphMem, agent: Union[str, Callable[[], str]]) -> MCPServer:
         return json.dumps(ops.describe())
 
     @server.tool()
-    async def call(tenant: str, op: str, args_json: str = "{}") -> str:
+    async def call(tenant: str, op: str, args_json: Union[str, dict] = "{}") -> str:
         """Run a memory operation on a tenant. args_json is a JSON object of the operation's arguments."""
         try:
-            args = json.loads(args_json or "{}")
+            args = _loads(args_json, {})
             return json.dumps(await ops.invoke(gm, me(), tenant, op, args), default=str)
         except Exception as e:  # tool errors are returned to the model, not raised through the transport
             return json.dumps({"error": f"{type(e).__name__}: {e}"})
@@ -58,10 +65,10 @@ def build(gm: GraphMem, agent: Union[str, Callable[[], str]]) -> MCPServer:
             return json.dumps({"error": f"{type(e).__name__}: {e}"})
 
     @server.tool()
-    async def publish_facts(tenant: str, space: str, fact_ids_json: str) -> str:
+    async def publish_facts(tenant: str, space: str, fact_ids_json: Union[str, list]) -> str:
         """Publish chosen facts from your tenant into a shared space. fact_ids_json is a JSON list of fact ids."""
         try:
-            return json.dumps(await spaces.publish(gm, me(), tenant, space, json.loads(fact_ids_json)))
+            return json.dumps(await spaces.publish(gm, me(), tenant, space, _loads(fact_ids_json, [])))
         except Exception as e:
             return json.dumps({"error": f"{type(e).__name__}: {e}"})
 
@@ -74,13 +81,13 @@ def build(gm: GraphMem, agent: Union[str, Callable[[], str]]) -> MCPServer:
             return json.dumps({"error": f"{type(e).__name__}: {e}"})
 
     @server.tool()
-    async def fork_call(fork_id: str, op: str, args_json: str = "{}") -> str:
+    async def fork_call(fork_id: str, op: str, args_json: Union[str, dict] = "{}") -> str:
         """Run a memory operation on a fork (same operations as call)."""
         try:
             if op not in ops.OPS:
                 raise KeyError(f"unknown operation {op!r}")
             fm = await branch.open_fork(gm, me(), fork_id)
-            return json.dumps(await getattr(fm, op)(**json.loads(args_json or "{}")), default=str)
+            return json.dumps(await getattr(fm, op)(**_loads(args_json, {})), default=str)
         except Exception as e:
             return json.dumps({"error": f"{type(e).__name__}: {e}"})
 

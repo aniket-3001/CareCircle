@@ -242,3 +242,21 @@ async def test_a_signed_in_persons_session_works_as_the_key_and_reaches_only_the
     assert any(n["label"] == "Person" for n in net["nodes"])
     other, _ = await tool(c, h, "call", {"tenant": theirs, "op": "care_people", "args_json": "{}"})
     assert list(other) == ["error"] and other["error"].startswith("PermissionDenied")          # a refusal that echoes the id the caller typed, and nothing else
+
+
+@with_stack
+async def test_arguments_may_be_a_json_string_or_the_object_itself(stack, gm):
+    """The MCP Inspector's command line parses a JSON argument before sending it; other clients send the string. Both must work."""
+    app, c = stack
+    t = tid(gm, "mh-obj")
+    h = await agent(c, "tt-mh-obj", t)
+    await tool(c, h, "call", {"tenant": t, "op": "assert_fact", "args_json": {"subject": "ann", "predicate": "likes", "obj": "tea"}})              # an object
+    await tool(c, h, "call", {"tenant": t, "op": "assert_fact", "args_json": json.dumps({"subject": "tea", "predicate": "grown_in", "obj": "assam"})})   # a string
+    as_obj, _ = await tool(c, h, "call", {"tenant": t, "op": "graph_path", "args_json": {"source": "ann", "target": "assam"}})
+    as_str, _ = await tool(c, h, "call", {"tenant": t, "op": "graph_path", "args_json": '{"source": "ann", "target": "assam"}'})
+    assert as_obj == as_str and as_obj["found"] and as_obj["length"] == 4
+    none, _ = await tool(c, h, "call", {"tenant": t, "op": "graph_schema"})                                                               # omitted
+    assert none["nodes"]
+    raw = await c.post("/mcp", headers=h, json=rpc("tools/call", {"name": "call", "arguments": {"tenant": t, "op": "graph_path", "args_json": [1, 2]}}))   # wrong shape
+    res = raw.json()["result"]
+    assert res["isError"] is True and "args_json" in res["content"][0]["text"]                                  # refused by the tool's own schema, with the argument named
