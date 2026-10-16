@@ -81,6 +81,18 @@ s, a = op(ravi, "care_chat_ask", person=P, question="why does she feel dizzy aft
 check(s == 200 and "prescriber or pharmacist" in a["text"], "a symptom question is pointed to a pharmacist", a)
 s, a = op(ravi, "care_chat_ask", person=P, question="add metformin 500mg twice daily and atorvastatin 20 mg at night")
 check(s == 200 and len(a.get("proposals", [])) == 2, "two medicines in one sentence are two proposals", len(a.get("proposals", [])))
+print("graph algorithms and the MCP door")
+s, v = op(ravi, "graph_path", source=P, target="metformin")
+check(s == 200 and v["found"] and v["path"][0]["ref"] == P and v["path"][-1]["ref"] == "metformin", "the shortest path from the person to a medicine is found", v)
+s, v = op(ravi, "graph_influence", metric="pagerank", top=3)
+check(s == 200 and v["rows"] and "algo.pageRank" in v["cypher"], "PageRank runs on the circle's own graph", v)
+s, v = op(ravi, "graph_communities", method="wcc")
+check(s == 200 and v["groups"] and sum(g["size"] for g in v["groups"]) == v["nodes_in_graph"], "connected groups cover every record once", v)
+check(op(ravi, "graph_influence", metric="degree")[0] == 422, "a bad metric is a clean 422")
+mcp = {"Accept": "application/json, text/event-stream"}
+check(http.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, headers=mcp).status_code == 401, "the MCP endpoint refuses a call with no key")
+r = http.post("/mcp", json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "whoami", "arguments": {}}}, headers={**mcp, **ravi})
+check(r.status_code == 200 and c in r.text, "the MCP endpoint answers the key's holder and names their circle", r.text)
 print("export and erase")
 fhir = ok(ravi, "care_export_fhir", person=P)
 meds = [e["resource"] for e in fhir["entry"] if e["resource"]["resourceType"] == "MedicationStatement"]
