@@ -59,3 +59,18 @@ async def test_a_mark_can_be_undone_by_whoever_made_it_or_the_owner_but_not_by_a
     await owner.care_restore_entry(e["id"])                                               # the owner can undo anyone's mark
     assert await regimen(a) == {"metformin": "500 mg"}
     assert "mistake" not in " ".join(x["text"] for x in await a.care_timeline("asha"))     # restored: the history no longer calls it one
+
+
+async def test_a_receipt_is_keyed_so_a_guessed_line_cannot_be_checked_by_hashing_alone(gm):
+    import hashlib
+    import json
+    t, owner, a, b = await circle(gm)
+    e = await a.care_record("asha", "warfarin", dose_text="5 mg", freq_text="bedtime", source_type="typed", at=1_000_000)
+    out = await owner.care_forget(e["id"], reason="entered twice")
+    guess = hashlib.sha256(json.dumps(["warfarin", "5 mg", "bedtime", "", "carer-a", 1_000_000], sort_keys=True).encode()).hexdigest()
+    assert out["sha256"] != guess                                                        # the old unkeyed form no longer matches a guess
+    same = await owner.care_receipt_check(out["receipt"], drug="warfarin", dose_text="5 mg", freq_text="bedtime", quote="", by="carer-a", at=1_000_000)
+    other = await owner.care_receipt_check(out["receipt"], drug="warfarin", dose_text="50 mg", freq_text="bedtime", quote="", by="carer-a", at=1_000_000)
+    assert same["matches"] is True and other["matches"] is False
+    with pytest.raises(PermissionDenied):
+        await b.care_receipt_check(out["receipt"], drug="warfarin")                      # only the owner may test guesses

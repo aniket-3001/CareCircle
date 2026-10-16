@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import hmac
+import secrets
 import json
 from datetime import datetime, timezone
 from typing import Optional
@@ -254,8 +256,8 @@ class CareViewMixin:
     async def care_forget(self, dose_id: str, reason: str = "") -> dict:
         """Remove one entry for good and return a receipt.
 
-        The dose, frequency, quote, links and acknowledgements are deleted. What stays is a receipt with a SHA-256 of what was removed
-        (so it can be matched to a copy someone kept, but does not reveal it), who did it, and when. Only the owner of the circle may do this: it cannot
+        The dose, frequency, quote, links and acknowledgements are deleted. What stays is a receipt with a keyed hash (HMAC-SHA-256, the key stays on the
+        server) of what was removed, who did it, and when. A plain hash of a short line like "warfarin 5 mg" could be found by trying likely lines; a keyed one cannot. Only the owner of the circle may do this: it cannot
         be undone and it removes what other carers may rely on. Any carer can instead mark an entry as entered by mistake (care_mark_mistake), which keeps it in the history."""
         rows = await self._q("MATCH (x:Dose {id:$id}) RETURN x.drug, x.dose_text, x.freq_text, x.quote, x.by, x.at, x.status, coalesce(x.product, '')",
                              {"id": dose_id}, scope="admin")
@@ -263,7 +265,7 @@ class CareViewMixin:
             raise KeyError(dose_id)
         drug, dt, ft, quote, by, at, status, product = rows[0]
         owner = await self._q("MATCH (x:Dose {id:$id})-[:FOR]->(p:Person) RETURN p.id", {"id": dose_id}, scope="write")
-        digest = hashlib.sha256(json.dumps([drug, dt, ft, quote, by, at], sort_keys=True).encode()).hexdigest()
+        digest = await self._receipt_mac([drug, dt, ft, quote, by, at])
         rid, t = new_id("rcpt"), now_ms()
         await self._q("MATCH (x:Dose {id:$id}) OPTIONAL MATCH (n:Nudge) WHERE n.key CONTAINS $id DETACH DELETE n, x", {"id": dose_id})
         await self._q("CREATE (:Receipt {id:$r, kind:'dose', hash:$h, at:$t, by:$by, reason:$why, removed:'dose, quote, links, acknowledgements'})",
@@ -272,7 +274,7 @@ class CareViewMixin:
             await self._care_rechain(owner[0][0], drug, product)
         left = (await self._q("MATCH (x:Dose {id:$id}) RETURN count(x)", {"id": dose_id}, scope="read"))[0][0]
         return {"receipt": rid, "forgotten": left == 0, "removed": "the entry, its quote, its links and acknowledgements", "sha256": digest,
-                "note": "The hash lets you match this to a copy someone else kept; it does not reveal the content."}
+                "note": "The receipt code lets this server match it to a copy someone kept (care_receipt_check); without the server's key it cannot be tried against guesses."}
 
     async def care_mark_mistake(self, dose_id: str, reason: str = "") -> dict:
         """Take an entry off the record as entered by mistake, without erasing it: it stays in the history, marked, with who marked it and why, and the entry
@@ -307,7 +309,7 @@ class CareViewMixin:
         doses = await self._q("MATCH (x:Dose)-[:FOR]->(:Person {id:$p}) RETURN x.id", {"p": p}, scope="admin")      # owners only
         ids = [r[0] for r in doses]
         gives = (await self._q("MATCH (g:Give {person:$p}) RETURN count(g)", {"p": p}))[0][0]
-        digest = hashlib.sha256(json.dumps([p, sorted(ids)]).encode()).hexdigest()
+        digest = await self._receipt_mac([p, sorted(ids)])
         await self._q("MATCH (g:Give {person:$p}) DELETE g", {"p": p})
         await self._q("MATCH (h:Handover {person:$p}) DELETE h", {"p": p})
         await self._q("MATCH (w:Watch) WHERE w.key STARTS WITH $k DELETE w", {"k": p + "|"})
@@ -323,6 +325,27 @@ class CareViewMixin:
                       {"r": rid, "h": digest, "t": now_ms(), "by": norm(self.agent), "rm": f"{len(ids)} entries, {gives} dose records"})
         left = (await self._q("MATCH (x:Dose)-[:FOR]->(:Person {id:$p}) RETURN count(x)", {"p": p}, scope="read"))[0][0]
         return {"receipt": rid, "forgotten": left == 0, "removed_entries": len(ids), "removed_dose_records": gives, "sha256": digest}
+
+    async def _receipt_key(self) -> bytes:
+        """The circle's own random key for receipts: made once, kept in the circle's graph, never returned by any operation."""
+        rows = await self._q("MATCH (s:Setting {key:'receipt_key'}) RETURN s.value LIMIT 1", scope="read", checked=True)
+        if rows:
+            return bytes.fromhex(rows[0][0])
+        key = secrets.token_hex(32)
+        await self._q("MERGE (s:Setting {key:'receipt_key'}) ON CREATE SET s.value=$v", {"v": key}, checked=True)
+        rows = await self._q("MATCH (s:Setting {key:'receipt_key'}) RETURN s.value LIMIT 1", scope="read", checked=True)
+        return bytes.fromhex(rows[0][0])
+
+    async def _receipt_mac(self, parts: list) -> str:
+        return hmac.new(await self._receipt_key(), json.dumps(parts, sort_keys=True).encode("utf-8"), hashlib.sha256).hexdigest()
+
+    async def care_receipt_check(self, receipt: str, drug: str = "", dose_text: str = "", freq_text: str = "", quote: str = "", by: str = "", at: int = 0) -> dict:
+        """Does a copy someone kept (the medicine, strength, frequency, quoted line, writer and time) match what a dose receipt says was erased? Admin only."""
+        rows = await self._q("MATCH (r:Receipt {id:$r, kind:'dose'}) RETURN r.hash", {"r": receipt}, scope="admin")
+        if not rows:
+            raise KeyError(receipt)
+        mine = await self._receipt_mac([norm(drug), dose_text, freq_text, quote, norm(by), at])
+        return {"receipt": receipt, "matches": hmac.compare_digest(mine, rows[0][0])}
 
     async def care_receipts(self) -> list[dict]:
         """Receipts of everything that was removed for good (hash, who, when), newest first."""
