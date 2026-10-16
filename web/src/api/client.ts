@@ -41,6 +41,8 @@ export function apiFor(s: Session) {
     trend: (kind: string, drug = '', now = Date.now()) => op<Trend>('care_trend', { person: p, kind, drug, now }),
     appoint: (title: string, at: number, place: string, who: string, bring: string) => op<{ id: string }>('care_appoint', { person: p, title, at, place, who, bring }),
     appointments: (now = Date.now()) => op<Appointment[]>('care_appointments', { person: p, now }),
+    editAppointment: (id: string, f: { title: string; at: number; place: string; who: string; bring: string }) => op<{ id: string }>('care_appointment_edit', { appointment_id: id, ...f }),
+    editProfileItem: (id: string, text: string) => op<{ id: string; resolved_to: string }>('care_profile_edit', { item_id: id, text }),
     cancelAppointment: (id: string) => op<{ id: string }>('care_appointment_cancel', { appointment_id: id }),
     visit: (id = '', now = Date.now()) => op<Visit>('care_since_visit', { person: p, appointment_id: id, now }),
     profile: () => op<CareProfile>('care_profile', { person: p }),
