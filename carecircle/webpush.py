@@ -10,10 +10,13 @@ import asyncio
 import hashlib
 from urllib.parse import urlparse
 import json
+import logging
 import os
 from typing import Optional
 
 from graphmem.db import now_ms
+
+log = logging.getLogger("carecircle.webpush")
 
 
 def public_key() -> str:
@@ -85,17 +88,27 @@ async def subscriptions(gm, agent: str) -> list[dict]:
     return [dict(endpoint=r[0], p256dh=r[1], auth=r[2], hash=r[3]) for r in rows]
 
 
+def _vapid():
+    """The signing key as an object. pywebpush reads a plain string as base64 DER, never as a PEM, so handing it the PEM text fails to parse."""
+    from py_vapid import Vapid
+    return Vapid.from_pem(_private_pem().encode())
+
+
 def _send_one(sub: dict, payload: dict) -> Optional[bool]:
-    """True sent, False subscription gone, None other failure."""
+    """True sent, False subscription gone, None other failure (logged without any key or address)."""
     from pywebpush import WebPushException, webpush
     try:
         webpush(subscription_info={"endpoint": sub["endpoint"], "keys": {"p256dh": sub["p256dh"], "auth": sub["auth"]}}, data=json.dumps(payload),
-                vapid_private_key=_private_pem(), vapid_claims={"sub": os.getenv("CC_VAPID_SUBJECT") or "mailto:carecircle@example.com"}, ttl=3600, timeout=8)
+                vapid_private_key=_vapid(), vapid_claims={"sub": os.getenv("CC_VAPID_SUBJECT") or "mailto:carecircle@example.com"}, ttl=3600, timeout=8)
         return True
     except WebPushException as e:
         code = getattr(getattr(e, "response", None), "status_code", None)
-        return False if code in (404, 410) else None
-    except Exception:
+        if code in (404, 410):
+            return False
+        log.warning("push not delivered: the push service answered %s", code)
+        return None
+    except Exception as e:  # noqa: BLE001
+        log.warning("push not delivered: %s", type(e).__name__)
         return None
 
 

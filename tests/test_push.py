@@ -1,4 +1,6 @@
 """Browser notifications: keys decide whether the feature exists, subscriptions belong to an account, dead ones are dropped, delivery shares the one claim."""
+import os
+
 import pytest
 
 from carecircle import webpush
@@ -53,3 +55,46 @@ async def test_subscribe_validates_and_dead_endpoints_are_removed(gm, keys, monk
 async def test_push_is_a_noop_when_disabled(gm, monkeypatch):
     monkeypatch.delenv("CC_VAPID_PUBLIC", raising=False)
     assert await webpush.push(gm, "nobody", "x") == 0
+
+
+def _browser_subscription():
+    """What a browser would hand us: a real P-256 public key and an auth secret, so the message is genuinely encrypted."""
+    import base64
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    pub = ec.generate_private_key(ec.SECP256R1()).public_key().public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+    b64 = lambda b: base64.urlsafe_b64encode(b).rstrip(b"=").decode()  # noqa: E731
+    return {"endpoint": "https://fcm.googleapis.com/fcm/send/abc", "p256dh": b64(pub), "auth": b64(os.urandom(16))}
+
+
+class _Reply:
+    def __init__(self, code):
+        self.status_code, self.text, self.headers, self.ok, self.reason = code, "", {}, code < 400, "x"
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise __import__("requests").HTTPError(response=self)
+
+
+def test_a_message_is_really_signed_and_encrypted_with_the_server_key(keys, monkeypatch):
+    """Everything but the network: the key we store must be usable by the library that signs. (It once was not: a PEM string was read as base64.)"""
+    import requests
+    seen = {}
+
+    def fake_post(url, data=None, headers=None, **kw):
+        seen.update(url=url, headers=headers, body=data)
+        return _Reply(201)
+
+    monkeypatch.setattr(requests, "post", fake_post)
+    assert webpush._send_one(_browser_subscription(), {"title": "Care Circle", "body": "hello"}) is True
+    assert seen["url"].startswith("https://fcm.googleapis.com/")
+    auth = seen["headers"]["Authorization"]
+    assert auth.startswith("vapid t=") and f"k={keys['CC_VAPID_PUBLIC']}" in auth            # signed, and the key matches what browsers were told
+    assert b"hello" not in seen["body"]                                                     # the text is encrypted on the wire
+
+
+@pytest.mark.parametrize("code,expected", [(404, False), (410, False), (500, None), (403, None)])
+def test_what_the_push_service_answers_decides_what_happens(keys, monkeypatch, code, expected):
+    import requests
+    monkeypatch.setattr(requests, "post", lambda *a, **k: _Reply(code))
+    assert webpush._send_one(_browser_subscription(), {"title": "t", "body": "b"}) is expected
