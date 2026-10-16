@@ -47,6 +47,22 @@ async def test_allergy_hits_ask_never_advise(gm):
     assert r["id"]
 
 
+async def test_allergy_groups_are_matched_by_the_words_a_family_uses_and_only_as_whole_words(gm):
+    from carecircle.classes import group_of
+    assert group_of("Sulpha drugs")[0] == "sulfa" and group_of("allergic to cephalosporins")[0] == "cephalosporin"
+    assert group_of("Telmisartan rash")[0] == "" and group_of("ace")[0] == "ace inhibitor"
+    assert group_of("grace")[0] == "" and group_of("peanuts")[0] == ""                        # a word inside another word is not a class
+    m = await _m(gm, "alc")
+    await m.care_record("asha", "ciprofloxacin", dose_text="500 mg")
+    await m.care_record("asha", "telmisartan", dose_text="40 mg")
+    await m.care_record("asha", "metformin", dose_text="500 mg")
+    await m.care_allergy_add("asha", "Quinolones")
+    await m.care_allergy_add("asha", "ARBs")
+    out = await m.care_allergy_check("asha")
+    assert {h["drug"] for h in out["hits"]} == {"ciprofloxacin", "telmisartan"}
+    assert all("not verified" in h["why"] for h in out["hits"])
+
+
 async def test_what_to_bring_is_assembled_from_the_record(gm):
     m = await _m(gm, "wb")
     now = int(time.time() * 1000)

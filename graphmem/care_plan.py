@@ -14,20 +14,9 @@ from typing import Optional
 
 from .db import new_id, norm, now_ms
 from .textcheck import fit
+from carecircle.classes import group_of
 
 H = 3_600_000
-# A short, hand-written list of common allergy groups -> medicines that belong to them. Deliberately small and labelled as such: a miss is possible,
-# which is why a hit is a prompt to ask, and the absence of a hit is never shown as "safe".
-ALLERGY_GROUPS = {
-    "penicillin": ("amoxicillin", "ampicillin", "penicillin v", "penicillin g", "piperacillin", "flucloxacillin", "dicloxacillin"),
-    "sulfa": ("sulfamethoxazole", "sulfasalazine", "sulfadiazine"),
-    "nsaid": ("ibuprofen", "naproxen", "diclofenac", "acetylsalicylic acid", "aspirin", "ketorolac", "celecoxib", "indomethacin"),
-    "aspirin": ("acetylsalicylic acid", "aspirin"),
-    "statin": ("atorvastatin", "simvastatin", "rosuvastatin", "pravastatin", "lovastatin"),
-    "macrolide": ("clarithromycin", "azithromycin", "erythromycin"),
-    "ace inhibitor": ("lisinopril", "enalapril", "ramipril", "captopril"),
-}
-
 
 class CarePlanMixin:
     # ------------------------------------------------------------------ appointments
@@ -162,9 +151,9 @@ class CarePlanMixin:
         hits = []
         for a in prof["allergies"]:
             text = norm(a["text"])
-            group = next((m for g, m in ALLERGY_GROUPS.items() if g in text), ())
+            gname, group = group_of(a["text"])
             for r in reg:
                 if r["drug"] == a["drug"] or r["drug"] in group or r["drug"] in text:
                     hits.append({"allergy": a["text"], "drug": r["drug"], "entry": r["id"],
-                                 "why": "the exact medicine" if r["drug"] == a["drug"] or r["drug"] in text else f"a {next(g for g, m in ALLERGY_GROUPS.items() if g in text)} medicine (short built-in list)"})
+                                 "why": "the exact medicine" if r["drug"] == a["drug"] or r["drug"] in text else f"a {gname} medicine (short hand-written list, not verified)"})
         return {"hits": hits, "allergies": len(prof["allergies"]), "note": "A hit means ask the prescriber or pharmacist. No hit does not mean there is no problem: the list of groups is short."}
