@@ -272,6 +272,9 @@ class Accounts:
         code = re.sub(r"[^A-Za-z0-9]", "", code).upper()
         if not await self.hit(f"join|{agent}", 10, 900):
             raise AuthProblem("Too many tries. Wait a few minutes.", 429)
+        peek = await self._q("MATCH (i:Invite {hash:$h}) WHERE i.exp > $now RETURN i.circle", {"h": _sha(code), "now": now_ms()})
+        if peek and await self.role(agent, peek[0][0]):          # already in: say so, and leave the code unused for the person it was meant for
+            raise AuthProblem("You are already in this circle.", 409)
         r = await self._q("MATCH (i:Invite {hash:$h}) WHERE i.exp > $now WITH i, i.circle AS c DETACH DELETE i RETURN c", {"h": _sha(code), "now": now_ms()})
         if not r:
             raise AuthProblem("That code is not valid, or it has expired or been used.", 404)
