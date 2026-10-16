@@ -19,7 +19,7 @@ def sign_up(pg, name, email):
     pg.get_by_test_id("open-signup").click()
     pg.get_by_label("Your name").fill(name)
     pg.get_by_label("Email").fill(email)
-    pg.get_by_label("Password").fill(PW)
+    pg.get_by_label("Password", exact=True).fill(PW)
     pg.get_by_test_id("auth").get_by_role("button", name="Create account").click()
 
 
@@ -224,7 +224,7 @@ with sync_playwright() as p:
     expect(pg.get_by_test_id("top-signup")).to_be_visible(timeout=15000)
     pg.get_by_test_id("top-signin").click()
     pg.get_by_label("Email").fill(f"kavya{stamp}@full.test")
-    pg.get_by_label("Password").fill(PW)
+    pg.get_by_label("Password", exact=True).fill(PW)
     pg.get_by_test_id("auth").get_by_role("button", name="Sign in", exact=True).click()
     expect(pg.get_by_text("Warfarin").first).to_be_visible(timeout=15000)
     print("9 account + sign out/in ok; the data was on the server")
