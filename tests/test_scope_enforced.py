@@ -44,3 +44,24 @@ async def test_read_operations_still_work_for_a_read_only_key(gm):
     reg = await ops.invoke(gm, "scope-ro3", t, "care_regimen", {"person": "asha"})
     assert [r["drug"] for r in reg] == ["metformin"]
     assert await ops.invoke(gm, "scope-ro3", t, "graph_schema", {})
+
+
+async def test_a_caller_cannot_vouch_for_its_own_photo(gm):
+    """A typed API call with source_type 'photo' and a source_text it wrote itself used to come back verified. Only text the server's own reader stored counts."""
+    t = tid(gm, "src")
+    await gm.grant("src-w", t, ("read", "write"))
+    m = gm.open("src-w", t)
+    forged = await m.care_record("asha", "warfarin", dose_text="5 mg", source_type="photo", quote="Warfarin 5 mg", source_text="Warfarin 5 mg tablets")
+    assert forged["status"] == "pending" and forged["verified"] is False                     # its own claim is ignored
+    wrong_kind = await m.care_record("asha", "aspirin", dose_text="75 mg", source_type="voice", quote="Aspirin 75 mg",
+                                     source_ref=await m.care_store_source("image", "Aspirin 75 mg tablets"))
+    assert wrong_kind["status"] == "pending"                                                # a stored photo is not a voice note
+    other = await m.care_record("asha", "metformin", dose_text="500 mg", source_type="photo", quote="Metformin 500 mg", source_ref="src_does_not_exist")
+    assert other["status"] == "pending"
+    real = await m.care_record("asha", "atorvastatin", dose_text="20 mg", source_type="photo", quote="Atorvastatin 20 mg",
+                               source_ref=await m.care_store_source("image", "CITY PHARMACY\nAtorvastatin 20 mg tablets"))
+    assert real["status"] == "confirmed" and real["verified"] is True
+    with pytest.raises(ValueError):
+        await m.care_store_source("typed", "anything")
+    from graphmem import ops
+    assert "care_store_source" not in ops.OPS                                                # callers cannot create sources through the API or MCP

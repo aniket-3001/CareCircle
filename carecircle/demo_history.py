@@ -72,8 +72,11 @@ async def build(ravi, meena, person: str, now: int) -> None:
     ts = lambda days_ago, hours=0: now - int(days_ago * D) - hours * H          # noqa: E731
 
     async def rec(who, days_ago, drug, dose, freq, src="typed", quote="", text="", action="set"):
+        ref = ""
+        if src != "typed":                                                       # a photo or letter: its text is stored the way the app's own reader stores it
+            ref = await handle[who].care_store_source({"photo": "image"}.get(src, src), text)
         r = await handle[who].care_record(person, drug, action=action, dose_text=dose, freq_text=freq, source_type=src, quote=quote,
-                                          source_text=text, at=ts(days_ago))
+                                          source_ref=ref, at=ts(days_ago))
         return r["id"]
 
     async def ack(who, dose_id, days_ago, extra_hours=0.0):

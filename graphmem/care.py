@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import difflib
+import hashlib
 import os
 import re
 from datetime import datetime, timezone
@@ -29,6 +30,7 @@ from .textcheck import fit
 _checker: Optional[Checker] = None
 _algos: Optional[Algos] = None
 SOURCES = ("typed", "photo", "voice", "document")
+SOURCE_KIND = {"photo": "image", "voice": "voice", "document": "document"}      # what the server's own reader calls each kind of source it has read
 H = 3_600_000
 
 
@@ -88,14 +90,20 @@ class CareMixin:
 
     async def care_record(self, person: str, drug: str, action: str = "set", dose_text: str = "", freq_text: str = "",
                           source_type: str = "typed", quote: str = "", source_text: str = "", confirm: bool = True,
-                          at: Optional[int] = None, edited: str = "") -> dict:
+                          at: Optional[int] = None, edited: str = "", source_ref: str = "") -> dict:
         """A change to what `person` takes. action 'set' (start/change) or 'stop'. The previous current entry is closed and linked
-        by SUPERSEDES. If `quote` is given it must occur in `source_text` (the OCR/transcript), else the entry stays UNVERIFIED and
-        PENDING until someone confirms it with care_confirm; pending entries never reach the regimen or the checks."""
+        by SUPERSEDES. If `quote` is given it must occur in the text it was read from, else the entry stays UNVERIFIED and PENDING until someone
+        confirms it with care_confirm; pending entries never reach the regimen or the checks. For a photo, voice note or document the text is the one
+        the SERVER read (named by `source_ref`, returned by /intake): text a caller sends along cannot vouch for itself. For typed entries the caller's
+        own `source_text` is the source."""
         if action not in ("set", "stop"):
             raise ValueError("action must be 'set' or 'stop'")
         if source_type not in SOURCES:
             raise ValueError(f"source_type must be one of {SOURCES}")
+        stored = None
+        if source_type != "typed":
+            stored = await self._source(source_ref, SOURCE_KIND[source_type]) if source_ref else None
+            source_text = stored["text"] if stored else ""                # never the caller's own claim about what a photo said
         verified = quote_in_source(quote, source_text) if quote else source_type == "typed"
         status = "confirmed" if (confirm and verified) else "pending"
         d, ts, did = norm(drug), (now_ms() if at is None else at), new_id("dose")
@@ -124,16 +132,35 @@ class CareMixin:
             CREATE (x:Dose {id:$id, drug:$d, dose_text:$dt, freq_text:$ft, valid_from:$ts, cur:false, action:$a, status:$st,
                             source_type:$src, quote:$q, verified:$v, by:$by, at:$ts, created_at:$now, edited:$ed})
             CREATE (x)-[:FOR]->(p) CREATE (x)-[:OF]->(dr)
+            WITH x OPTIONAL MATCH (s:Source {id:$sref}) FOREACH (_ IN CASE WHEN s IS NULL THEN [] ELSE [1] END | CREATE (x)-[:READ_FROM]->(s))
             RETURN x.id""",
             {"p": norm(person), "d": d, "id": did, "dt": dose_text, "ft": freq_text, "ts": ts, "now": now_ms(), "a": action, "st": status,
-             "src": source_type, "q": quote[:200], "v": verified, "by": norm(self.agent), "ed": ",".join(sorted({x for x in edited.split(",") if x in ("drug", "dose", "freq")}))})
+             "src": source_type, "q": quote[:200], "v": verified, "by": norm(self.agent), "ed": ",".join(sorted({x for x in edited.split(",") if x in ("drug", "dose", "freq")})),
+             "sref": stored["id"] if stored else ""})
         if status == "confirmed":
             await self._care_activate(did)
         out = {"id": rows[0][0], "status": status, "verified": verified,
-               "note": None if verified else "quote not found in the source text: confirm manually before it counts"}
+               "note": None if verified else ("no stored source for this " + source_type + ": confirm manually before it counts" if source_type != "typed" and not stored
+                                              else "quote not found in the source text: confirm manually before it counts")}
         if warning:
             out["warning"] = warning
         return out
+
+    async def care_store_source(self, kind: str, text: str) -> str:
+        """Keep the text the server read from a photo, voice note or document, and return its id. NOT an operation callers can reach: only the server's own
+        intake (OCR, speech to text, document reader) calls it, so a stored source is evidence of what was really read, not of what a caller says it read."""
+        if kind not in SOURCE_KIND.values():
+            raise ValueError("unknown source kind")
+        text = (text or "")[:20000]
+        sid = new_id("src")
+        await self._q("MATCH (o:Source) WHERE o.at < $old AND NOT (:Dose)-[:READ_FROM]->(o) DELETE o", {"old": now_ms() - 7 * 24 * H})
+        await self._q("CREATE (:Source {id:$i, kind:$k, text:$t, sha256:$h, by:$by, at:$n})",
+                      {"i": sid, "k": kind, "t": text, "h": hashlib.sha256(text.encode("utf-8")).hexdigest(), "by": norm(self.agent), "n": now_ms()})
+        return sid
+
+    async def _source(self, ref: str, kind: str) -> Optional[dict]:
+        rows = await self._q("MATCH (s:Source {id:$i, kind:$k}) RETURN s.id, s.text", {"i": ref, "k": kind}, scope="read", checked=True)
+        return {"id": rows[0][0], "text": rows[0][1]} if rows else None
 
     async def _care_activate(self, did: str) -> None:
         """A confirmed entry has joined the record: lay out that medicine's whole timeline again."""

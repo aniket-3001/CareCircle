@@ -25,7 +25,7 @@ async def seeded(gm):
         r = await c["ravi"].care_record("asha", d, dose_text=dose, freq_text=freq)
         await c["meena"].care_ack(r["id"])
     await c["meena"].care_record("asha", "clarithromycin", dose_text="500 mg", freq_text="twice daily", source_type="photo",
-                                 quote="Clarithromycin 500 mg tablets", source_text="x\nClarithromycin 500 mg tablets\ny", at=now - 5 * H)
+                                 quote="Clarithromycin 500 mg tablets", source_ref=await c["meena"].care_store_source("image", "x\nClarithromycin 500 mg tablets\ny"), at=now - 5 * H)
     await c["ravi"].care_give("asha", "metformin", "2026-10-16 08:00")
     return t, c, now
 

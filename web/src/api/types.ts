@@ -105,6 +105,7 @@ export interface Proposal {
 
 export interface IntakeResult {
   source: { kind: string; method: string; status: string; note: string | null };
+  source_id?: string;
   text: string;
   proposals: Proposal[];
 }

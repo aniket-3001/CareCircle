@@ -195,11 +195,14 @@ class Bot:
         kinds = {"image": "photo", "voice": "voice", "document": "document"}
         link = await self._link(chat)
         who = await self._patient(self.gm.open(link["agent"], link["circle"])) if link else "mum"   # the circle's person
+        sid = ""
+        if link and kinds.get(src["kind"]):                          # keep what was read, so the saved entry can be checked against it and points back at it
+            sid = await self.gm.open(link["agent"], link["circle"]).care_store_source(src["kind"], src["text"])
         for p in props[:4]:
             cid = os.urandom(4).hex()
             top = p["drug_candidates"][0]["name"]
             await self._hold(cid, chat, {"drug": top, "dose_text": p.get("dose_text", ""), "freq_text": p.get("freq_text", ""),
-                                 "quote": p["quote"], "source_text": src["text"], "source_type": kinds.get(src["kind"], "typed")})
+                                 "quote": p["quote"], "source_ref": sid, "source_type": kinds.get(src["kind"], "typed")})
             alt = ", ".join(c["name"] for c in p["drug_candidates"][1:])
             await self.api.send(chat, f"I read: {top} {p.get('dose_text', '')} {p.get('freq_text', '')}\nFrom: \"{p['quote'][:120]}\""
                                 f"{' (quote verified)' if p.get('verified') else ' (could not verify the quote)'}"
@@ -215,7 +218,8 @@ class Bot:
             return await self.api.send(chat, "Discarded." if kind == "no" else "That request expired.")
         mem = self.gm.open(link["agent"], link["circle"])
         r = await mem.care_record(person or await self._patient(mem), p["drug"], dose_text=p["dose_text"], freq_text=p["freq_text"],
-                                  source_type=p["source_type"], quote=p["quote"], source_text=p["source_text"])
+                                  source_type=p["source_type"], quote=p["quote"], source_ref=p.get("source_ref", ""),
+                                  source_text=p.get("source_text", ""))
         if r["status"] == "pending":
             await mem.care_confirm(r["id"])                          # the person just confirmed by tapping
         await self.api.send(chat, f"Saved {p['drug']} for {person or 'the person'}. Other carers will be asked to acknowledge it.")

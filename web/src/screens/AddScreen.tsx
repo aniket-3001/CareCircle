@@ -132,7 +132,7 @@ export function AddScreen(): React.JSX.Element {
           )}
           {props.map((p, i) => (
             <motion.div key={`${p.quote}-${i}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-              <ProposalCard p={p} kind={KINDS[result?.source.kind ?? 'typed'] ?? 'typed'} sourceText={result?.text ?? ''} onDone={() => setProps((cur) => cur.filter((_, j) => j !== i))} />
+              <ProposalCard p={p} kind={KINDS[result?.source.kind ?? 'typed'] ?? 'typed'} sourceText={result?.text ?? ''} sourceId={result?.source_id ?? ''} onDone={() => setProps((cur) => cur.filter((_, j) => j !== i))} />
             </motion.div>
           ))}
         </div>
@@ -141,7 +141,7 @@ export function AddScreen(): React.JSX.Element {
   );
 }
 
-export function ProposalCard({ p, kind, sourceText, onDone }: { p: Proposal; kind: 'photo' | 'voice' | 'document' | 'typed'; sourceText: string; onDone: () => void }): React.JSX.Element {
+export function ProposalCard({ p, kind, sourceText, sourceId = '', onDone }: { p: Proposal; kind: 'photo' | 'voice' | 'document' | 'typed'; sourceText: string; sourceId?: string; onDone: () => void }): React.JSX.Element {
   const app = useApp();
   const toast = useToast();
   const [drug, setDrug] = useState(p.drug_candidates[0]?.name ?? '');
@@ -153,7 +153,7 @@ export function ProposalCard({ p, kind, sourceText, onDone }: { p: Proposal; kin
     setBusy(true);
     try {
       const edited = [drug !== (p.drug_candidates[0]?.name ?? '') && 'drug', dose !== p.dose_text && 'dose', freq !== p.freq_text && 'freq'].filter(Boolean).join(',');
-      const r = await app.api.record({ edited, drug, dose_text: dose, freq_text: freq, source_type: kind, quote: p.quote, source_text: sourceText || p.quote });
+      const r = await app.api.record({ edited, drug, dose_text: dose, freq_text: freq, source_type: kind, quote: p.quote, source_text: sourceText || p.quote, source_ref: sourceId });
       await app.api.confirm(r.id);
       toast(`Saved ${title(drug)}. ${r.warning ? `${r.warning} ` : ''}The other carers will be asked to acknowledge it.`);
       app.bump();

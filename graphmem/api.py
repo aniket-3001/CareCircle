@@ -270,7 +270,7 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
         import asyncio
         from carecircle import intake as ci
         m = gm.open(agent, tenant)
-        await m.care_resolve("x")                                    # read-scope check on the tenant
+        await m._guard("write")                                      # reading a source stores it (so an entry can point at what it was read from)
         from graphmem.care import checker
         if file is not None:
             data = await file.read(ci.MAX_BYTES + 1)
@@ -282,7 +282,8 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
         img = data if file is not None and src["kind"] == "image" else None
         fmt = (file.filename.rsplit(".", 1)[-1].lower() if img else "png").replace("jpg", "jpeg")
         props = await asyncio.to_thread(ci.propose, src["text"], checker(), img, fmt if fmt in ("png", "jpeg", "webp") else "png")
-        return {"source": {k: src[k] for k in ("kind", "method", "status", "note")}, "text": src["text"], "proposals": props}
+        sid = await m.care_store_source(src["kind"], src["text"]) if src["kind"] in ("image", "voice", "document") else ""
+        return {"source": {k: src[k] for k in ("kind", "method", "status", "note")}, "source_id": sid, "text": src["text"], "proposals": props}
 
     @app.post("/v1/tenants/{tenant}/forks")
     async def fork_create(tenant: str, b: ForkBody, agent: str = Depends(agent_id)):

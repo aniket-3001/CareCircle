@@ -28,7 +28,7 @@ async def messy_history(ravi, meena):
     await ravi.care_record("mum", "metformin", action="stop", at=NOW - 20 * H)
     await ravi.care_record("mum", "metformin", dose_text="850 mg", freq_text="twice daily", at=NOW - 5 * H)     # restarted
     await ravi.care_record("mum", "atorvastatin", dose_text="20 mg", freq_text="at night", source_type="photo",
-                           quote="Atorvastatin 20mg", source_text="no such words here")                       # pending: not on the record
+                           quote="Atorvastatin 20mg", source_ref=await ravi.care_store_source("image", "no such words here"))                       # pending: not on the record
     await ravi.care_record("dad", "amlodipine", dose_text="5 mg", freq_text="daily", at=NOW - 12 * H)         # a second person
     await meena.care_ack(a["id"])
     await meena.care_ack(b["id"])

@@ -56,10 +56,10 @@ async def test_supersession_quote_verify_and_regimen(gm):
     t, c = await circle(gm, "ravi", "meena")
     m = c["ravi"]
     a = await m.care_record("mum", "warfarin", dose_text="5 mg", freq_text="at bedtime", source_type="photo",
-                            quote="Warfarin Sodium 5mg", source_text="CITYPHARMACYRx48213 WarfarinSodium5mgtablets Qty30")
+                            quote="Warfarin Sodium 5mg", source_ref=await m.care_store_source("image", "CITYPHARMACYRx48213 WarfarinSodium5mgtablets Qty30"))
     assert a["status"] == "confirmed" and a["verified"]
     b = await m.care_record("mum", "warfarin", dose_text="3 mg", source_type="photo", quote="Warfarin 3 mg",
-                            source_text="something else entirely")
+                            source_ref=await m.care_store_source("image", "something else entirely"))
     assert b["status"] == "pending" and not b["verified"]             # quote not in source: never counts until confirmed
     assert [r["dose_text"] for r in await m.care_regimen("mum")] == ["5 mg"]
     await m.care_confirm(b["id"])
@@ -306,7 +306,7 @@ async def _regimen_with_conflict(gm):
     for d in ("atorvastatin", "amlodipine", "metformin"):
         await c["ravi"].care_record("asha", d, dose_text="10 mg", freq_text="once daily")
     r = await c["meena"].care_record("asha", "clarithromycin", dose_text="500 mg", freq_text="twice daily", source_type="photo",
-                                     quote="Clarithromycin 500 mg tablets", source_text="DEMO\nClarithromycin 500 mg tablets\nTake one")
+                                     quote="Clarithromycin 500 mg tablets", source_ref=await c["meena"].care_store_source("image", "DEMO\nClarithromycin 500 mg tablets\nTake one"))
     return t, c, r
 
 

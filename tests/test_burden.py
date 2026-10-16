@@ -33,8 +33,8 @@ async def test_reading_stats_count_corrections_without_keeping_text(gm):
     await gm.grant("ravi", t, ("read", "write"))
     m = gm.open("ravi", t)
     src = "Warfarin 4 mg every evening"
-    await m.care_record("asha", "warfarin", dose_text="4 mg", source_type="photo", quote="Warfarin 4 mg", source_text=src)
-    await m.care_record("asha", "metformin", dose_text="500 mg", source_type="voice", quote="metformin 500 mg", source_text="metformin 500 mg", edited="dose")
+    await m.care_record("asha", "warfarin", dose_text="4 mg", source_type="photo", quote="Warfarin 4 mg", source_ref=await m.care_store_source("image", src))
+    await m.care_record("asha", "metformin", dose_text="500 mg", source_type="voice", quote="metformin 500 mg", source_ref=await m.care_store_source("voice", "metformin 500 mg"), edited="dose")
     await m.care_record("asha", "vitamin d", dose_text="1000 iu")                      # typed: not a reading
     s = await m.care_reading_stats("asha")
     assert (s["saved"], s["unchanged"]) == (2, 1) and "1 were saved exactly as read" in s["statement"] and set(s["by_source"]) == {"photo", "voice"}
