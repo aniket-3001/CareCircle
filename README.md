@@ -62,7 +62,7 @@ carer-acknowledgement state, the dose-slot guard and the access grants all live 
 | Feature | What the graph does | Without it |
 |---|---|---|
 | Interaction check | `(a:Drug)-[:INTERACTS {level}]-(b:Drug)` over the regimen, plus a 2-hop enzyme path `(x)-[:INHIBITS]->(:Enzyme)<-[:SUBSTRATE_OF]-(y)` | no shared knowledge to check against |
-| Who has not seen a change | `(:Carer)-[:ACKED]->(:Dose)` absence per carer; age-weighted divergence | a flat log cannot say who is behind (baseline "last change only" is right in 0/40 circles, the graph query in 40/40) |
+| Who has not seen a change | `(:Carer)-[:ACKED]->(:Dose)` absence per carer; age-weighted divergence | a log that only tracks each carer's latest change is right in 4/40 test circles; the graph query is right in 40/40. A log with a separate acknowledgements table can do the same job, so this is correctness, not a claim that only a graph can do it |
 | History, "what did we know then?" | `Dose -[:SUPERSEDES]-> Dose` with `valid_from/valid_to`; as-of queries | overwrites lose the past |
 | No double dose | one `MERGE (:Give {key})` claim per slot, single atomic query | two carers both think they gave it (exactly one winner in 100/100 races of 10 concurrent claims) |
 | Verified intake | each entry keeps `source_type` and the exact `quote` from the OCR/transcript | an unexplained entry |
@@ -288,6 +288,8 @@ This project was built with substantial help from Claude (Anthropic) via Claude 
 AI assistance and reviewed and run by the author. At runtime, an optional Amazon Bedrock model (Amazon Nova) only turns OCR/transcript text into
 proposed fields; it never decides interactions or doses.
 
+**Commits carry no AI co-author line.** The git history lists the author only, and no "Co-Authored-By" trailer for Claude or any other assistant appears on any commit or pull request on GitHub; AI assistance is disclosed here, in the README, instead. Contributors should keep it that way: write the commit message as the author and leave assistant trailers out.
+
 ## Run it
 Deployed on one AWS EC2 instance (t3.large, Docker Compose, Caddy for HTTPS, Bedrock through the instance role, only ports 80/443 open): `deploy/docker-compose.prod.yml`.
 
@@ -303,7 +305,7 @@ python scripts/fetch_reference.py                                           # DD
 python -c "from carecircle import reference as r; print(r.load())"          # build the shared cc_ref graph
 (cd web && npm ci && npm run build)                                         # the React app (served by the API from web/dist)
 python -m graphmem.api                                                      # http://127.0.0.1:8000
-python -m pytest -q tests                                                   # 112 tests against live FalkorDB
+python -m pytest -q tests                                                   # the whole suite, against a live FalkorDB
 (cd web && npm test)                                                        # UI unit tests; `npm run dev` for hot reload (proxies to :8000)
 PORT=8000 python scripts/ui_e2e.py && PORT=8000 python scripts/ui_e2e_accounts.py    # browser walk-throughs: demo, then accounts (need Chrome and `pip install playwright`)
 PYTHONPATH=. python bench/care_bench.py                                     # benchmarks below (`--out run.json`, then `python bench/gate.py bench/baselines/care_bench.json run.json` compares two runs)
