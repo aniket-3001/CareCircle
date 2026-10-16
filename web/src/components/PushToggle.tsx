@@ -37,9 +37,10 @@ export function PushToggle(): React.JSX.Element | null {
       const j = sub.toJSON();
       const r = await fetch('/v1/push/subscribe', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ endpoint: j.endpoint, p256dh: j.keys?.p256dh, auth: j.keys?.auth }) });
       if (!r.ok) throw new Error('The server did not accept the subscription.');
-      await fetch('/v1/push/test', { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+      const t = await fetch('/v1/push/test', { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+      const sent = t.ok ? ((await t.json()) as { sent?: number }).sent ?? 0 : 0;
       setOn(true);
-      toast(tr('Notifications are on for this browser.'));
+      toast(sent > 0 ? tr('Notifications are on for this browser.') : tr('Notifications are on, but the test message did not arrive. Reminders may not reach this browser.'));
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Could not switch notifications on');
     } finally { setBusy(false); }
