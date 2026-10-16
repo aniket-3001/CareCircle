@@ -5,7 +5,7 @@ sys.path.insert(0, __file__.rsplit("run.py", 1)[0].rstrip("/\\") or ".")
 import harness  # noqa: E402
 import s_accounts  # noqa: E402,F401
 
-for name in ("s_medicines", "s_extras", "s_helper"):
+for name in ("s_medicines", "s_extras", "s_helper", "s_security"):
     try:
         __import__(name)
     except ModuleNotFoundError as e:
