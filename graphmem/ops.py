@@ -26,6 +26,8 @@ OPS = {
     "get_task": "read", "open_tasks": "read", "create_plan": "write", "check_plan": "read", "rebase_plan": "write",
     "resume": "read",
     # traceability
+    # graph algorithms on the memory graph
+    "graph_schema": "read", "graph_path": "read", "graph_influence": "read", "graph_communities": "read", "graph_neighbourhood": "read",
     # care circle
     "care_record": "write", "care_confirm": "write", "care_regimen": "read", "care_check": "read", "care_resolve": "read",
     "care_ack": "write", "care_divergence": "read", "care_nudges": "write", "care_reminders": "read", "care_give": "write", "care_gives": "read", "care_people": "read", "care_drug_info": "read", "care_recalls": "read", "care_measure": "write", "care_measures": "read", "care_forget_measure": "write", "care_trend": "read", "care_appoint": "write", "care_appointments": "read", "care_appointment_edit": "write", "care_profile_edit": "write", "care_appointment_cancel": "write", "care_since_visit": "read", "care_condition_add": "write", "care_allergy_add": "write", "care_profile": "read", "care_profile_remove": "write", "care_allergy_check": "read", "care_summary_counts": "read", "care_reading_stats": "read", "care_watch": "write", "care_watched": "read", "care_witness": "write", "care_handover": "write", "care_handovers": "read", "care_sole_knowers": "read", "care_hubs": "read",

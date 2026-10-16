@@ -26,6 +26,7 @@ from .care_plan import CarePlanMixin
 from .care_track import CareTrackMixin
 from .care_view import CareViewMixin
 from .embed import get_embedder
+from .graph_algos import GraphAlgoMixin
 from .extract import RuleExtractor
 
 STOP = set("a an and are as at be by did do does for from has have how i in is it of on or that the this to was "
@@ -53,7 +54,7 @@ MAX_FACT_PART_CHARS = 500
 ROLE_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 
 
-class TenantMemory(CareMixin, CareViewMixin, CareTrackMixin, CarePlanMixin, CareFollowupsMixin, CareCustodyMixin):
+class TenantMemory(GraphAlgoMixin, CareMixin, CareViewMixin, CareTrackMixin, CarePlanMixin, CareFollowupsMixin, CareCustodyMixin):
     def __init__(self, db: Db, tenant: str, agent: str, guard: Optional[Guard] = None, graph: Optional[str] = None,
                  extractor=None):
         self.db, self.tenant, self.agent, self._guard, self._graph = db, tenant, agent, guard, graph
