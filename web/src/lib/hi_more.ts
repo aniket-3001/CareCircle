@@ -5,6 +5,8 @@ export const HI_MORE: Record<string, string> = {
   'Delete this circle…': 'यह सर्कल हटाएँ…', 'Delete the circle': 'सर्कल हटाएँ', 'Sign out of all devices': 'सभी डिवाइस से साइन आउट', 'Download all my data': 'मेरा सारा डेटा डाउनलोड करें',
   'This removes the circle for every carer in it, with every medicine, reading, note and conversation. It cannot be undone. Type the circle name to confirm.': 'यह सर्कल उसके हर देखभालकर्ता के लिए हट जाएगा, हर दवा, रीडिंग, नोट और बातचीत के साथ। इसे वापस नहीं किया जा सकता। पुष्टि के लिए सर्कल का नाम लिखें।',
   'Edit appointment': 'अपॉइंटमेंट बदलें', 'Save changes': 'बदलाव सहेजें', 'Reword it': 'दोबारा लिखें',
+  'Display': 'दिखावट', 'Theme': 'थीम', 'Light': 'लाइट', 'Dark': 'डार्क', 'Text size': 'अक्षर का आकार', 'Normal': 'सामान्य', 'Large': 'बड़ा', 'Larger': 'और बड़ा',
+  'Text size applies on wider screens; on a phone, use the browser zoom.': 'अक्षर का आकार चौड़ी स्क्रीन पर लागू होता है; फ़ोन पर ब्राउज़र ज़ूम इस्तेमाल करें।',
   // Follow-ups
   'Follow-ups': 'अगले कदम', 'Things to ask or tell, drawn from the record. You choose which to keep.': 'पूछने या बताने की बातें, रिकॉर्ड से। कौन-सी रखनी हैं, आप चुनें।', 'Suggest from the record': 'रिकॉर्ड से सुझाव लें', 'Nothing new to suggest.': 'सुझाने को कुछ नया नहीं।', 'Add the ticked ones': 'चुनी हुई जोड़ें', 'Done by': 'पूरा किया', 'Added by': 'जोड़ा', 'The record has changed since: look again first': 'तब से रिकॉर्ड बदला है: पहले फिर देख लें', 'Dismiss': 'हटाएँ', 'Done': 'हो गया', 'Cancel': 'रद्द करें',
   // Add

@@ -366,3 +366,9 @@ code, .code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: 
 .pw-wrap input { width: 100%; padding-right: 46px; }
 .pw-eye { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
 .pw-eye:hover { color: var(--text); }
+
+/* Text size: a person's setting, applied to the whole page (zoom keeps every fixed pixel size in proportion). */
+@media (min-width: 760px) {
+  html[data-text='large'] body { zoom: 1.15; }
+  html[data-text='larger'] body { zoom: 1.3; }
+}
