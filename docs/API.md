@@ -53,10 +53,18 @@ Content-Type: application/json
 | `graph_influence` | read | `metric`, `label`, `top` | The most influential nodes: metric 'pagerank' (many well-connected nodes point here), 'harmonic' (how quickly a node reaches the rest of the graph, following the links' direction) or 'betweenness' (how many shortest paths between other nodes pass through it; exact, computed by this server). `label` is optional: a node label from graph_schema (such as Dose or Drug) to rank only those nodes; leave it out to rank every node. `top` is how many to return. |
 | `graph_communities` | read | `method`, `label`, `top` | Groups of nodes that belong together: method 'wcc' (connected components) or 'labelpropagation' (communities inside a connected graph). `label` is optional: a node label from graph_schema to group only those nodes. `top` is how many groups to return. |
 | `graph_neighbourhood` | read | `ref`*, `depth`, `label`, `limit` | Everything within `depth` hops of one node, ignoring direction, nearest first (at most `limit` nodes). `ref` names the node by its id, key or name; `label` is an optional node label from graph_schema that narrows the match. |
-| `care_record` | write | `person`*, `drug`*, `action`, `dose_text`, `freq_text`, `source_type`, `quote`, `source_text`, `confirm`, `at`, `edited` | A change to what `person` takes. action 'set' (start/change) or 'stop'. The previous current entry is closed and linked |
+| `care_record` | write | `person`*, `drug`*, `action`, `dose_text`, `freq_text`, `source_type`, `quote`, `source_text`, `confirm`, `at`, `edited`, `source_ref`, `product` | A change to what `person` takes. action 'set' (start/change) or 'stop'. The previous current entry is closed and linked |
 | `care_add_person` | write | `person`* | Add another person to the circle on purpose (a name close to someone already there is otherwise refused as a likely typing slip). |
+| `care_timezone` | read | none | The circle's time zone (IANA name) and whether anyone has set it yet. |
+| `care_set_timezone` | write | `tz`* | Set the circle's time zone, e.g. 'Asia/Kolkata'. It decides which day a dose slot belongs to. |
+| `care_schedule_suggest` | read | `freq_text`* | Times suggested by a written frequency ('twice daily' -> 08:00 and 20:00), for a person to confirm or change. Reads nothing from the circle. |
+| `care_schedule_set` | write | `dose_id`*, `times`*, `as_needed`, `ends_on` | Confirm when this entry is taken: the clock times (HH:MM, 24-hour), or `as_needed` for a medicine with no fixed times, and optionally the last |
+| `care_today` | read | `person`*, `now` | Today's confirmed dose slots in the circle's time zone, in clock order, each with its state: given (and by whom), due, not marked given yet, or |
+| `care_give_slot` | write | `person`*, `dose_id`*, `time`*, `now` | Mark one of today's confirmed slots as given. Same once-per-slot claim as care_give: if someone already marked it, this says who. |
+| `care_slot_nudges` | write | `person`*, `now`, `hold` | Reminders for today's slots, each produced once per carer: when a slot is due ('Metformin 08:00 is due') and when it is still not marked given |
 | `care_confirm` | write | `dose_id`* | A person confirms a pending entry (after looking at the quote beside the source). Makes it current. |
 | `care_regimen` | read | `person`*, `as_of` | What `person` takes now, or at `as_of` (ms): confirmed 'set' entries valid at that time. |
+| `care_duplicates` | read | `person`*, `as_of` | Ingredients recorded on more than one current entry (the same medicine reaching the person through two products). |
 | `care_check` | read | `person`*, `as_of` | Interaction flags for the regimen at `as_of`, from the shared reference graph (sources attached; never 'safe'). |
 | `care_resolve` | read | `text`*, `n` | Top-n drug name candidates for an OCR/voice string. Nothing is auto-accepted; a person chooses. |
 | `care_ack` | write | `dose_id`* | The calling carer says they have seen this change. |
@@ -94,6 +102,8 @@ Content-Type: application/json
 | `care_hubs` | read | `person`* | Graph-algorithm views: which medicines sit in most hazards within this regimen, and the PageRank hubs of the reference graph |
 | `care_graph` | read | `person`*, `include_history`, `now` | The circle as a graph: nodes and edges, each with plain-language metadata (read scope). |
 | `care_timeline` | read | `person`*, `limit`, `now` | Everything that happened for this person, newest first, as plain sentences. |
+| `care_history_digest` | read | `person`*, `upto` | A fingerprint of what was written about a person: each entry's fixed fields are chained (hash of the one before + this one), oldest first. |
+| `care_receipt_check` | admin | `receipt`*, `drug`, `dose_text`, `freq_text`, `quote`, `by`, `at` | Does a copy someone kept (the medicine, strength, frequency, quoted line, writer and time) match what a dose receipt says was erased? Admin only. |
 | `care_forget` | admin | `dose_id`*, `reason` | Remove one entry for good and return a receipt. |
 | `care_forget_person` | admin | `person`*, `confirm` | Remove everything about the person cared for (entries, dose slots, reminders). Needs the person's name typed as `confirm`. |
 | `care_mark_mistake` | write | `dose_id`*, `reason` | Take an entry off the record as entered by mistake, without erasing it: it stays in the history, marked, with who marked it and why, and the entry |
