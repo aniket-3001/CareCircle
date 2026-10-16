@@ -171,6 +171,29 @@ def _a_doses(f: Facts) -> str:
     return "Recorded as given: " + "; ".join(f"{_title(g['drug'])} for {g['slot']} by {_who(g['by'])}" for g in f.gives[:6]) + "."
 
 
+TIMING_WORDS = re.compile(r"\b(empty stomach|with (food|meals?)|before (food|meals?|bed)|after (food|meals?)|at what time|what time of day|when is)\b", re.I)
+ABOUT_THE_RECORD = re.compile(r"\b(list|record|recorded|written|label|says?|noted|prescribed|entered|typed|on file)\b", re.I)
+
+
+def _timing_lookup(f: Facts, low: str, q: str) -> Optional[dict]:
+    """'Is metformin on her list meant to be taken with food?' asks what the RECORD says, which we can answer, not whether to do something, which we cannot.
+    Only when the question names a medicine on the record, refers to the record, and its only trigger is a timing phrase; a question with any other
+    advice wording ('should she...', 'is it safe...') still goes to the refusal."""
+    drug = next((r["drug"] for r in f.regimen if r["drug"] in low), None)
+    if not drug or not TIMING_WORDS.search(q) or not ABOUT_THE_RECORD.search(q):
+        return None
+    if ADVICE_Q.search(TIMING_WORDS.sub(" ", q)):
+        return None
+    r = next(x for x in f.regimen if x["drug"] == drug)
+    written = " ".join(f"{r['dose_text']} {r['freq_text']}".split())
+    on_record = re.search(r"\b(food|meals?|stomach|bed|night|morning|evening|breakfast)\b", r["freq_text"] or "", re.I)
+    said = (f"The record for {_title(drug)} says: {written}." if written else f"The record has no dose or timing for {_title(drug)}.")
+    if not on_record:
+        said += " It does not mention food or a time of day."
+    return {"answer": said + " The record is what people typed in; what it should be is for her prescriber or pharmacist.",
+            "source": "rules", "links": [{"tab": "today", "label": "Open Today"}]}
+
+
 def _a_drug(f: Facts, drug: str) -> str:
     r = next(x for x in f.regimen if x["drug"] == drug)
     flags = [x for x in f.check["direct"] if drug in x["drugs"]] + [x for x in f.check["enzyme_paths"] if drug in (x["x"], x["y"])]
@@ -258,9 +281,12 @@ def ask(question: str, facts: Facts, checker, generate=None, lang: str = "") -> 
                     "source": "proposal", "proposals": props[:3], "text": text, "links": []}
         return {"answer": "I could not find a medicine name in that. Try typing it as \"warfarin 5 mg once daily\", or use the Add tab for a photo or voice note.", "source": "rules",
                 "links": [{"tab": "add", "label": "Open Add"}]}
+    low = q.lower()
+    lookup = _timing_lookup(facts, low, q)
+    if lookup:
+        return lookup
     if ADVICE_Q.search(q):
         return {"answer": REFUSAL, "source": "refusal", "links": []}
-    low = q.lower()
     drug = next((r["drug"] for r in facts.regimen if r["drug"] in low), None)
     if drug and not (UNSEEN.search(q) or DOSES.search(q)):
         return {"answer": _a_drug(facts, drug), "source": "rules", "links": [{"tab": "graph", "label": "See it in the graph"}]}

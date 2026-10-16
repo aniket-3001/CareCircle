@@ -181,3 +181,20 @@ async def test_helper_names_what_only_one_carer_knows(gm):
     t, c, now = await seeded(gm)
     r = await say(c, "what does only one carer know?", now)
     assert r["source"] == "rules" and "only Meena" in r["answer"] and "Clarithromycin" in r["answer"] and not scan_advice(r["answer"])
+
+
+async def test_a_question_about_what_the_record_says_is_answered_and_a_question_about_what_to_do_is_not(gm):
+    """'Is metformin on her list meant to be taken with food?' asks what the list says. The record can answer that; whether to do it is for a prescriber."""
+    t, c, now = await seeded(gm)
+    await c["ravi"].care_record("asha", "warfarin", dose_text="5 mg", freq_text="with food at bedtime")
+    r = await say(c, "Is metformin on her list meant to be taken with food?", now)
+    assert r["source"] == "rules" and "The record for Metformin says: 500 mg twice daily." in r["answer"] and "does not mention food" in r["answer"]
+    assert "prescriber or pharmacist" in r["answer"] and not scan_advice(r["answer"])
+    r = await say(c, "what does the list say about warfarin with food", now)
+    assert "5 mg with food at bedtime" in r["answer"] and "does not mention" not in r["answer"]
+    for q in ("Should she take metformin with food?", "Is it safe to take metformin with food?", "does the list say metformin with food is ok to skip?",
+              "Can I give metformin on an empty stomach?", "what about metformin with alcohol", "with food: how much metformin is the record say to give?"):
+        r = await say(c, q, now)
+        assert r["source"] == "refusal", (q, r["answer"][:80])
+    r = await say(c, "what time of day is the record's entry for a medicine she does not take", now)
+    assert r["source"] != "rules" or "The record for" not in r["answer"]
