@@ -118,8 +118,14 @@ class Accounts:
         salt = secrets.token_bytes(16)
         pw_hash = _hash(password, salt) if password else ""
         await self.gm.register_agent(agent)
-        await self._q("CREATE (:Account {agent:$ag, email:$e, name:$n, hash:$h, salt:$s, provider:$p, sub:$sub, demo:$d, created_at:$t})",
-                      {"ag": agent, "e": email, "n": name, "h": pw_hash, "s": salt.hex(), "p": provider, "sub": sub, "d": demo, "t": now_ms()})
+        try:
+            await self._q("CREATE (:Account {agent:$ag, email:$e, name:$n, hash:$h, salt:$s, provider:$p, sub:$sub, demo:$d, created_at:$t})",
+                          {"ag": agent, "e": email, "n": name, "h": pw_hash, "s": salt.hex(), "p": provider, "sub": sub, "d": demo, "t": now_ms()})
+        except Exception as e:                      # two sign-ups for one email at the same instant: the database's own uniqueness rule lets only one in
+            if "unique" not in str(e).lower() and "constraint" not in str(e).lower():
+                raise
+            await self._q("MATCH (a:Agent {id:$ag}) OPTIONAL MATCH (a)-[:HAS_KEY]->(k) DETACH DELETE k, a", {"ag": agent})      # do not leave the loser's agent behind
+            raise AuthProblem("There is already an account with that email. Sign in instead.", 409) from None
         return await self.by_agent(agent)  # type: ignore[return-value]
 
     async def signup_local(self, email: str, password: str, name: str) -> dict:
