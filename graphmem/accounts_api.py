@@ -179,8 +179,8 @@ def mount(app: FastAPI, gm: GraphMem, agent_id, demo_on: bool) -> Accounts:
         return await profile(agent)
 
     @app.post("/v1/account/password")
-    async def password(b: Password, agent: str = Depends(agent_id)):
-        await acc.change_password(agent, b.old, b.new)
+    async def password(b: Password, agent: str = Depends(agent_id), authorization: Optional[str] = Header(None)):
+        await acc.change_password(agent, b.old, b.new, _bearer(authorization))
         return {"ok": True}
 
     @app.delete("/v1/account")

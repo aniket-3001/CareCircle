@@ -65,8 +65,10 @@ async def test_profile_edit_password_change_and_signout(client):
     assert (await client.patch("/v1/account", json={"name": "Priya S"}, headers=auth(token))).json()["name"] == "Priya S"
     assert (await client.patch("/v1/account", json={"name": "  "}, headers=auth(token))).status_code == 400
     assert (await client.post("/v1/account/password", json={"old": "wrong-one1", "new": "another-pass2"}, headers=auth(token))).status_code == 401
+    other = (await client.post("/v1/auth/signin", json={"email": "priya@tt.test", "password": PW})).json()["token"]      # a second device
     assert (await client.post("/v1/account/password", json={"old": PW, "new": "another-pass2"}, headers=auth(token))).status_code == 200
-    assert (await client.get("/v1/account", headers=auth(token))).status_code == 401           # every session ended by a password change
+    assert (await client.get("/v1/account", headers=auth(token))).status_code == 200           # the device that changed it stays signed in
+    assert (await client.get("/v1/account", headers=auth(other))).status_code == 401           # every other device must sign in again
     t2 = (await client.post("/v1/auth/signin", json={"email": "priya@tt.test", "password": "another-pass2"})).json()["token"]
     assert (await client.post("/v1/auth/signout", headers=auth(t2))).status_code == 200
     assert (await client.get("/v1/account", headers=auth(t2))).status_code == 401

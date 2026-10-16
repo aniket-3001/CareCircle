@@ -151,7 +151,7 @@ class Accounts:
         await self._q("MATCH (a:Account {agent:$ag}) SET a.name=$n", {"ag": agent, "n": name})
         return await self.by_agent(agent)  # type: ignore[return-value]
 
-    async def change_password(self, agent: str, old: str, new: str) -> None:
+    async def change_password(self, agent: str, old: str, new: str, keep_token: str = "") -> None:
         row = await self.by_agent(agent)
         if not row or row["provider"] != "local":
             raise AuthProblem("This account signs in with Amazon Cognito: change the password from the sign-in page ('Forgot your password?').")
@@ -162,7 +162,7 @@ class Accounts:
             raise AuthProblem(problem)
         salt = secrets.token_bytes(16)
         await self._q("MATCH (a:Account {agent:$ag}) SET a.hash=$h, a.salt=$s", {"ag": agent, "h": _hash(new, salt), "s": salt.hex()})
-        await self._q("MATCH (a:Account {agent:$ag})<-[:OF]-(s:Session) DETACH DELETE s", {"ag": agent})   # every other device signs in again
+        await self._q("MATCH (a:Account {agent:$ag})<-[:OF]-(s:Session) WHERE s.hash <> $keep DETACH DELETE s", {"ag": agent, "keep": _sha(keep_token) if keep_token else ""})   # every other device signs in again; this one stays
 
     # ------------------------------------------------------------------ sessions
     async def new_session(self, agent: str) -> str:
