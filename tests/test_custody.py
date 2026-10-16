@@ -1,4 +1,6 @@
 """Second-carer confirmation (the family's rule) and append-only handover notes."""
+import asyncio
+
 import pytest
 
 from conftest import tid
@@ -34,6 +36,7 @@ async def test_watched_dose_needs_a_different_carer(gm):
 async def test_handover_notes_are_append_only_and_erased_with_the_person(gm):
     ravi, meena = await _two(gm, "ho")
     await ravi.care_handover("asha", "INR was 2.4 on Tuesday. Next check Monday.")
+    await asyncio.sleep(0.01)                                                   # two notes in the same millisecond have no order; real ones never do
     await meena.care_handover("asha", "Gave the evening warfarin. She slept early.")
     notes = await meena.care_handovers("asha")
     assert [n["by"] for n in notes] == ["meena", "ravi"] and "2.4" in notes[1]["text"]
