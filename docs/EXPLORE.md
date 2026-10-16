@@ -161,7 +161,22 @@ Skills ranked by how often they worked (smoothed, so one lucky run does not win)
 MATCH (s:Skill) RETURN s.name AS skill, s.wins AS wins, s.runs AS runs, toFloat(s.wins + 1) / (s.runs + 2) AS smoothed ORDER BY smoothed DESC
 ```
 
-## 6. Two things to know
+## 6. Use FalkorDB's own MCP server on the same graphs
+
+FalkorDB publishes an MCP server (`@falkordb/mcpserver`) that lets an MCP client list graphs, read a graph's schema and run Cypher. It works against these graphs. It was run by hand on 2026-10-16 with the MCP Inspector CLI against the pinned database and the seeded graphs above (it is not part of the automated tests, because it downloads from npm). **Run it as a database user that can only read**: its own read-only setting is not a safeguard.
+
+```
+# once, on the database: a user that can only list graphs and run read-only queries (the same shape as the app's own read-only user)
+redis-cli ACL SETUSER explorer reset on '>choose-a-password' '~*' '&*' +ping +auth +hello +info +client +graph.ro_query +graph.list
+
+FALKORDB_HOST=localhost FALKORDB_PORT=6379 FALKORDB_USERNAME=explorer FALKORDB_PASSWORD=choose-a-password FALKORDB_DEFAULT_READONLY=true npx -y @falkordb/mcpserver
+```
+
+What was checked, under that user: `list_graphs`, `get_graph_schema`, `get_node_schema` (label `Fact`) and `query_graph_readonly` all worked, including the "who has not seen a change" query from section 2 (it returned `meena-explore` and `clarithromycin`) and PageRank over `cc_ref` (the same top hubs as the app: idelalisib, clozapine, ozanimod). A write through `query_graph` was refused (`graph.RO_QUERY is to be executed only on read-only queries`), and `delete_graph` with its confirmation flag was refused by the database (`NOPERM ... 'graph.DELETE'`).
+
+**The warning that matters:** with the default database user and `FALKORDB_DEFAULT_READONLY=true`, `delete_graph` with `confirmDelete=true` **deleted a graph** (tested on a throwaway graph). The server's read-only setting stops writes through its query tool, not its delete tool. The database user's permissions are what actually protect you. Never point this server at a database holding real circles with the default user, and remember it connects with database credentials, so it sees every graph the user can list: it is a tool for your own machine, not something to give to another person's agent.
+
+## 7. Two things to know
 
 - **The live site does not expose FalkorDB Browser.** The Browser has one login for the whole database, so on a server holding many families' circles it would show all of them. The live site gives each person their own door instead: their circle's **Graph** tab draws the graph and shows the Cypher behind each list, and `POST /v1/tenants/{circle}/{op}` and `/mcp` run the same read-only graph operations, each limited to the circles that key may read. Run the Browser locally against the synthetic data above.
 - **The queries here only read.** If you type a write into the Browser against a graph you care about, it will run. Seed a throwaway database for exploring.
