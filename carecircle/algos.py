@@ -20,7 +20,7 @@ Q_REG = ("MATCH (a:Drug)-[h:HAZARD]->(b:Drug) WHERE a.name IN $d AND b.name IN $
 
 
 class Algos:
-    def __init__(self, host="localhost", port=6379):
+    def __init__(self, host="localhost", port=int(os.getenv("FALKORDB_PORT", "6379"))):
         self.g = FalkorDB(host=host, port=port, password=os.getenv("GRAPHMEM_DB_PASSWORD") or None).select_graph(REF_GRAPH)
 
     def _run(self, q, p):

@@ -4,6 +4,7 @@ needed: the graph's nodes are plain functions that call the tools. Skipped when 
 import asyncio
 import json
 import operator
+import os
 import uuid
 from typing import Annotated, TypedDict
 
@@ -49,7 +50,8 @@ def build(tools):
 async def test_checkpoints_live_in_falkordb_and_the_next_session_finds_them(gm):
     t = tid(gm, "lg")
     ckpt = "tt_lg_" + uuid.uuid4().hex[:8]                                        # the checkpoint graph, named apart from every graph of ours
-    raw = falkordb.FalkorDB()
+    port = int(os.getenv("FALKORDB_PORT", "6379"))                               # the database the suite is pointed at (the 6.0.2 compatibility run uses another port)
+    raw = falkordb.FalkorDB(port=port)
     try:
         async with serving() as url:
             key = await key_for(url, "tt-lg-a", t)
@@ -57,14 +59,14 @@ async def test_checkpoints_live_in_falkordb_and_the_next_session_finds_them(gm):
             config = {"configurable": {"thread_id": "session-1"}}
 
             def first_session():
-                app = build(tools).compile(checkpointer=FalkorDBSaver(database=ckpt))
+                app = build(tools).compile(checkpointer=FalkorDBSaver(database=ckpt, port=port))
                 return app.invoke({"steps": [], "path_length": -1}, config)
 
             out = await asyncio.to_thread(first_session)
             assert out["path_length"] == 4 and out["steps"] == ["learned two facts", "path found: True"]
 
             def next_session():                                                      # a new saver and a new compiled graph: nothing shared with the first but the database
-                app = build(tools).compile(checkpointer=FalkorDBSaver(database=ckpt))
+                app = build(tools).compile(checkpointer=FalkorDBSaver(database=ckpt, port=port))
                 snap = app.get_state(config)
                 history = list(app.get_state_history(config))
                 again = app.invoke({"steps": ["asked again"], "path_length": -1}, config)

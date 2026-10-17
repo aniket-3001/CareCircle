@@ -126,7 +126,7 @@ class RetryingGraph:
 
 
 class Db:
-    def __init__(self, host: str = "localhost", port: int = 6379, max_connections: int = 64,
+    def __init__(self, host: str = "localhost", port: int = int(os.getenv("FALKORDB_PORT", "6379")), max_connections: int = 64,
                  ro_password: Optional[str] = None):
         # GRAPHMEM_DB_PASSWORD: the database itself requires a password (Redis requirepass), so another container or a stray port cannot read it.
         pool = BlockingConnectionPool(host=host, port=port, max_connections=max_connections,

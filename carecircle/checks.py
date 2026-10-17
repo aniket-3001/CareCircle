@@ -23,7 +23,7 @@ NOTICE = "Flags are for discussion with a prescriber or pharmacist. Different re
 
 
 class Checker:
-    def __init__(self, host="localhost", port=6379):
+    def __init__(self, host="localhost", port=int(os.getenv("FALKORDB_PORT", "6379"))):
         self.g = FalkorDB(host=host, port=port, password=os.getenv("GRAPHMEM_DB_PASSWORD") or None).select_graph(REF_GRAPH)
         self.load_brands()
 

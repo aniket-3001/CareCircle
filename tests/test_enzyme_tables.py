@@ -44,7 +44,8 @@ def test_a_clinical_path_is_never_replaced_by_a_laboratory_one_for_the_same_pair
 
 def test_the_reference_graph_records_its_version_so_start_up_reloads_an_older_shape():
     from falkordb import FalkorDB
-    g = FalkorDB().select_graph(reference.REF_GRAPH)
+    import os
+    g = FalkorDB(port=int(os.getenv("FALKORDB_PORT", "6379"))).select_graph(reference.REF_GRAPH)
     got = g.ro_query("MATCH (m:Meta {key:'ref'}) RETURN m.version").result_set
     assert got and got[0][0] == reference.REF_VERSION
 

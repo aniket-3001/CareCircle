@@ -17,7 +17,7 @@ def test_rxnorm_suggestions_are_kept_only_if_the_reference_graph_has_them(monkey
     monkeypatch.setenv("CC_EXTERNAL", "1")
     monkeypatch.setattr(external, "rxnorm_ingredients", lambda t: [{"name": "amoxicillin", "rxcui": "723", "source": "RxNorm (NLM)"},
                                                                    {"name": "notarealdrug", "rxcui": "1", "source": "RxNorm (NLM)"}])
-    got = Checker("localhost", 6379).resolve("zzqx brandname", 3)
+    got = Checker().resolve("zzqx brandname", 3)
     assert [c["name"] for c in got] == ["amoxicillin"] and got[0]["via"] == "RxNorm (NLM)"
 
 
