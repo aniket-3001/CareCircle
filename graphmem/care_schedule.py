@@ -246,7 +246,7 @@ class CareScheduleMixin:
         return {"person": norm(person), "tz": tz, "date": today.isoformat(), "items": items, "counts": counts, "unscheduled": unscheduled, "as_needed": as_needed}
 
     async def care_give_slot(self, person: str, dose_id: str, time: str, now: Optional[int] = None) -> dict:
-        """Mark one of today's confirmed slots as given. Same once-per-slot claim as care_give: if someone already marked it, this says who."""
+        """Mark one of today's confirmed slots as given. Same once-per-slot claim as care_give: if someone already marked it, this says who. A combination tablet is one claim over all its ingredients: every one is recorded or none is, and a refusal says whether the same tablet or a shared ingredient was already recorded."""
         t = now_ms() if now is None else now
         rows = await self._q("MATCH (x:Dose {id:$id, status:'confirmed', cur:true, action:'set'})-[:FOR]->(:Person {id:$p}) OPTIONAL MATCH (x)-[:VIA]->(pr:Product) "
                              "RETURN x.drug, coalesce(pr.slots, x.slots), coalesce(pr.combo, x.product, ''), coalesce(pr.key, '')", {"id": dose_id, "p": norm(person)}, scope="read")
@@ -262,14 +262,45 @@ class CareScheduleMixin:
         if time not in allowed:
             raise ValueError(f"{time} is not one of this medicine's times ({', '.join(allowed) or 'none set'})")
         day = sched.local_date(t, await self._tz())
-        results = [await self.care_give(person, d, f"{day.isoformat()} {time}") for d, _sl in members]
-        if len(results) == 1:
-            return results[0]
-        names = [d for d, _sl in members]
-        miss = next((r for r in results if not r["given"]), None)
-        if miss:
-            return {**miss, "ingredients": names}
-        return {"given": True, "slot": results[0]["slot"], "ingredients": names, **({"needs_second_carer": True} if any(r.get("needs_second_carer") for r in results) else {})}
+        if len(members) == 1:
+            return await self.care_give(person, drug, f"{day.isoformat()} {time}")
+        return await self._give_tablet(person, [d for d, _sl in members], pkey, f"{day.isoformat()} {time}")
+
+    async def _give_tablet(self, person: str, drugs: list[str], pkey: str, slot: str) -> dict:
+        """Mark one tablet of a combination as given: every ingredient, or none. It is ONE write that creates the gives only if no give of any of these ingredients
+        is already on record for this slot, so two carers ticking at once have exactly one winner, and a tablet is never recorded as half given (an ingredient
+        already given through another entry refuses the whole tick, and nothing at all is written)."""
+        from .care import parse_slot
+        slot, slot_ms = parse_slot(slot)
+        p, me = norm(person), norm(self.agent)
+        rows = [{"drug": norm(d), "ing": self._ingredient(d), "key": f"{p}|{norm(d)}|{norm(slot)}"} for d in drugs]
+        made = await self._q(
+            """UNWIND $rows AS x
+               OPTIONAL MATCH (e:Give {person:$p}) WHERE e.key = x.key OR (e.ing = x.ing AND e.slot_ms IS NOT NULL AND e.slot_ms = $ms)
+               WITH collect(e) AS clashes WHERE size(clashes) = 0
+               UNWIND $rows AS x
+               CREATE (:Give {key:x.key, by:$me, at:$t, person:$p, drug:x.drug, slot:$s, ing:x.ing, slot_ms:$ms, via:$pk})
+               RETURN count(*)""",
+            {"rows": rows, "p": p, "ms": slot_ms, "me": me, "t": now_ms(), "s": norm(slot), "pk": pkey})
+        names = [r["drug"] for r in rows]
+        if made and made[0][0]:                                            # an aggregate over no rows still answers [[0]]: that is a refusal
+            watched = (await self._q("MATCH (w:Watch) WHERE w.key IN $k RETURN count(w)", {"k": [f"{p}|{r['drug']}" for r in rows]}, scope="read"))[0][0] > 0
+            return {"given": True, "slot": slot, "ingredients": names, **({"needs_second_carer": True} if watched else {})}
+        clash = await self._q(
+            "MATCH (e:Give {person:$p}) WHERE e.key IN $keys OR (e.ing IN $ings AND e.slot_ms IS NOT NULL AND e.slot_ms = $ms) RETURN e.drug, e.by, e.at, coalesce(e.via, '') ORDER BY e.at LIMIT 10",
+            {"p": p, "keys": [r["key"] for r in rows], "ings": [r["ing"] for r in rows], "ms": slot_ms}, scope="read")
+        if not clash:
+            raise RuntimeError("the tablet could not be recorded; nothing was saved")
+        same_tablet = all(c[3] == pkey for c in clash)
+        first = clash[0]
+        await self._q("MERGE (v:Prevented {key:$k}) ON CREATE SET v.person=$p, v.drug=$d, v.slot=$s, v.by=$me, v.first_by=$by, v.at=$t",
+                      {"k": f"{p}|{pkey}|{norm(slot)}|{me}", "p": p, "d": names[0], "s": norm(slot), "me": me, "by": first[1], "t": now_ms()}, checked=True)
+        already = sorted({c[0] for c in clash})
+        note = ("this tablet was already recorded as given; check with them before giving another dose" if same_tablet else
+                f"{', '.join(already)} was already recorded as given for this time through another entry (a different product, or by hand); "
+                "check with them, and with the prescriber if both were meant, before giving another dose. Nothing was recorded for this tablet.")
+        return {"given": False, "duplicate": True, "already_given_by": first[1], "at": first[2], "reason": "same_tablet" if same_tablet else "shared_ingredient",
+                "ingredients": names, "already": already, "note": note}
 
     # ------------------------------------------------------------------ reminders about the checklist
     async def care_slot_edges(self, person: str, now: Optional[int] = None) -> list[int]:
