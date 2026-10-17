@@ -388,61 +388,108 @@ class CareMixin:
         return out
 
     # ------------------------------------------------------------------ doses given: never twice for one slot
-    async def _canonical_slot(self, person: str, drug: str, slot: str) -> tuple[str, Optional[tuple]]:
+    @staticmethod
+    def _ingredient(drug: str) -> str:
+        """The ingredient a typed medicine name stands for ("Metformin HCl", "Glycomet" -> metformin), so the double-dose guard compares medicines and not spellings.
+        Only a strong match counts (score 0.95 or more: an exact name, a salt form or a known alias); anything else stays as typed."""
+        d = norm(drug)
+        try:
+            top = checker().candidates(d, 1)
+        except Exception:
+            return d
+        return top[0]["name"] if top and top[0]["score"] >= 0.95 else d
+
+    async def _kin(self, person: str, drug: str) -> tuple[str, list[str], list[str]]:
+        """(ingredient, every name this person's confirmed entries use for it, the union of those entries' current times). Two products of one ingredient
+        (plain and a combination) are two entries with their own times; the guard looks at all of them."""
+        ing = await asyncio.to_thread(self._ingredient, drug)
+        rows = await self._q("MATCH (x:Dose {action:'set', status:'confirmed'})-[:FOR]->(:Person {id:$p}) RETURN x.drug, x.cur, x.slots", {"p": norm(person)}, scope="read")
+        names, times = {norm(drug)}, set()
+        for name, cur, slots in rows:
+            if await asyncio.to_thread(self._ingredient, name) == ing:
+                names.add(name)
+                if cur:
+                    times.update(slots or [])
+        return ing, sorted(names), sorted(times)
+
+    async def _canonical_slot(self, person: str, drug: str, slot: str, ing: str = "", times: Optional[list] = None) -> tuple[str, Optional[tuple]]:
         """Bring a typed slot to the medicine's own times, so 21:00 and 21:15 are one dose and not two.
 
-        When the person has confirmed times for this medicine, a typed time is moved to the nearest of them (within SNAP_MIN minutes; farther is refused with the list).
-        When no times are set, the app cannot know what a "slot" is, so a give within NEAR_MIN minutes of an earlier one by anyone counts as that same dose:
-        returns (slot, (earlier slot, who, when)) for the caller to refuse."""
-        cur = await self._q("MATCH (x:Dose {drug:$d, cur:true, action:'set', status:'confirmed'})-[:FOR]->(:Person {id:$p}) RETURN x.slots LIMIT 1",
-                            {"d": norm(drug), "p": norm(person)}, scope="read")
-        times = list(cur[0][0] or []) if cur else []
+        When the person has confirmed times for this ingredient (on any of its entries), a typed time is moved to the nearest of them (within SNAP_MIN minutes;
+        farther is refused with the list). When no times are set, the app cannot know what a "slot" is, so a give within NEAR_MIN minutes of an earlier one by
+        anyone counts as that same dose. Either way a give of the same ingredient under another spelling at the same slot is that dose too.
+        Returns (slot, (earlier slot, who, when)) for the caller to refuse. This read is only the early answer: the write repeats the check atomically."""
+        if not ing:
+            ing, _names, times = await self._kin(person, drug)
         mins = lambda hhmm: int(hhmm[:2]) * 60 + int(hhmm[3:5])  # noqa: E731
         if times:
             want = mins(slot[11:16])
             best = min(times, key=lambda t: abs(mins(t) - want))
             if abs(mins(best) - want) > SNAP_MIN:
                 raise ValueError(f"{slot[11:16]} is not one of this medicine's times ({', '.join(times)}); give it at one of those, or change the times first")
-            return f"{slot[:10]} {best}", None
+            slot = f"{slot[:10]} {best}"
         mine = datetime.strptime(slot, "%Y-%m-%d %H:%M")
-        for s, by, at in await self._q("MATCH (g:Give {person:$p, drug:$d}) RETURN g.slot, g.by, g.at", {"p": norm(person), "d": norm(drug)}, scope="read"):
+        for s, d, by, at in await self._q("MATCH (g:Give {person:$p}) RETURN g.slot, g.drug, g.by, g.at", {"p": norm(person)}, scope="read"):
+            same_name = norm(d) == norm(drug)
+            if not same_name and await asyncio.to_thread(self._ingredient, d) != ing:
+                continue
             try:
                 gap = abs((datetime.strptime(s, "%Y-%m-%d %H:%M") - mine).total_seconds()) / 60
             except (TypeError, ValueError):
                 continue
-            if s != slot and gap < NEAR_MIN:
+            if times:                                                  # the slot is already the medicine's own: only another spelling of it is a different claim
+                if s == slot and not same_name:
+                    return slot, (s, by, at)
+            elif (s != slot or not same_name) and gap < NEAR_MIN:
                 return slot, (s, by, at)
         return slot, None
 
     async def care_give(self, person: str, drug: str, slot: str) -> dict:
         """Record that the calling carer gave `drug` for dose slot `slot` (e.g. '2026-10-16 08:00'). A slot can be claimed once:
-        the claim is a single MERGE, so two carers racing get exactly one winner and the other is told who already recorded it."""
+        the claim is one query that looks for an earlier give of the same ingredient close to this time and, if there is none, MERGEs the slot, so two
+        carers racing get exactly one winner and the other is told who already recorded it."""
         slot, slot_ms = parse_slot(slot)
+        ing, names, times = await self._kin(person, drug)
         on_record = await self._q(
-            """MATCH (x:Dose {drug:$d, action:'set', status:'confirmed'})-[:FOR]->(:Person {id:$p})
-               WHERE x.valid_from <= $ms + $slack AND (x.valid_to IS NULL OR x.valid_to >= $ms - $slack) RETURN x.id LIMIT 1""",
-            {"d": norm(drug), "p": norm(person), "ms": slot_ms, "slack": 14 * 3_600_000}, scope="read")      # slack: the slot is local time, the record is UTC
+            """MATCH (x:Dose {action:'set', status:'confirmed'})-[:FOR]->(:Person {id:$p})
+               WHERE x.drug IN $d AND x.valid_from <= $ms + $slack AND (x.valid_to IS NULL OR x.valid_to >= $ms - $slack) RETURN x.id LIMIT 1""",
+            {"d": names, "p": norm(person), "ms": slot_ms, "slack": 14 * 3_600_000}, scope="read")      # slack: the slot is local time, the record is UTC
         if not on_record:
             raise KeyError(f"{norm(drug) or 'that medicine'} was not on the record at that time, so a dose of it cannot be recorded as given")
-        slot, near = await self._canonical_slot(person, drug, slot)
-        if near:                                                       # a different time typed for what is, in practice, the same dose
-            await self._q("MERGE (v:Prevented {key:$k}) ON CREATE SET v.person=$p, v.drug=$d, v.slot=$s, v.by=$me, v.first_by=$by, v.at=$t",
-                          {"k": f"{norm(person)}|{norm(drug)}|{near[0]}|{norm(self.agent)}", "p": norm(person), "d": norm(drug), "s": norm(slot), "me": norm(self.agent), "by": near[1], "t": now_ms()}, checked=True)
-            return {"given": False, "duplicate": True, "already_given_by": near[1], "at": near[2],
-                    "note": f"a dose of this was recorded for {near[0]}, within {NEAR_MIN} minutes of this one; check with them before giving another dose"}
+        slot, near = await self._canonical_slot(person, drug, slot, ing, times)
+        slot_ms = parse_slot(slot)[1]
         key = f"{norm(person)}|{norm(drug)}|{norm(slot)}"
-        rows = await self._q(
-            """MERGE (g:Give {key:$k}) ON CREATE SET g.by=$me, g.at=$t, g.person=$p, g.drug=$d, g.slot=$s, g.won=true
-               WITH g, g.won AS fresh, g.by AS by, g.at AS at SET g.won=false RETURN fresh, by, at""",
-            {"k": key, "me": norm(self.agent), "t": now_ms(), "p": norm(person), "d": norm(drug), "s": norm(slot)})
-        fresh, by, at = rows[0]
-        if fresh:
-            watched = (await self._q("MATCH (w:Watch {key:$k}) RETURN count(w)", {"k": f"{norm(person)}|{norm(drug)}"}, scope="read"))[0][0] > 0
-            return {"given": True, "slot": slot, **({"needs_second_carer": True} if watched else {})}
+        window = 0 if times else (NEAR_MIN - 1) * 60_000
+        if not near:
+            rows = await self._q(
+                """OPTIONAL MATCH (e:Give {person:$p, ing:$ing}) WHERE e.key <> $k AND e.slot_ms IS NOT NULL AND abs(e.slot_ms - $ms) <= $w
+                   WITH e ORDER BY e.at LIMIT 1
+                   WITH e WHERE e IS NULL
+                   MERGE (g:Give {key:$k}) ON CREATE SET g.by=$me, g.at=$t, g.person=$p, g.drug=$d, g.slot=$s, g.ing=$ing, g.slot_ms=$ms, g.won=true
+                   WITH g, g.won AS fresh, g.by AS by, g.at AS at SET g.won=false RETURN fresh, by, at""",
+                {"k": key, "me": norm(self.agent), "t": now_ms(), "p": norm(person), "d": norm(drug), "s": norm(slot), "ing": ing, "ms": slot_ms, "w": window})
+            if rows:
+                fresh, by, at = rows[0]
+                if fresh:
+                    watched = (await self._q("MATCH (w:Watch {key:$k}) RETURN count(w)", {"k": f"{norm(person)}|{norm(drug)}"}, scope="read"))[0][0] > 0
+                    return {"given": True, "slot": slot, **({"needs_second_carer": True} if watched else {})}
+                await self._q("MERGE (v:Prevented {key:$k}) ON CREATE SET v.person=$p, v.drug=$d, v.slot=$s, v.by=$me, v.first_by=$by, v.at=$t",
+                              {"k": f"{key}|{norm(self.agent)}", "p": norm(person), "d": norm(drug), "s": norm(slot), "me": norm(self.agent), "by": by, "t": now_ms()}, checked=True)     # one record per carer and slot, however often they tap
+                return {"given": False, "duplicate": True, "already_given_by": by, "at": at,
+                        "note": "this slot was already recorded; check with them before giving another dose"}
+            near = await self._near_give(person, ing, key, slot_ms, window)          # another carer's give of this ingredient, close to this time, got in first
+            if not near:
+                raise RuntimeError("the dose could not be recorded; nothing was saved")
         await self._q("MERGE (v:Prevented {key:$k}) ON CREATE SET v.person=$p, v.drug=$d, v.slot=$s, v.by=$me, v.first_by=$by, v.at=$t",
-                      {"k": f"{key}|{norm(self.agent)}", "p": norm(person), "d": norm(drug), "s": norm(slot), "me": norm(self.agent), "by": by, "t": now_ms()}, checked=True)     # one record per carer and slot, however often they tap
-        return {"given": False, "duplicate": True, "already_given_by": by, "at": at,
-                "note": "this slot was already recorded; check with them before giving another dose"}
+                      {"k": f"{norm(person)}|{norm(drug)}|{near[0]}|{norm(self.agent)}", "p": norm(person), "d": norm(drug), "s": norm(slot), "me": norm(self.agent), "by": near[1], "t": now_ms()}, checked=True)
+        return {"given": False, "duplicate": True, "already_given_by": near[1], "at": near[2],
+                "note": f"a dose of this was recorded for {near[0]}, within {NEAR_MIN} minutes of this one; check with them before giving another dose" if not times else
+                        f"a dose of this was recorded for {near[0]} under another name; check with them before giving another dose"}
+
+    async def _near_give(self, person: str, ing: str, key: str, slot_ms: int, window: int) -> Optional[tuple]:
+        rows = await self._q("MATCH (e:Give {person:$p, ing:$ing}) WHERE e.key <> $k AND e.slot_ms IS NOT NULL AND abs(e.slot_ms - $ms) <= $w "
+                             "RETURN e.slot, e.by, e.at ORDER BY e.at LIMIT 1", {"p": norm(person), "ing": ing, "k": key, "ms": slot_ms, "w": window}, scope="read")
+        return tuple(rows[0]) if rows else None
 
     async def care_gives(self, person: str, limit: int = 50) -> list[dict]:
         rows = await self._q("MATCH (g:Give {person:$p}) OPTIONAL MATCH (w:Watch {key: g.person + '|' + g.drug}) "

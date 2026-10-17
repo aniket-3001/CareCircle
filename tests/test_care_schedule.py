@@ -293,3 +293,42 @@ async def test_a_dose_given_at_21_00_and_21_15_is_one_dose_whether_or_not_times_
         await b.care_give("asha", "metformin", f"{day} 14:00")
     out = await a.care_outcomes("asha")
     assert out["double_doses_stopped"] >= 2
+
+
+async def test_two_gives_sent_together_with_no_times_set_are_one_dose(gm):
+    """The review: 21:00 and 21:15 sent at the same moment both returned given: true in 5 of 30 rounds, because the check read the earlier gives and then wrote."""
+    t, a, b, _ = await circle(gm)
+    day = (datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+    await entry(a, "amlodipine", "5 mg", "once daily")
+    wins = []
+    for i in range(30):
+        d = f"2026-09-{i + 1:02d}"
+        r = await asyncio.gather(a.care_give("asha", "amlodipine", f"{d} 21:00"), b.care_give("asha", "amlodipine", f"{d} 21:15"))
+        wins.append(sum(1 for x in r if x["given"]))
+    assert wins == [1] * 30
+
+
+async def test_the_same_ingredient_from_two_products_keeps_its_own_times_and_one_guard(gm):
+    """N2: two current entries of one ingredient (plain and a combination) each have times; the old lookup took one entry's times at random, so the other's
+    were refused. The guard is on the ingredient: both products at the same time is one dose of it."""
+    t, a, b, _ = await circle(gm)
+    day = (datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+    plain = await entry(a, "amlodipine", "5 mg", "once daily")
+    combo = (await a.care_record("asha", "amlodipine", dose_text="5 mg", freq_text="once daily", product="Telma-AM", source_type="typed"))["id"]
+    await a.care_schedule_set(plain, ["08:00"])
+    await a.care_schedule_set(combo, ["20:00"])
+    assert (await a.care_give("asha", "amlodipine", f"{day} 20:05"))["given"] is True          # the combination's time
+    assert (await b.care_give("asha", "amlodipine", f"{day} 08:05"))["given"] is True          # the plain entry's time
+    again = await b.care_give("asha", "amlodipine", f"{day} 19:55")
+    assert again["given"] is False and again["already_given_by"] == "sc-a"
+
+
+async def test_a_second_spelling_of_the_same_ingredient_is_the_same_dose(gm):
+    """The guard matched the typed string: 'metformin' and 'Metformin HCl' were two medicines to it."""
+    t, a, b, _ = await circle(gm)
+    day = (datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+    await entry(a, "metformin", "500 mg", "daily")
+    await entry(a, "metformin hydrochloride", "500 mg", "daily")
+    assert (await a.care_give("asha", "metformin", f"{day} 09:00"))["given"] is True
+    second = await b.care_give("asha", "metformin hydrochloride", f"{day} 09:10")
+    assert second["given"] is False and second["already_given_by"] == "sc-a"
