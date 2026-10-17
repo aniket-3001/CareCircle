@@ -80,3 +80,32 @@ async def test_an_entry_can_show_the_text_it_was_read_from_and_a_typed_one_says_
     assert none["has_source"] is False and none["text"] == "" and "Typed in by hand" in none["note"]
     with pytest.raises(KeyError):
         await m.care_entry_source("dose_nope")
+
+
+async def test_an_agent_with_write_access_cannot_consume_shared_reminders_but_can_read_them(gm):
+    """Round 3: a read-write agent key called care_nudges once and another carer's reminder flipped to 'delivered' without being sent. Consuming reminders is for the
+    delivery loop and the circle's owner; everyone else reads them with care_reminders, which claims nothing."""
+    t = tid(gm, "scope-c")
+    for a, s in (("scope-own", ("read", "write", "admin")), ("scope-agent", ("read", "write")), ("scope-other", ("read", "write"))):
+        await gm.grant(a, t, s)
+    other, agent = gm.open("scope-other", t), gm.open("scope-agent", t)
+    await gm.open("scope-own", t).care_record("asha", "warfarin", dose_text="5 mg", freq_text="at bedtime", source_type="typed", at=1)
+    await other.care_record("asha", "metformin", dose_text="500 mg", freq_text="twice daily", source_type="typed", at=2)       # two carers, each behind on the other's entry
+    assert ops.OPS["care_nudges"] == "admin" and ops.OPS["care_slot_nudges"] == "admin" and ops.OPS["care_reminders"] == "read"
+    for op in ("care_nudges", "care_slot_nudges"):
+        with pytest.raises(PermissionDenied):
+            await ops.invoke(gm, "scope-agent", t, op, {"person": "asha"})                    # through the API / MCP surface
+    seen = await ops.invoke(gm, "scope-agent", t, "care_reminders", {"person": "asha", "now": 10**13})            # the read-only preview works for the agent
+    assert seen and all(r["delivered"] is False for r in seen)
+    again = await ops.invoke(gm, "scope-agent", t, "care_reminders", {"person": "asha", "now": 10**13})
+    assert [r["message"] for r in again] == [r["message"] for r in seen]                       # looking claimed nothing
+    got = await ops.invoke(gm, "scope-own", t, "care_nudges", {"person": "asha", "now": 10**13})              # the owner (and the delivery loop) can still deliver
+    assert got
+    assert all(r["delivered"] is True for r in await ops.invoke(gm, "scope-agent", t, "care_reminders", {"person": "asha", "now": 10**13}))
+
+
+async def test_the_catalogue_an_agent_sees_has_no_reminder_consuming_tool(gm):
+    t = tid(gm, "scope-cat")
+    await gm.grant("scope-cat-a", t, ("read", "write"))
+    visible = [n for n, s in ops.OPS.items() if s in ("read", "write")]
+    assert "care_nudges" not in visible and "care_slot_nudges" not in visible and "care_reminders" in visible

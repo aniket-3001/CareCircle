@@ -364,7 +364,8 @@ class CareMixin:
 
     async def care_nudges(self, person: str, now: Optional[int] = None, remind_after_h: float = 4, escalate_after_h: float = 12,
                           hold: Optional[set] = None) -> list[dict]:
-        """Reminders due: unacknowledged changes older than remind_after_h -> 'remind' that carer; older than escalate_after_h ->
+        """CLAIMS the reminders that are due (so they are not produced twice): for the delivery loop and the circle's owner only. To look at what is due without using
+        it up, call care_reminders. Reminders due: unacknowledged changes older than remind_after_h -> 'remind' that carer; older than escalate_after_h ->
         'escalate' to the other carers. Each (kind, carer, dose, recipient) is produced once: claiming it is a conditional write."""
         if self._guard:                                  # it only lists what is due, but each reminder it returns is claimed (used up): that is a write
             await self._guard("write")

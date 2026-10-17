@@ -61,7 +61,7 @@ Content-Type: application/json
 | `care_schedule_set` | write | `dose_id`*, `times`*, `as_needed`, `ends_on` | Confirm when this entry is taken: the clock times (HH:MM, 24-hour), or `as_needed` for a medicine with no fixed times, and optionally the last |
 | `care_today` | read | `person`*, `now` | Today's confirmed dose slots in the circle's time zone, in clock order, each with its state: given (and by whom), due, not marked given yet, or |
 | `care_give_slot` | write | `person`*, `dose_id`*, `time`*, `now` | Mark one of today's confirmed slots as given. Same once-per-slot claim as care_give: if someone already marked it, this says who. A combination tablet is one claim over all its ingredients: every one is recorded or none is, and a refusal says whether the same tablet or a shared ingredient was already recorded. |
-| `care_slot_nudges` | write | `person`*, `now`, `hold` | Reminders for today's slots, each produced once per carer: when a slot is due ('Metformin 08:00 is due') and when it is still not marked given |
+| `care_slot_nudges` | admin | `person`*, `now`, `hold` | Reminders for today's slots, each produced once per carer: when a slot is due ('Metformin 08:00 is due') and when it is still not marked given |
 | `care_confirm` | write | `dose_id`* | A person confirms a pending entry (after looking at the quote beside the source). Makes it current. |
 | `care_regimen` | read | `person`*, `as_of` | What `person` takes now, or at `as_of` (ms): confirmed 'set' entries valid at that time. |
 | `care_duplicates` | read | `person`*, `as_of` | Ingredients recorded on more than one current entry (the same medicine reaching the person through two products: a combination brand and a plain |
@@ -69,7 +69,7 @@ Content-Type: application/json
 | `care_resolve` | read | `text`*, `n` | Top-n drug name candidates for an OCR/voice string. Nothing is auto-accepted; a person chooses. |
 | `care_ack` | write | `dose_id`* | The calling carer says they have seen this change. |
 | `care_divergence` | read | `person`*, `now` | Per carer: confirmed changes they have not acknowledged and a [0,1] divergence score. Older unacknowledged changes count |
-| `care_nudges` | write | `person`*, `now`, `remind_after_h`, `escalate_after_h`, `hold` | Reminders due: unacknowledged changes older than remind_after_h -> 'remind' that carer; older than escalate_after_h -> |
+| `care_nudges` | admin | `person`*, `now`, `remind_after_h`, `escalate_after_h`, `hold` | CLAIMS the reminders that are due (so they are not produced twice): for the delivery loop and the circle's owner only. To look at what is due without using |
 | `care_reminders` | read | `person`*, `now`, `remind_after_h`, `escalate_after_h` | Reminders that are due, as a read-only preview: nothing is claimed, so looking at them never uses them up (care_nudges claims and delivers). |
 | `care_give` | write | `person`*, `drug`*, `slot`* | Record that the calling carer gave `drug` for dose slot `slot` (e.g. '2026-10-16 08:00'). A slot can be claimed once: |
 | `care_gives` | read | `person`*, `limit` |  |
