@@ -61,6 +61,8 @@ Every number and flag says where it came from, and when the sources disagree or 
 
 The same memory is open to any agent: `POST /mcp` on the live address (Streamable HTTP, `Authorization: Bearer <key>`), or the stdio server `python -m graphmem.mcp_server`, or the LangChain and LlamaIndex tools in `integrations/`. Keys carry scopes (`read`, `write`, `admin`) that are enforced before every operation. Setup, tool list and examples: [Connect your agent stack](docs/DETAILS.md#connect-your-agent-stack).
 
+On the question this memory exists to answer ("which carer has not seen which change?") on 20 generated circles: Care Circle 20/20, Mem0 7/20, a model given every event 10/20; and in a race of ten callers for one dose slot Care Circle accepts one, Mem0 all ten. Tiny circles, one question, untuned baselines: read the limits in `docs/BENCHMARKS.md` (B6) before quoting it.
+
 ## Safety by design
 - **No advice.** A scanner (`carecircle/safety.py`) rejects outgoing text that tells someone to take, stop, skip or change a dose. Messages are
   templates whose facts (drug, hours, carer) are checked before sending.
