@@ -231,4 +231,11 @@ export const HI_MORE: Record<string, string> = {
   "More: how to read a flag, how the record adds up, readings, where the flags come from": "और: फ़्लैग कैसे पढ़ें, रिकॉर्ड का जोड़, रीडिंग, फ़्लैग कहाँ से आते हैं",
   "double doses stopped (a second carer tried to mark a dose already marked)": "दोहरी खुराकें रुकीं (दूसरे देखभालकर्ता ने पहले से चिह्नित खुराक चिह्नित करनी चाही)",
   "changes seen more than 4 hours after they were made": "बदलाव जो बनने के 4 घंटे से ज़्यादा बाद देखे गए",
+  "Check the stored log": "संग्रहीत लॉग जाँचें",
+  "The log is unbroken": "लॉग अटूट है",
+  "events": "घटनाएँ",
+  "entries, each still as it was written": "प्रविष्टियाँ, हर एक वैसी ही जैसी लिखी गई थी",
+  "older entries are from before the log began": "पुरानी प्रविष्टियाँ लॉग शुरू होने से पहले की हैं",
+  "The log is NOT intact": "लॉग सही नहीं है",
+  "event": "घटना",
 };

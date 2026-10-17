@@ -282,6 +282,7 @@ class CareViewMixin:
                       {"r": rid, "h": digest, "t": t, "by": norm(self.agent), "why": reason[:200]})
         if owner:                                                   # close the gap: the entry before it becomes current again
             await self._care_rechain(owner[0][0], drug, product)
+        await self._chain_note("erase", dose_id, digest, norm(self.agent))      # the log says an entry was erased, and by whom, without saying what it held
         left = (await self._q("MATCH (x:Dose {id:$id}) RETURN count(x)", {"id": dose_id}, scope="read"))[0][0]
         return {"receipt": rid, "forgotten": left == 0, "removed": "the entry, its quote, its links and acknowledgements", "sha256": digest,
                 "note": "The receipt code lets this server match it to a copy someone kept (care_receipt_check); without the server's key it cannot be tried against guesses."}
@@ -296,6 +297,7 @@ class CareViewMixin:
         await self._q("MATCH (x:Dose {id:$id}) SET x.status='mistake', x.status_before=$was, x.cur=false, x.mistake_by=$by, x.mistake_at=$t, x.mistake_reason=$why",
                       {"id": dose_id, "was": was, "by": norm(self.agent), "t": now_ms(), "why": (reason or "")[:200]}, checked=True)
         await self._care_rechain(person, drug, product)
+        await self._chain_note("mistake", dose_id, norm(self.agent), (reason or "")[:200])
         return {"id": dose_id, "status": "mistake", "note": "Marked as entered by mistake. It stays in the history; the owner or you can put it back."}
 
     async def care_restore_entry(self, dose_id: str) -> dict:
@@ -309,6 +311,7 @@ class CareViewMixin:
         await self._q("MATCH (x:Dose {id:$id}) SET x.status=$st, x.status_before=null, x.mistake_by=null, x.mistake_at=null, x.mistake_reason=null",
                       {"id": dose_id, "st": before or "confirmed"}, checked=True)
         await self._care_rechain(person, drug, product)
+        await self._chain_note("restore", dose_id, norm(self.agent))
         return {"id": dose_id, "status": before or "confirmed"}
 
     async def care_forget_person(self, person: str, confirm: str = "") -> dict:
@@ -325,12 +328,17 @@ class CareViewMixin:
         await self._q("MATCH (h:Handover {person:$p}) DELETE h", {"p": p})
         await self._q("MATCH (w:Watch) WHERE w.key STARTS WITH $k DELETE w", {"k": p + "|"})
         await self._q("MATCH (f:Followup {person:$p}) DETACH DELETE f", {"p": p})
-        for lab in ("Measurement", "Appointment", "Condition", "Allergy"):
+        for lab in ("Measurement", "Appointment", "Condition", "Allergy", "Consent", "Review"):
             await self._q(f"MATCH (m:{lab})-[:FOR]->(:Person {{id:$p}}) DETACH DELETE m", {"p": p})
         if ids:
             await self._q("UNWIND $ids AS i MATCH (n:Nudge) WHERE n.key CONTAINS i DELETE n", {"ids": ids})
             await self._q("MATCH (x:Dose)-[:FOR]->(:Person {id:$p}) DETACH DELETE x", {"p": p})
         await self._q("MATCH (q:Person {id:$p, role:'patient'}) DETACH DELETE q", {"p": p})
+        await self._q("MATCH (s:Source) DETACH DELETE s")                         # the text read from photos, voice notes and documents (names and all)
+        await self._q("MATCH (m:ChatMsg) DELETE m")                                # the helper's conversation: it is about this person
+        await self._q("MATCH (e:Event) DELETE e")                                  # the history log started over: it held hashes of the entries that no longer exist
+        await self._q("MATCH (c:Chain) DELETE c")
+        await self._chain_note("erase_person", p, digest, norm(self.agent))
         rid = new_id("rcpt")
         await self._q("CREATE (:Receipt {id:$r, kind:'person', hash:$h, at:$t, by:$by, reason:'', removed:$rm})",
                       {"r": rid, "h": digest, "t": now_ms(), "by": norm(self.agent), "rm": f"{len(ids)} entries, {gives} dose records"})

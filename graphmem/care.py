@@ -145,6 +145,7 @@ class CareMixin:
                 await self._q("MATCH (o:Dose {id:$o}), (x:Dose {id:$n}) WHERE o.slots IS NOT NULL AND x.slots IS NULL "
                               "SET x.slots=o.slots, x.as_needed=o.as_needed, x.sched_by=o.sched_by, x.sched_at=o.sched_at, x.ends_on=o.ends_on",
                               {"o": cur[0][0], "n": did}, checked=True)
+        await self._chain_entry(rows[0][0])                               # the append-only log: this entry, as written
         out = {"id": rows[0][0], "status": status, "verified": verified,
                "note": None if verified else ("no stored source for this " + source_type + ": confirm manually before it counts" if source_type != "typed" and not stored
                                               else "quote not found in the source text: confirm manually before it counts")}

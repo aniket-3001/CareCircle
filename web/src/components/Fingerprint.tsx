@@ -1,5 +1,6 @@
 import { Fingerprint as Icon } from 'lucide-react';
 import { useState } from 'react';
+import type { ChainCheck } from '../api/types';
 import { Async } from './Async';
 import { useT } from '../lib/i18n';
 import { useApp, useLoad } from '../state';
@@ -12,6 +13,7 @@ export function Fingerprint(): React.JSX.Element {
   const d = useLoad((a) => a.api.digest(), [app.rev]);
   const [saved, setSaved] = useState('');
   const [verdict, setVerdict] = useState<'same' | 'different' | 'bad' | null>(null);
+  const [chain, setChain] = useState<ChainCheck | null>(null);
 
   async function check(): Promise<void> {
     const m = /^\s*(\d{1,6}):([0-9a-f]{64})\s*$/i.exec(saved);
@@ -32,6 +34,16 @@ export function Fingerprint(): React.JSX.Element {
               <input type="text" value={saved} onChange={(e) => { setSaved(e.target.value); setVerdict(null); }} aria-label={t('A line you kept earlier')} placeholder="12:ab34…" data-testid="fingerprint-input" />
               <button type="button" className="btn btn--soft btn--sm" onClick={() => void check()} disabled={!saved.trim()} data-testid="fingerprint-check">{t('Check')}</button>
             </div>
+            <div className="row">
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => void app.api.chain().then(setChain)} data-testid="chain-check">{t('Check the stored log')}</button>
+            </div>
+            {chain && (
+              <p role="status" data-testid="chain-verdict">
+                {chain.ok
+                  ? `${t('The log is unbroken')}: ${chain.events} ${t('events')}, ${chain.entries_logged} ${t('entries, each still as it was written')}.${chain.entries_not_logged > 0 ? ` ${chain.entries_not_logged} ${t('older entries are from before the log began')}.` : ''}`
+                  : `${t('The log is NOT intact')}: ${chain.first_problem?.why ?? ''} (${t('event')} ${chain.first_problem?.seq ?? ''}).`}
+              </p>
+            )}
             {verdict && <p role="status" data-testid="fingerprint-verdict">{verdict === 'same' ? t('Those entries are exactly as they were.') : verdict === 'different' ? t('Those entries are NOT the same as when the line was kept: one was changed or removed.') : t('That does not look like a kept line (a number, a colon and 64 letters or digits).')}</p>}
           </>
         )}

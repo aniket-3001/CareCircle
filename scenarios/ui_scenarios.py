@@ -649,6 +649,9 @@ def u18(w, b, r):
     pg.get_by_test_id("fingerprint-check").click()
     expect(pg.get_by_test_id("fingerprint-verdict")).to_contain_text("exactly as they were", timeout=15000)
     r.check(True, "and still matches after a later entry is added")
+    pg.get_by_test_id("chain-check").click()
+    expect(pg.get_by_test_id("chain-verdict")).to_contain_text("unbroken", timeout=15000)
+    r.check("3 entries" in pg.get_by_test_id("chain-verdict").inner_text(), "the stored log is unbroken and holds all three entries", pg.get_by_test_id("chain-verdict").inner_text())
     r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
     ctx.close()
 

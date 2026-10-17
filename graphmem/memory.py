@@ -23,6 +23,7 @@ from .care import CareMixin
 from .care_custody import CareCustodyMixin
 from .care_followups import CareFollowupsMixin
 from .care_plan import CarePlanMixin
+from .care_chain import CareChainMixin
 from .care_consent import CareConsentMixin, CareReviewMixin
 from .care_schedule import CareScheduleMixin
 from .care_track import CareTrackMixin
@@ -56,7 +57,7 @@ MAX_FACT_PART_CHARS = 500
 ROLE_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 
 
-class TenantMemory(GraphAlgoMixin, CareConsentMixin, CareReviewMixin, CareScheduleMixin, CareMixin, CareViewMixin, CareTrackMixin, CarePlanMixin, CareFollowupsMixin, CareCustodyMixin):
+class TenantMemory(GraphAlgoMixin, CareChainMixin, CareConsentMixin, CareReviewMixin, CareScheduleMixin, CareMixin, CareViewMixin, CareTrackMixin, CarePlanMixin, CareFollowupsMixin, CareCustodyMixin):
     def __init__(self, db: Db, tenant: str, agent: str, guard: Optional[Guard] = None, graph: Optional[str] = None,
                  extractor=None):
         self.db, self.tenant, self.agent, self._guard, self._graph = db, tenant, agent, guard, graph
