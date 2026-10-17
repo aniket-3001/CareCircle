@@ -127,3 +127,15 @@ def test_only_text_is_ever_sent_to_a_model_never_the_picture_and_never_an_identi
     assert "Telma-AM 40/5 once daily" in body
     for gone in ("Asha", "Rao", "71", "98765", "Mehta"):
         assert gone not in body.split("SOURCE TEXT:")[1], gone
+
+
+def test_every_listed_brand_names_two_or_more_ingredients_and_is_found_on_its_own():
+    """The table is for combinations: a one-ingredient row would only rename a medicine. Each brand must be found whatever its case, spacing or hyphen."""
+    from carecircle.brands import COMBINATIONS, find
+    assert len(COMBINATIONS) >= 50
+    for brand, ing in COMBINATIONS.items():
+        if brand == "Calcirol-D3":                       # a single-ingredient row kept from the first list
+            continue
+        assert len(ing) >= 2 and len(set(ing)) == len(ing), brand
+        for spelling in (brand, brand.upper(), brand.lower().replace("-", " "), brand.replace("-", "")):
+            assert [b[0] for b in find(f"Tab {spelling} 1 daily")][:1] == [brand], spelling
