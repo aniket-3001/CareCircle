@@ -22,3 +22,22 @@ The reference graph (`cc_ref`) can always be rebuilt from public data: `python -
 **What to expect (recovery numbers).** A crash or reboot: back in about a minute from the append-only file, losing at most the last second of writes. A lost disk or host: restore the newest snapshot, which loses up to 6 hours of writes (the backup interval) and takes minutes. There is no replica, so a restore is manual.
 
 **Demo circles are synthetic**, so losing them costs nothing; the backup matters most for any circle created with real use.
+
+## FalkorDB crash-loops on start while replaying its log (seen 17 Oct 2026)
+
+Symptom: the site answers 502, `docker ps` shows `deploy-falkordb-1  Restarting (139)`, and `docker logs deploy-falkordb-1` shows the snapshot loading and then
+`crashed by signal: 11` in `GraphContext_GetSchemaByID` while it replays `appendonlydir/appendonly.aof.1.incr.aof`. The snapshot (`dump.rdb`) itself loads.
+It happened when a deploy changed FalkorDB's start arguments, so the container was recreated after 36 hours of writes. Rolling back the code does not help,
+because the same log is replayed. What fixed it (keep the old files, delete nothing):
+
+```
+C="docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env"; V=/var/lib/docker/volumes/deploy_falkor-data/_data; TS=$(date +%Y%m%d-%H%M%S)
+$C stop falkordb api
+mkdir -p /opt/cc-backup && cp -a $V /opt/cc-backup/falkor-data-$TS && mv $V/appendonlydir /opt/cc-backup/appendonlydir-crashing-$TS
+docker run -d --name dbfix -v deploy_falkor-data:/var/lib/falkordb/data -e REDIS_ARGS="--appendonly no" <the pinned falkordb image>
+docker exec dbfix redis-cli graph.list | wc -l          # the graphs are there
+docker exec dbfix redis-cli config set appendonly yes    # writes a fresh log from what was loaded; wait for aof_rewrite_in_progress:0
+docker stop dbfix && docker rm dbfix && $C up -d falkordb && $C up -d api
+```
+
+Anything written after the snapshot and only in the crashing log is lost (that time, nothing: the log was older than the snapshot).
