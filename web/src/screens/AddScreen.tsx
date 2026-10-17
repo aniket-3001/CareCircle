@@ -193,6 +193,11 @@ export function ProposalCard({ p, kind, sourceText, sourceId = '', goToday = tru
           {p.combination_strength ? ` (${tr('printed strength')}: ${p.combination_strength})` : ''}. {tr('Each ingredient is saved on its own, so confirm each one. From a hand-written list: check the pack.')}
         </p>
       )}
+      {p.possible_combination && (
+        <p className="banner banner--warn" role="note" data-testid="possible-combination">
+          <b>{p.possible_combination}</b> {tr('may be a combination product. Only one ingredient was read from it. Check the pack for any others and add them yourself.')}
+        </p>
+      )}
       <blockquote className="quote">“{p.quote}”</blockquote>
       <div className="grid-2">
         <label className="field">

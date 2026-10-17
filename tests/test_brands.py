@@ -139,3 +139,26 @@ def test_every_listed_brand_names_two_or_more_ingredients_and_is_found_on_its_ow
         assert len(ing) >= 2 and len(set(ing)) == len(ing), brand
         for spelling in (brand, brand.upper(), brand.lower().replace("-", " "), brand.replace("-", "")):
             assert [b[0] for b in find(f"Tab {spelling} 1 daily")][:1] == [brand], spelling
+
+
+def test_a_known_brand_with_an_unlisted_suffix_is_flagged_not_read_as_the_plain_brand():
+    """Stamlo-T, Storvas-EZ, Pantocid-D ... are usually combinations; reading them as the one-ingredient brand lost the other ingredient with no sign of it."""
+    from carecircle import intake
+    ch = Checker()
+    for text, ing in [("Stamlo-T 5", "amlodipine"), ("Storvas-EZ 10", "atorvastatin"), ("Atorva-F 10", "atorvastatin"), ("Rosuvas-F 10", "rosuvastatin"),
+                      ("Pantocid-D", "pantoprazole"), ("Omez-DSR", "omeprazole"), ("Cipro-TZ", "ciprofloxacin")]:
+        got = intake.propose(text, ch)
+        assert [(p["drug_candidates"][0]["name"], bool(p.get("possible_combination"))) for p in got] == [(ing, True)], text
+    for text in ("Dolo 650", "Telma 40", "Glycomet tab", "Crocin od", "Stamlo 5 mg", "Telma-H 40"):        # plain brands, and a listed combination: no warning
+        assert not [p for p in intake.propose(text, ch) if p.get("possible_combination")], text
+
+
+def test_no_listed_combination_loses_an_ingredient_on_a_multi_line_prescription():
+    """Every listed brand, in turn with every other, one per line with dose and timing lines between: all ingredients come out."""
+    import itertools
+    from carecircle import intake
+    ch = Checker()
+    for (a, ia), (b, ib) in itertools.combinations(brands.COMBINATIONS.items(), 2):
+        text = f"1. {a}\n   40/5\n   once daily\n2. {b}\n   at night"
+        got = {(p["combination"], p["drug_candidates"][0]["name"]) for p in intake.rule_proposals(text, ch) if p.get("combination")}
+        assert got == {(a, i) for i in ia} | {(b, i) for i in ib}, text

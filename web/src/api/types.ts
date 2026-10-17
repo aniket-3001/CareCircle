@@ -216,6 +216,8 @@ export interface Proposal {
   combination?: string;
   combination_ingredients?: string[];
   combination_strength?: string;
+  /** The name as written, when it looks like a known brand plus a suffix (Stamlo-T) that the list does not have: it may hold more than the one ingredient read. */
+  possible_combination?: string;
 }
 
 export interface IntakeResult {

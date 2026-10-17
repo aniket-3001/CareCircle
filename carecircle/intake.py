@@ -18,6 +18,7 @@ import re
 from typing import Optional
 
 from . import brands
+from .aliases import ALIASES
 from .verify import field_in_quote, quote_in_source
 
 DOSE_RE = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?)(?:[\s.:]?(?:mcg|µg|mg|ml|iu|units?)|\s?g)", re.I)   # OCR glues words: "Sodium5mgtablets"
@@ -137,6 +138,21 @@ def _split_medicines(line: str, checker) -> list[str]:
 
 _NOT_A_MEDICINE_LINE = re.compile(r"^(take|taken|store|keep|qty|quantity|refills?|rx|dr|doctor|patient|name|date|pharmacy|tablets?|capsules?|use|apply|"
                                   r"dispense|discard|expiry|exp|mfg|batch|lot|total|price|mrp|phone|tel|address|signature)\b", re.I)
+
+
+_NOT_A_SUFFIX = {"tab", "tabs", "tablet", "tablets", "cap", "caps", "syp", "inj", "od", "bd", "bid", "tid", "qid", "prn", "sos", "hs", "pm", "mg", "ml", "mcg", "iu",
+                 "once", "twice", "with", "after", "and", "the", "for", "one", "two", "use", "take", "per", "day", "daily", "at", "in", "of", "to"}
+_STEM = re.compile(r"(?<![A-Za-z])(" + "|".join(sorted(map(re.escape, ALIASES), key=len, reverse=True)) + r")[ \-]([A-Za-z]{1,4})(?![A-Za-z])", re.I)
+
+
+def unlisted_suffix(quote: str, ingredient: str) -> str:
+    """A brand written as a known one-ingredient brand plus a short suffix ("Stamlo-T", "Storvas-EZ", "Pantocid-D") is very often a COMBINATION the hand-written
+    list does not have, and reading it as the plain brand silently loses the other ingredient. Returns the name as written when `quote` has one for this
+    ingredient ("" otherwise) so the proposal can say so; it cannot say what the other ingredient is, only that the pack must be checked."""
+    for m in _STEM.finditer(quote or ""):
+        if ALIASES.get(m.group(1).lower()) == ingredient and m.group(2).lower() not in _NOT_A_SUFFIX and not brands.find(m.group(0)):
+            return m.group(0)
+    return ""
 
 
 def _names_a_medicine(line: str, checker) -> bool:
@@ -298,5 +314,9 @@ def propose(text: str, checker) -> list[dict]:
         p["verified"] = quote_in_source(p["quote"], text)
         props.append(p)
     for p in props:
+        if not p.get("combination"):
+            tok = unlisted_suffix(p["quote"], p["drug_candidates"][0]["name"])
+            if tok:
+                p["possible_combination"] = tok                  # not "the plain brand": the name goes on past the brand, and the list does not know it
         p["needs_human"] = True                                  # always: nothing is written without a person confirming
     return props
