@@ -17,7 +17,7 @@ from pathlib import Path
 from .curated import CURATED_SUBSTRATES
 
 REF_GRAPH = "cc_ref"
-REF_VERSION = 4          # bump when the shape of the reference graph changes: start-up reloads it when the stored version is older (2: laboratory and transporter tables; 3: allergy classes; 4: combination brands)
+REF_VERSION = 5          # bump when the shape of the reference graph changes: start-up reloads it when the stored version is older (2: laboratory and transporter tables; 3: allergy classes; 4: combination brands; 5: class members linked to their drug)
 DATA = Path(__file__).resolve().parent.parent / "data" / "ref"
 
 
@@ -157,6 +157,8 @@ def load(host: str = "localhost", port: int = 6379, data_dir: Path = DATA) -> di
         mem = [{"m": m, "s": s} for m, s in c["members"].items()]
         for i in range(0, len(mem), 500):
             g.query("MATCH (c:Class {name:$n}) UNWIND $r AS x MERGE (m:Member {name:x.m}) CREATE (m)-[:IN_CLASS {source:x.s}]->(c)", {"n": name, "r": mem[i:i + 500]})
+    members = sorted({m for c in CLASS_TABLE.values() for m in c["members"]})
+    g.query("UNWIND $n AS x MATCH (m:Member {name:x}) MATCH (d:Drug {name:x}) MERGE (m)-[:IS]->(d)", {"n": members})      # a class member is the same molecule as the (:Drug) the interactions hang on
     from .brands import COMBINATIONS, SOURCE as BRAND_SOURCE, squash
     g.query("CREATE INDEX FOR (b:Brand) ON (b.key)")
     g.query("CREATE INDEX FOR (i:Ingredient) ON (i.name)")

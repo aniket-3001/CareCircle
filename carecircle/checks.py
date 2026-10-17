@@ -43,6 +43,21 @@ class Checker:
         brands.set_table(table, from_graph=True)
         return len(table)
 
+    def class_packs(self, cls: str) -> list[dict]:
+        """Listed brands that contain a medicine in this allergy class, in ONE traversal of the reference graph:
+        (:Brand)-[:CONTAINS]->(:Ingredient)-[:IS]->(:Drug)<-[:IS]-(:Member)-[:IN_CLASS]->(:Class). Each row carries the path in words and who says the medicine is in the class."""
+        rows = self.g.ro_query(
+            "MATCH (b:Brand)-[:CONTAINS]->(i:Ingredient)-[:IS]->(d:Drug)<-[:IS]-(m:Member)-[r:IN_CLASS]->(c:Class {name:$c}) "
+            "RETURN b.name, i.name, c.name, r.source ORDER BY b.name, i.name", {"c": norm(cls)}).result_set
+        return [{"brand": b, "ingredient": i, "class": c, "source": s, "path": f"{b} contains {i} -> {i} is in the {c} class ({s})"} for b, i, c, s in rows]
+
+    def class_interactions(self, cls: str, drugs: list[str]) -> list[dict]:
+        """What the medicines in this class interact with, among `drugs`: (:Class)<-[:IN_CLASS]-(:Member)-[:IS]->(:Drug)-[:INTERACTS]-(:Drug), one traversal."""
+        rows = self.g.ro_query(
+            "MATCH (c:Class {name:$c})<-[:IN_CLASS]-(m:Member)-[:IS]->(d:Drug)-[x:INTERACTS]-(o:Drug) WHERE o.name IN $d AND d.name <> o.name "
+            "RETURN d.name, o.name, x.level, x.source ORDER BY d.name, o.name", {"c": norm(cls), "d": [norm(x) for x in drugs]}).result_set
+        return [{"member": a, "with": b, "level": lv, "source": s} for a, b, lv, s in rows]
+
     def brands_containing(self, drug: str) -> list[dict]:
         """Listed brands whose ingredients include `drug`, with the other ingredients: (:Brand)-[:CONTAINS]->(:Ingredient {name}) and back out again."""
         return [{"brand": r[0], "ingredients": r[1]} for r in self.g.ro_query(

@@ -160,4 +160,12 @@ class CarePlanMixin:
                     h = by_drug[r["drug"]]
                     hits.append({"allergy": a["text"], "drug": r["drug"], "entry": r["id"], "class": h["class"], "source": h["source"],
                                  "why": f"a {h['class']} medicine ({h['source']}; walked from the class in the reference graph)" if ch["from_graph"] else f"a {h['class']} medicine ({h['source']})"})
-        return {"hits": hits, "allergies": len(prof["allergies"]), "note": "A hit means ask the prescriber or pharmacist. No hit does not mean there is no problem: the class tables are not complete."}
+        packs, seen = [], set()                                                    # the packs ON RECORD that contain a medicine in a class an allergy names (one graph traversal per class)
+        on_record = {norm(r.get("product") or ""): r for r in reg if r.get("product")}
+        for a in prof["allergies"]:
+            for cls in (await asyncio.to_thread(checker().class_hits, a["text"], [r["drug"] for r in reg]))["classes"]:
+                for p in await asyncio.to_thread(checker().class_packs, cls):
+                    if norm(p["brand"]) in on_record and (a["text"], p["brand"], p["ingredient"]) not in seen:
+                        seen.add((a["text"], p["brand"], p["ingredient"]))
+                        packs.append({"allergy": a["text"], "product": p["brand"], "ingredient": p["ingredient"], "class": p["class"], "source": p["source"], "entry": on_record[norm(p["brand"])]["id"], "path": p["path"]})
+        return {"hits": hits, "packs": packs, "allergies": len(prof["allergies"]), "note": "A hit means ask the prescriber or pharmacist. No hit does not mean there is no problem: the class tables are not complete."}
