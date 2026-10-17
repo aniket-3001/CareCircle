@@ -42,7 +42,7 @@ export interface TodayItem {
   time: string;
   slot: string;
   at: number;
-  state: 'given' | 'due' | 'not_marked' | 'upcoming';
+  state: 'given' | 'due' | 'not_marked' | 'upcoming' | 'before';
   given_by: string | null;
   given_at: number | null;
   needs_second_carer: boolean;
@@ -112,7 +112,7 @@ export interface TodayView {
   tz: string;
   date: string;
   items: TodayItem[];
-  counts: { given: number; due: number; not_marked: number; upcoming: number };
+  counts: { given: number; due: number; not_marked: number; upcoming: number; before: number };
   unscheduled: { dose_id: string; drug: string; dose_text: string; freq_text: string; suggestion: Suggestion }[];
   as_needed: { dose_id: string; drug: string; dose_text: string; freq_text: string }[];
 }

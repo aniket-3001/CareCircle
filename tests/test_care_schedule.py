@@ -332,3 +332,35 @@ async def test_a_second_spelling_of_the_same_ingredient_is_the_same_dose(gm):
     assert (await a.care_give("asha", "metformin", f"{day} 09:00"))["given"] is True
     second = await b.care_give("asha", "metformin hydrochloride", f"{day} 09:10")
     assert second["given"] is False and second["already_given_by"] == "sc-a"
+
+
+async def test_a_slot_before_the_entry_or_before_its_times_existed_is_not_reported_as_missed(gm):
+    """N5: metformin recorded at 20:30 with times 08:00 and 20:00 told every carer at once '08:00: not marked as given yet'."""
+    t, a, b, _ = await circle(gm)
+    day = date(2026, 9, 20)
+    rec = at(day, "20:30")
+    e = await a.care_record("asha", "metformin", dose_text="500 mg", freq_text="twice daily", source_type="typed", at=rec)
+    await a.care_schedule_set(e["id"], ["08:00", "20:00", "21:00"])
+    now = rec + 5 * 60_000
+    today = await a.care_today("asha", now)
+    states = {i["time"]: i["state"] for i in today["items"]}
+    assert states == {"08:00": "before", "20:00": "before", "21:00": "due"}, states
+    assert today["counts"]["not_marked"] == 0 and today["counts"]["before"] == 2
+    assert [x for x in await a.care_slot_nudges("asha", now) if x["kind"] == "slot_not_marked"] == []        # nobody is told it was missed
+    assert (await a.care_give_slot("asha", e["id"], "08:00", now))["given"] is True                              # but it can still be marked if it was given
+    later = at(day, "22:45")                                                                                       # the 21:00 slot that existed when it was recorded can be missed
+    assert {i["time"]: i["state"] for i in (await a.care_today("asha", later))["items"]}["21:00"] == "not_marked"
+
+
+async def test_times_confirmed_late_leave_earlier_slots_neutral_and_editing_them_does_not_move_that(gm, monkeypatch):
+    from graphmem import care_schedule
+    t, a, b, _ = await circle(gm)
+    day = date(2026, 9, 20)
+    e = await entry(a, "atorvastatin", "20 mg", "daily", at_ms=at(date(2026, 9, 1), "09:00"))               # an old entry
+    monkeypatch.setattr(care_schedule, "now_ms", lambda: at(day, "13:00"))
+    await a.care_schedule_set(e, ["08:00"])                                                                      # times first confirmed at 13:00
+    assert {i["time"]: i["state"] for i in (await a.care_today("asha", at(day, "13:05")))["items"]} == {"08:00": "before"}
+    monkeypatch.setattr(care_schedule, "now_ms", lambda: at(day, "15:00"))
+    await a.care_schedule_set(e, ["08:00", "14:00"])                                                             # edited at 15:00: the starting point stays 13:00
+    states = {i["time"]: i["state"] for i in (await a.care_today("asha", at(day, "16:00")))["items"]}
+    assert states == {"08:00": "before", "14:00": "not_marked"}, states

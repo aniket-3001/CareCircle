@@ -13,6 +13,7 @@ const STATE: Record<TodayItem['state'], { text: string; tone: 'ok' | 'info' | 'w
   due: { text: 'Due now', tone: 'info' },
   not_marked: { text: 'Not marked as given yet', tone: 'warn' },
   upcoming: { text: 'Later today', tone: 'mute' },
+  before: { text: 'Before it was recorded', tone: 'mute' },
 };
 
 /** Today's doses, from the times a carer confirmed: one row per slot, with who marked it given. It reports what is recorded ("not marked as given yet");
@@ -67,7 +68,7 @@ function Checked({ today, error, onGive, busy, onSet, setting, closeSet, t }: {
     <section className="card" aria-labelledby="checklist-title" data-testid="checklist">
       <div className="card-head">
         <h2 id="checklist-title"><CalendarClock size={20} strokeWidth={1.75} aria-hidden="true" /> {t("Today's doses")}</h2>
-        <Pill tone={late ? 'warn' : 'info'}>{today.counts.given} / {today.items.length} {t('marked given')}</Pill>
+        <Pill tone={late ? 'warn' : 'info'}>{today.counts.given} / {today.items.length - today.counts.before} {t('marked given')}</Pill>
       </div>
       {late > 0 && <p className="muted" role="status" data-testid="checklist-late">{late === 1 ? t('1 dose is not marked as given yet.') : `${late} ${t('doses are not marked as given yet.')}`} {t('Check with the others before marking one.')}</p>}
       <div className="rows">

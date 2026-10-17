@@ -105,10 +105,14 @@ def end_date(start_ms: int, days: int, tz: str) -> str:
 EARLY_MIN, GRACE_MIN = 60, 90
 
 
-def slot_state(now_ms: int, moment_ms: int, given: bool) -> str:
-    """given | upcoming | due | not_marked. 'due' runs from an hour before to 90 minutes after; later it is 'not marked given yet'."""
+def slot_state(now_ms: int, moment_ms: int, given: bool, tracked_since_ms: int = 0) -> str:
+    """given | before | upcoming | due | not_marked. 'due' runs from an hour before to 90 minutes after; later it is 'not marked given yet'.
+    A slot that came before the entry was recorded (or before its times were confirmed) is 'before': the record cannot say it was missed, so it is neither
+    counted as missed nor reminded about."""
     if given:
         return "given"
+    if moment_ms < tracked_since_ms:
+        return "before"
     delta = (now_ms - moment_ms) / 60000
     if delta < -EARLY_MIN:
         return "upcoming"

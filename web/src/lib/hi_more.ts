@@ -78,6 +78,7 @@ export const HI_MORE: Record<string, string> = {
   'It comes off the current record and the entry before it counts again. It stays in the history, marked, with your name, and the owner or you can put it back.': 'यह मौजूदा रिकॉर्ड से हट जाती है और उससे पहले की प्रविष्टि फिर से मान्य हो जाती है। यह इतिहास में आपके नाम के साथ चिह्नित रहती है, और मालिक या आप इसे वापस रख सकते हैं।',
   'Mark as entered by mistake': 'गलती से दर्ज हुआ चिह्नित करें',
   'may be a combination product. Only one ingredient was read from it. Check the pack for any others and add them yourself.': 'शायद यह एक संयुक्त (कॉम्बिनेशन) दवा है। इसमें से केवल एक घटक पढ़ा गया। बाकी घटकों के लिए पैक देखें और उन्हें खुद जोड़ें।',
+  'Before it was recorded': 'रिकॉर्ड होने से पहले',
   'This is a combination product.': 'यह एक संयुक्त (कॉम्बिनेशन) दवा है।', 'usually contains': 'में आम तौर पर होता है', 'printed strength': 'छपी हुई मात्रा',
   'Each ingredient is saved on its own, so confirm each one. From a hand-written list: check the pack.': 'हर घटक अलग से सहेजा जाता है, इसलिए हर एक की पुष्टि करें। यह हाथ से लिखी सूची से है: पैक देख लें।',
   'not checked': 'जाँचा नहीं गया', 'Another medicine: type its name': 'कोई और दवा: उसका नाम लिखें', 'Medicine name': 'दवा का नाम',

@@ -443,7 +443,7 @@ def u13(w, b, r):
     pg.get_by_test_id("save-times").click()
     expect(pg.get_by_test_id("slot")).to_have_count(2, timeout=15000)
     r.check(pg.get_by_test_id("slot").nth(1).inner_text().startswith("21:00") or "21:00" in pg.get_by_test_id("slot").nth(1).inner_text(), "the times a person confirmed are the ones on the checklist")
-    r.check(pg.get_by_test_id("slot").nth(0).get_attribute("data-state") in ("given", "due", "not_marked", "upcoming"), "each slot says where it stands")
+    r.check(pg.get_by_test_id("slot").nth(0).get_attribute("data-state") in ("given", "due", "not_marked", "upcoming", "before"), "each slot says where it stands")
     pg.get_by_test_id("give-slot").first.click()
     expect(pg.get_by_test_id("slot").first).to_have_attribute("data-state", "given", timeout=15000)
     reg = u.ok(c, "care_today", person="mum")

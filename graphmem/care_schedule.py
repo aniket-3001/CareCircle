@@ -63,7 +63,7 @@ class CareScheduleMixin:
             if day < sched.local_date(now_ms(), tz) - __import__("datetime").timedelta(days=1) or day.year > 2100:
                 raise ValueError("the last day of a course cannot be in the past")
             ends = day.isoformat()
-        await self._q("MATCH (x:Dose {id:$id}) SET x.slots=$s, x.as_needed=$a, x.ends_on=$e, x.sched_by=$by, x.sched_at=$t",
+        await self._q("MATCH (x:Dose {id:$id}) SET x.slots=$s, x.as_needed=$a, x.ends_on=$e, x.sched_by=$by, x.sched_at=$t, x.sched_first=coalesce(x.sched_first, $t)",
                       {"id": dose_id, "s": slots, "a": bool(as_needed), "e": ends, "by": norm(self.agent), "t": now_ms()}, checked=True)
         return {"id": dose_id, "drug": rows[0][0], "times": slots, "as_needed": bool(as_needed), "ends_on": ends or None}
 
@@ -93,6 +93,8 @@ class CareScheduleMixin:
                 for hhmm in r["slots"]:
                     if r.get("ends_on") and day.isoformat() > r["ends_on"]:
                         continue
+                    if r.get("since") and sched.slot_moment_ms(day, hhmm, tz) < r["since"]:
+                        continue                                    # before the entry was recorded: it cannot have been missed
                     if sched.slot_moment_ms(day, hhmm, tz) + 90 * 60_000 > t:        # a slot still inside its window is not a miss yet
                         continue
                     due += 1
@@ -147,6 +149,13 @@ class CareScheduleMixin:
         return out
 
     # ------------------------------------------------------------------ the checklist
+    @staticmethod
+    def _tracked_since(r: dict, confirmed_at: dict, now: int) -> int:
+        """From when the record can speak about this entry's slots: when it was recorded, and when its times were FIRST confirmed (later edits of the times do not move it; and once that moment has passed; a look at
+        an earlier moment ignores it, so a look-back does not change)."""
+        c = confirmed_at.get(r["id"])
+        return max(int(r.get("since") or 0), int(c) if c is not None and int(c) <= now else 0)
+
     async def care_today(self, person: str, now: Optional[int] = None) -> dict:
         """Today's confirmed dose slots in the circle's time zone, in clock order, each with its state: given (and by whom), due, not marked given yet, or
         upcoming. Also the medicines that have no times yet ('unscheduled') and those taken as needed. It reports what is recorded; it does not advise."""
@@ -157,6 +166,8 @@ class CareScheduleMixin:
         gives = {r[0]: (r[1], r[2], r[3]) for r in await self._q(
             "MATCH (g:Give {person:$p}) WHERE g.slot STARTS WITH $d RETURN g.key, g.by, g.at, g.witness", {"p": norm(person), "d": today.isoformat()}, scope="read")}
         watched = {r[0] for r in await self._q("MATCH (w:Watch) WHERE w.key STARTS WITH $k RETURN w.key", {"k": norm(person) + "|"}, scope="read")}
+        confirmed_at = {r[0]: r[1] for r in await self._q("MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p}) WHERE x.sched_first IS NOT NULL RETURN x.id, x.sched_first",
+                                                          {"p": norm(person)}, scope="read")}
         items, unscheduled, as_needed = [], [], []
         for r in reg:
             if r["as_needed"]:
@@ -170,10 +181,10 @@ class CareScheduleMixin:
                 moment = sched.slot_moment_ms(today, hhmm, tz)
                 got = gives.get(f"{norm(person)}|{norm(r['drug'])}|{slot}")
                 items.append({"dose_id": r["id"], "drug": r["drug"], "dose_text": r["dose_text"], "freq_text": r["freq_text"], "time": hhmm, "slot": slot, "at": moment,
-                              "state": sched.slot_state(t, moment, got is not None), "given_by": got[0] if got else None, "given_at": got[1] if got else None,
+                              "state": sched.slot_state(t, moment, got is not None, self._tracked_since(r, confirmed_at, t)), "given_by": got[0] if got else None, "given_at": got[1] if got else None,
                               "needs_second_carer": bool(got) and f"{norm(person)}|{norm(r['drug'])}" in watched and not got[2]})
         items.sort(key=lambda i: (i["at"], i["drug"]))
-        counts = {k: sum(1 for i in items if i["state"] == k) for k in ("given", "due", "not_marked", "upcoming")}
+        counts = {k: sum(1 for i in items if i["state"] == k) for k in ("given", "due", "not_marked", "upcoming", "before")}
         return {"person": norm(person), "tz": tz, "date": today.isoformat(), "items": items, "counts": counts, "unscheduled": unscheduled, "as_needed": as_needed}
 
     async def care_give_slot(self, person: str, dose_id: str, time: str, now: Optional[int] = None) -> dict:
