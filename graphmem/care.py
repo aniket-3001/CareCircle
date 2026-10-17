@@ -401,6 +401,10 @@ class CareMixin:
         """Ongoing public recalls listed for the medicines on record. Only medicine names go out. Shown as published; whether one applies depends on the
         pack at home, which only a person (or the pharmacist) can check."""
         from carecircle import external
+        tz = (await self.care_timezone())["tz"]
+        if not any(tz.startswith(p) for p in ("America/", "US/", "Pacific/Honolulu")):       # openFDA lists US recalls only; for anyone else it would be noise, and no name should go out for nothing
+            return {"checked": [], "available": False, "recalls": [], "region": "US only",
+                    "note": f"Recall lookups use openFDA, which lists US recalls. This circle's time zone is {tz}, so none were looked up and no medicine name was sent."}
         reg = await self.care_regimen(person)
         drugs = sorted({r["drug"] for r in reg})
         found = await asyncio.gather(*[asyncio.to_thread(external.openfda_recalls, d) for d in drugs])

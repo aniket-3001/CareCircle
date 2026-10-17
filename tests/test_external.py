@@ -45,6 +45,7 @@ async def test_recalls_come_from_the_names_on_record_only(gm, monkeypatch):
     m = gm.open("ravi", t)
     await m.care_record("asha", "metformin", dose_text="500 mg")
     await m.care_record("asha", "warfarin", dose_text="4 mg")
+    await m.care_set_timezone("America/New_York")                              # openFDA lists US recalls: only a US circle looks them up
     out = await m.care_recalls("asha")
     assert sorted(seen) == ["metformin", "warfarin"] and [r["number"] for r in out["recalls"]] == ["D-1"] and "not a statement about this person" in out["note"]
     assert "asha" not in repr(seen)                                           # nothing but medicine names is sent
@@ -80,3 +81,17 @@ def test_lookups_survive_a_restart_through_the_reference_graph(monkeypatch):
     external._cache.clear()                                                    # a restart: the in-memory cache is gone
     assert external._get(url) == {"results": [{"x": 1}]} and len(calls) == 1   # served from the graph, no second call
     external._ref().query("MATCH (c:Cached {url:$u}) DELETE c", {"u": url})
+
+
+async def test_a_circle_outside_the_us_looks_up_no_recalls_and_sends_no_name(gm, monkeypatch):
+    seen = []
+    monkeypatch.setattr(external, "openfda_recalls", lambda d, limit=2: seen.append(d) or [])
+    t = tid(gm, "rd")
+    await gm.grant("ravi", t, ("read", "write"))
+    m = gm.open("ravi", t)
+    await m.care_record("asha", "metformin", dose_text="500 mg")
+    for tz in (None, "Asia/Kolkata", "Europe/London"):                          # the default zone is India's
+        if tz:
+            await m.care_set_timezone(tz)
+        out = await m.care_recalls("asha")
+        assert seen == [] and out["available"] is False and out["region"] == "US only" and "no medicine name was sent" in out["note"]
