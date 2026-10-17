@@ -110,6 +110,13 @@ class GraphAlgoMixin:
     async def _find(self, ref: str, label: Optional[str]):
         """The internal id of the node a reference names (first match when several share a name), or None."""
         pat = f"(n:`{label}`)" if label else "(n)"            # label was checked against db.labels() and NAME
+        if label:                                       # with a label each of these is an indexed equality lookup (id, key and name are indexed on the labels that have them)
+            for prop in ("id", "key", "name"):
+                rows = await self._q(f"MATCH {pat} WHERE n.{prop} = $r RETURN id(n) LIMIT 1", {"r": ref}, scope="read")
+                if rows:
+                    return rows[0][0]
+            return None
+        # without a label the three-way OR cannot use an index: it scans every node. That is fine for a circle's graph (hundreds of nodes) and is why a label is worth passing.
         rows = await self._q(f"MATCH {pat} WHERE n.id = $r OR n.key = $r OR n.name = $r RETURN id(n) LIMIT 1", {"r": ref}, scope="read")
         return rows[0][0] if rows else None
 
