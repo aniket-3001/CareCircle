@@ -1,3 +1,4 @@
+import { tr } from '../lib/i18n';
 import { forceCollide, forceLink, forceManyBody, forceRadial, forceSimulation, type Simulation, type SimulationLinkDatum, type SimulationNodeDatum } from 'd3-force';
 import { Expand, Scan, Minimize2, Minus, Pause, Play, Plus } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -245,7 +246,7 @@ export function KnowledgeGraph({ visible, selection, onSelect, replayKey }: Prop
         ref={svg}
         className={`kg__svg${dim ? ' kg--dim' : ''}`}
         role="group"
-        aria-label="Knowledge graph of this circle. Tab to a node and press Enter to inspect it."
+        aria-label={tr('Knowledge graph of this circle. Tab to a node and press Enter to inspect it.')}
         viewBox={`0 0 ${size.w} ${size.h}`}
       >
         <rect className="kg__backdrop" width={size.w} height={size.h} onPointerDown={onBackdropDown} onPointerMove={onBackdropMove} onPointerUp={onBackdropUp} />
@@ -284,7 +285,7 @@ export function KnowledgeGraph({ visible, selection, onSelect, replayKey }: Prop
                   style={{ ['--nc' as string]: k.color }}
                   role="button"
                   tabIndex={0}
-                  aria-label={`${k.word}: ${n.label}. Press Enter for details.`}
+                  aria-label={`${tr(k.word)}: ${n.label}. ${tr('Press Enter for details.')}`}
                   aria-pressed={sel}
                   onPointerDown={(e) => onNodeDown(e, n.id)}
                   onPointerMove={onNodeMove}
@@ -311,7 +312,7 @@ export function KnowledgeGraph({ visible, selection, onSelect, replayKey }: Prop
           </g>
         </g>
       </svg>
-      <div className="kg__hint" aria-hidden="true">Click a node or line · drag · scroll to zoom</div>
+      <div className="kg__hint" aria-hidden="true">{tr('Click a node or line · drag · scroll to zoom')}</div>
       <div className="kg__ctl">
         <button type="button" aria-label="Zoom in" onClick={() => zoomBy(1.25)}><Plus size={18} aria-hidden="true" /></button>
         <button type="button" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.25)}><Minus size={18} aria-hidden="true" /></button>
@@ -321,7 +322,7 @@ export function KnowledgeGraph({ visible, selection, onSelect, replayKey }: Prop
       </div>
       <div className="kg__legend" aria-hidden="true">
         {kinds.map((k) => (
-          <span key={k} style={{ ['--nc' as string]: KIND[k].color }}><i />{KIND[k].word}</span>
+          <span key={k} style={{ ['--nc' as string]: KIND[k].color }}><i />{tr(KIND[k].word)}</span>
         ))}
       </div>
     </div>

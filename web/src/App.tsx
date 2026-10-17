@@ -170,7 +170,7 @@ export function App(): React.JSX.Element {
                   </label>
                 )}
                 {session && !acct && Object.keys(session.keys).length > 1 && (
-                  <fieldset className="actors" style={{ margin: 0 }} aria-label="Acting as">
+                  <fieldset className="actors" style={{ margin: 0 }} aria-label={t('Acting as')}>
                     {Object.keys(session.keys).map((k) => (
                       <button key={k} type="button" className="actor" aria-pressed={k === session.as} onClick={() => actAs(k)}>
                         <span className="av" aria-hidden="true">{nameOf(k).charAt(0)}</span>
@@ -251,7 +251,7 @@ export function App(): React.JSX.Element {
               <dl className="meta">
                 <div><dt>Interactions</dt><dd>DDInter 2.0, licence CC BY-NC-SA 4.0 (non-commercial). About a quarter of pairs have no severity and are shown as unrated.</dd></div>
                 <div><dt>Enzyme paths</dt><dd>FDA drug-interaction index table (not exhaustive) plus a small list marked “curated (unverified)”.</dd></div>
-                <div><dt>Demo people</dt><dd>The demo accounts and the throw-away demo use made-up people. Circles you create contain only what you add.</dd></div>
+                <div><dt>Demo people</dt><dd>{t('The demo accounts and the throw-away demo use made-up people. Circles you create contain only what you add.')}</dd></div>
                 <div><dt>Design</dt><dd>Visual language from The Vayu Project (hrsh-kr/the-vayu-project).</dd></div>
               </dl>
             </section>

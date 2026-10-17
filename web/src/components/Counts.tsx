@@ -15,10 +15,10 @@ export function Counts(): React.JSX.Element {
       <Async state={counts}>
         {(c) => (
           <ul className="steps">
-            <li><span>{c.load.statement}</span></li>
-            <li><span>{c.anticholinergic.statement}{c.anticholinergic.medicines.length > 0 && ` (${c.anticholinergic.medicines.map((m) => `${title(m.drug)} ${m.score}`).join(', ')})`} <span className="muted">· {c.anticholinergic.source}</span></span></li>
-            <li><span>{c.coverage.statement}</span></li>
-            <li><span>{c.reading.statement}</span></li>
+            <li><span>{tr(c.load.statement)}</span></li>
+            <li><span>{tr(c.anticholinergic.statement)}{c.anticholinergic.medicines.length > 0 && ` (${c.anticholinergic.medicines.map((m) => `${title(m.drug)} ${m.score}`).join(', ')})`} <span className="muted">· {c.anticholinergic.source}</span></span></li>
+            <li><span>{tr(c.coverage.statement)}</span></li>
+            <li><span>{tr(c.reading.statement)}</span></li>
           </ul>
         )}
       </Async>

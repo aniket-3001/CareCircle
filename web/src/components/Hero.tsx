@@ -48,7 +48,7 @@ export function Hero({ check, chips }: { check: CheckResult; chips: Chip[] }): R
           <h2 id="hero-title" className="hero-level">
             {t(noData ? 'Nothing to check yet' : onlyDuplicates ? 'Possible duplicate flagged' : (j.state === 'partial' && j.headline) || HEAD[sev])}
           </h2>
-          <p className="hero-line">{j.statement}</p>
+          <p className="hero-line">{t(j.statement)}</p>
         </div>
         <FaceIcon face={noData ? 'neutral' : level.face} size={76} />
       </div>
@@ -66,7 +66,7 @@ export function Hero({ check, chips }: { check: CheckResult; chips: Chip[] }): R
           </dd>
         </dl>
       )}
-      <ul className="hero-chips" aria-label="The circle at a glance">
+      <ul className="hero-chips" aria-label={t('The circle at a glance')}>
         {chips.map(({ Icon, text }) => (
           <li key={text}>
             <Icon size={20} strokeWidth={1.75} aria-hidden="true" />

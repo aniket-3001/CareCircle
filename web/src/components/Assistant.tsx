@@ -136,7 +136,7 @@ export function Assistant({ open, onClose, initial }: { open: boolean; onClose: 
   return (
     <Sheet open={open} title={t('Ask the helper')} onClose={onClose}>
       <div className="chat" data-testid="assistant">
-        <p className="muted small">I answer from this circle's record, prepare entries for you to confirm, and never give medical advice. Your conversation is saved to your account.</p>
+        <p className="muted small">{t('I answer from this circle\'s record, prepare entries for you to confirm, and never give medical advice. Your conversation is saved to your account.')}</p>
         <div className="chat-log" role="log" aria-live="polite">
           {msgs === null && <Spinner />}
           {msgs?.length === 0 && (

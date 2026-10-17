@@ -59,7 +59,7 @@ export function ProfileCard(): React.JSX.Element {
               <input type="text" aria-label={tr('Add an allergy')} value={alg} onChange={(e) => setAlg(e.target.value)} placeholder={tr('Add an allergy, e.g. Penicillin')} maxLength={80} />
               <button type="submit" className="btn btn--sm" disabled={!alg.trim()}>{tr('Add')}</button>
             </form>
-            <p className="muted small">{check.data?.note}</p>
+            <p className="muted small">{tr(check.data?.note ?? '')}</p>
           </div>
         )}
       </Async>

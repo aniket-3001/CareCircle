@@ -55,7 +55,7 @@ export function CircleForms({ onDone }: { onDone?: () => void }): React.JSX.Elem
       <form className="card" onSubmit={create} aria-labelledby="new-circle-title" data-testid="new-circle">
         <h2 id="new-circle-title">{tr('Create a circle')}</h2>
         <p className="muted small">{tr('One circle looks after one person. You are its owner and can invite other carers.')}</p>
-        <label className="field">{tr('Circle name')}<input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Mum's medicines" required maxLength={60} /></label>
+        <label className="field">{tr('Circle name')}<input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={tr('e.g. Mum\'s medicines')} required maxLength={60} /></label>
         <label className="field">{tr('Person being looked after')}<input type="text" value={person} onChange={(e) => setPerson(e.target.value)} placeholder="e.g. Mum" required maxLength={40} /></label>
         <div className="row">
           <button type="submit" className="btn" disabled={!!busy || !name.trim() || !person.trim()}><Plus size={18} aria-hidden="true" /> {tr('Create')}</button>

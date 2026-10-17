@@ -107,7 +107,7 @@ export function Welcome({ onSession, request }: { onSession: (s: Session) => voi
   const anonymous = () => run(async () => onSession(await startDemo()));
 
   const emailField = <label className="field">{t('Email')}<input type="email" value={email} autoComplete="email" inputMode="email" required onChange={(e) => setEmail(e.target.value)} /></label>;
-  const nameField = <label className="field">{t('Your name')}<input type="text" value={name} autoComplete="name" onChange={(e) => setName(e.target.value)} placeholder="How other carers see you" /></label>;
+  const nameField = <label className="field">{t('Your name')}<input type="text" value={name} autoComplete="name" onChange={(e) => setName(e.target.value)} placeholder={t('How other carers see you')} /></label>;
   const pwField = (label: string, ac: string) => <label className="field">{t(label)}<PasswordInput value={password} autoComplete={ac} required onChange={setPassword} /></label>;
   const codeField = <label className="field">{t('The code we emailed you')}<input value={code} inputMode="numeric" autoComplete="one-time-code" required onChange={(e) => setCode(e.target.value)} /></label>;
   const messages = (
@@ -196,7 +196,7 @@ export function Welcome({ onSession, request }: { onSession: (s: Session) => voi
               <form className="stack" onSubmit={submit(doForgot)}>
                 {back}
                 <h2 id="auth-title">{t('Reset your password')}</h2>
-                <p className="muted">We will email a code to the address on your account.</p>
+                <p className="muted">{t('We will email a code to the address on your account.')}</p>
                 {emailField}
                 {messages}
                 <button type="submit" className="btn" disabled={busy}>{t('Send the code')}</button>
@@ -237,12 +237,12 @@ export function Welcome({ onSession, request }: { onSession: (s: Session) => voi
           <section className="card">
             <h2>{t('What you can do in two minutes')}</h2>
             <ol className="steps">
-              <li><span>Add a medicine from a photo, a voice note, a document or by typing: each reading shows the exact line it came from.</span></li>
-              <li><span>See what the record flags, with its source, and open the graph to read why in plain words.</span></li>
-              <li><span>Invite another carer with a code and see who has not yet seen a change.</span></li>
-              <li><span>Ask the helper about the record, or link the Telegram bot to add things by chat.</span></li>
+              <li><span>{t('Add a medicine from a photo, a voice note, a document or by typing: each reading shows the exact line it came from.')}</span></li>
+              <li><span>{t('See what the record flags, with its source, and open the graph to read why in plain words.')}</span></li>
+              <li><span>{t('Invite another carer with a code and see who has not yet seen a change.')}</span></li>
+              <li><span>{t('Ask the helper about the record, or link the Telegram bot to add things by chat.')}</span></li>
             </ol>
-            <p className="muted small"><KeyRound size={14} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> Everything you add is saved on the server, never only in your browser.</p>
+            <p className="muted small"><KeyRound size={14} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> {t('Everything you add is saved on the server, never only in your browser.')}</p>
           </section>
         </div>
       </div>

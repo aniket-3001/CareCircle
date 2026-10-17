@@ -60,13 +60,13 @@ export function Appointments(): React.JSX.Element {
     <section className="card" aria-labelledby="appt-title" data-testid="appointments">
       <div className="card-head"><h2 id="appt-title">{tr('Appointments')}</h2><CalendarDays size={20} aria-hidden="true" /></div>
       <form className="grid-2" onSubmit={add}>
-        <label className="field">{tr('What')}<input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. INR check at the clinic" required maxLength={80} /></label>
+        <label className="field">{tr('What')}<input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={tr('e.g. INR check at the clinic')} required maxLength={80} /></label>
         <label className="field">{tr('When')}<input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} required /></label>
         <label className="field">{tr('Where')}<input type="text" value={place} onChange={(e) => setPlace(e.target.value)} maxLength={100} /></label>
         <label className="field">{tr('Who goes')}
           <select value={who} onChange={(e) => setWho(e.target.value)}><option value="">not decided</option>{carers.map((c) => <option key={c} value={c}>{nameOf(c)}</option>)}</select>
         </label>
-        <label className="field" style={{ gridColumn: '1 / -1' }}>{tr('What to bring')}<input type="text" value={bring} onChange={(e) => setBring(e.target.value)} placeholder="e.g. INR diary, every pill box" maxLength={200} /></label>
+        <label className="field" style={{ gridColumn: '1 / -1' }}>{tr('What to bring')}<input type="text" value={bring} onChange={(e) => setBring(e.target.value)} placeholder={tr('e.g. INR diary, every pill box')} maxLength={200} /></label>
         <div className="row"><button type="submit" className="btn btn--sm" disabled={busy || !name.trim()}>{tr('Add appointment')}</button>{busy && <Spinner />}</div>
       </form>
       <Async state={list}>

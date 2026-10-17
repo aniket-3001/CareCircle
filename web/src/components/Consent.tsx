@@ -47,7 +47,7 @@ export function Consent(): React.JSX.Element {
               <div className="row"><button type="submit" className="btn btn--sm" data-testid="consent-save">{t('Write it down')}</button>
                 <button type="button" className="btn btn--soft btn--sm" onClick={() => setView(!view)} data-testid="patient-view-toggle">{view ? t('Hide their view') : t('Show what they would read')}</button></div>
             </form>
-            <p className="muted small">{r.note}</p>
+            <p className="muted small">{t(r.note)}</p>
           </>
         )}
       </Async>

@@ -146,7 +146,7 @@ export function AccountScreen(): React.JSX.Element {
           {!p.demo && (
             <section className="card" aria-labelledby="del-title">
               <div className="row"><ShieldAlert size={20} strokeWidth={1.75} aria-hidden="true" /><h2 id="del-title">{tr('Delete my account')}</h2></div>
-              <p className="muted">Deletes your account, your sessions and every circle you are the only member of, with everything recorded in it. Circles with other carers stay, and the longest-standing carer becomes their owner. This cannot be undone.</p>
+              <p className="muted">{tr('Deletes your account, your sessions and every circle you are the only member of, with everything recorded in it. Circles with other carers stay, and the longest-standing carer becomes their owner. This cannot be undone.')}</p>
               <button type="button" className="btn btn--soft" style={{ color: 'var(--danger)', justifySelf: 'start' }} onClick={() => setSure(true)}><Trash2 size={18} aria-hidden="true" /> {tr('Delete my account…')}</button>
             </section>
           )}

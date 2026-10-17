@@ -1,3 +1,4 @@
+import { tr } from '../lib/i18n';
 import { MousePointerClick } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { CareGraph, GraphEdge, GraphNode } from '../api/types';
@@ -51,7 +52,7 @@ function NodeBody({ graph, node, onSelect }: { graph: CareGraph; node: GraphNode
       <div>
         <div style={{ ['--nc' as string]: KIND[node.kind].color }}>
           <div className="inspector__title" role="heading" aria-level={3}>{node.label}</div>
-          <Pill tone={TONE[node.kind] ?? 'mute'}>{KIND[node.kind].word}</Pill>
+          <Pill tone={TONE[node.kind] ?? 'mute'}>{tr(KIND[node.kind].word)}</Pill>
         </div>
       </div>
       <p>{node.summary}</p>
@@ -126,7 +127,7 @@ export function Inspector({ graph, selection, onSelect }: { graph: CareGraph; se
           <div className="empty">
             <span className="ico"><MousePointerClick size={26} strokeWidth={1.75} aria-hidden="true" /></span>
             <b>Nothing selected</b>
-            <span>Click a node or a line in the graph to see what it is, where it came from and how it is connected, in plain words.</span>
+            <span>{tr('Click a node or a line in the graph to see what it is, where it came from and how it is connected, in plain words.')}</span>
           </div>
         )}
       </aside>

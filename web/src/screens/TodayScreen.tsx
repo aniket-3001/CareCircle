@@ -105,8 +105,8 @@ export function TodayScreen(): React.JSX.Element {
                   <section className="card" aria-labelledby="sources-title">
                     <h2 id="sources-title">{t('Where the flags come from')}</h2>
                     <ul className="steps">
-                      <li><span><b>Direct pairs:</b> DDInter 2.0, a curated interaction database, with its severity.</span></li>
-                      <li><span><b>Enzyme paths:</b> one medicine slows or speeds a liver enzyme that clears another (FDA table, a two-step graph path).</span></li>
+                      <li><span><b>{t('Direct pairs:')}</b> {t('DDInter 2.0, a curated interaction database, with its severity.')}</span></li>
+                      <li><span><b>{t('Enzyme paths:')}</b> {t('one medicine slows or speeds a liver enzyme that clears another (FDA table, a two-step graph path).')}</span></li>
                     </ul>
                   </section>
                 </div>
@@ -116,7 +116,7 @@ export function TodayScreen(): React.JSX.Element {
               <section className="card wide" aria-labelledby="flags-title">
                 <h2 id="flags-title">{t('Flags, with their sources')}</h2>
                 <Flags check={c} />
-                <p className="muted small">{c.notice}</p>
+                <p className="muted small">{t(c.notice)}</p>
               </section>
             )}
           </div>

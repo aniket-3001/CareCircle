@@ -1,3 +1,4 @@
+import { HI_PATTERNS } from './hi_patterns';
 import { useSyncExternalStore } from 'react';
 import { HI_MORE } from './hi_more';
 
@@ -80,8 +81,17 @@ const HI: Record<string, string> = {
 };
 
 export const tr = (s: string): string => translate(s);
+/** A sentence the server wrote with numbers in it: the matching pattern keeps the numbers and swaps the words. */
+function fromPattern(s: string): string {
+  for (const [re, f] of HI_PATTERNS) {
+    const m = s.match(re);
+    if (m) return f(m);
+  }
+  return s;
+}
+
 export function translate(s: string, l: Lang = current): string {
-  return l === 'hi' ? HI[s] ?? HI_MORE[s] ?? s : s;
+  return l === 'hi' ? HI[s] ?? HI_MORE[s] ?? fromPattern(s) : s;
 }
 
 /** `const t = useT()`: re-renders when the language changes. */

@@ -35,7 +35,7 @@ export function MedActions({ r }: { r: RegimenEntry }): React.JSX.Element {
   return (
     <>
       <div className="row">
-        <button type="button" className="icon-btn" aria-label={`Change the recorded dose of ${title(r.drug)}`} onClick={() => { setDose(r.dose_text); setFreq(r.freq_text); setMode('edit'); }}><Pencil size={16} aria-hidden="true" /></button>
+        <button type="button" className="icon-btn" aria-label={`${tr('Change the recorded dose of')} ${title(r.drug)}`} onClick={() => { setDose(r.dose_text); setFreq(r.freq_text); setMode('edit'); }}><Pencil size={16} aria-hidden="true" /></button>
         <button type="button" className="icon-btn" aria-label={`Record ${title(r.drug)} as stopped`} onClick={() => setMode('stop')}><Ban size={16} aria-hidden="true" /></button>
       </div>
       <Sheet open={mode === 'edit'} title={`Change ${title(r.drug)}`} onClose={() => setMode(null)}>

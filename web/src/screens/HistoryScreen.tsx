@@ -187,12 +187,12 @@ export function HistoryScreen(): React.JSX.Element {
       <PrintSummary />
       <Sheet open={forgetting !== null} title={tr('Remove this entry for good?')} onClose={() => setForgetting(null)}>
         <p>{tr('Its medicine, dose, quoted line, links and acknowledgements are deleted from the graph and cannot be brought back. A receipt with a hash of what was removed stays.')}</p>
-        <label className="field">{tr('Reason (optional)')}<input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. entered by mistake" /></label>
+        <label className="field">{tr('Reason (optional)')}<input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={tr('e.g. entered by mistake')} /></label>
         <button type="button" className="btn btn--danger" onClick={() => void doForget()}>{tr('Remove for good')}</button>
       </Sheet>
       <Sheet open={mistake !== null} title={tr('Mark this entry as entered by mistake?')} onClose={() => setMistake(null)}>
         <p>{tr('It comes off the current record and the entry before it counts again. It stays in the history, marked, with your name, and the owner or you can put it back.')}</p>
-        <label className="field">{tr('Reason (optional)')}<input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. should have been 4 mg" /></label>
+        <label className="field">{tr('Reason (optional)')}<input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={tr('e.g. should have been 4 mg')} /></label>
         <button type="button" className="btn" onClick={() => void doMistake()}>{tr('Mark as entered by mistake')}</button>
       </Sheet>
       <Sheet open={erase} title={`Remove everything about ${title(app.session.person)}?`} onClose={() => setErase(false)}>
@@ -210,7 +210,7 @@ function PrintSummary(): React.JSX.Element {
   const now = useLoad((a) => a.api.check());
   return (
     <div className="print-only" aria-hidden="true">
-      <h1>Medicines on record for {title(app.session.person)}</h1>
+      <h1>{tr('Medicines on record for')} {title(app.session.person)}</h1>
       <p>Prepared {new Date().toLocaleString()} by Care Circle{app.profile ? ` for ${app.profile.name}` : ''}. This is a list of what carers recorded, checked against public interaction data. It is not medical advice and not a prescription.</p>
       {now.data && (
         <>
@@ -218,7 +218,7 @@ function PrintSummary(): React.JSX.Element {
           <ul>{now.data.regimen.map((r) => <li key={r.id}><b>{title(r.drug)}</b> {r.dose_text} {r.freq_text} (recorded by {nameOf(r.by)}, {r.source})</li>)}</ul>
           <h2>{tr('What the sources list for these medicines')}</h2>
           <Flags check={now.data} />
-          <p>{now.data.notice}</p>
+          <p>{tr(now.data.notice)}</p>
         </>
       )}
     </div>

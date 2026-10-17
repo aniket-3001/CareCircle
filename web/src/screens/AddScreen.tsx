@@ -86,24 +86,24 @@ export function AddScreen(): React.JSX.Element {
               <button type="button" className={`tile${over === 'photo' ? ' tile--over' : ''}`} onClick={() => photo.current?.click()} {...drop('photo')}>
                 <span className="ico"><Camera size={26} strokeWidth={1.75} aria-hidden="true" /></span>
                 <b>{tr('Photo')}</b>
-                <span>of a label or box</span>
+                <span>{tr('of a label or box')}</span>
               </button>
-              {pick(photo, 'image/*', 'Choose a photo of a label')}
-              <button type="button" className={`tile${recording ? ' tile--rec' : ''}`} onClick={() => void toggleRecord()} aria-pressed={!!recording} aria-label={recording ? 'Stop recording' : 'Record a voice note'}>
+              {pick(photo, 'image/*', tr('Choose a photo of a label'))}
+              <button type="button" className={`tile${recording ? ' tile--rec' : ''}`} onClick={() => void toggleRecord()} aria-pressed={!!recording} aria-label={tr(recording ? 'Stop recording' : 'Record a voice note')}>
                 <span className="ico">{recording ? <Square size={22} strokeWidth={1.75} aria-hidden="true" /> : <Mic size={26} strokeWidth={1.75} aria-hidden="true" />}</span>
-                <b>{recording ? 'Stop' : 'Voice note'}</b>
-                <span>{recording ? 'Recording…' : 'say it out loud'}</span>
+                <b>{tr(recording ? 'Stop' : 'Voice note')}</b>
+                <span>{tr(recording ? 'Recording…' : 'say it out loud')}</span>
               </button>
               <button type="button" className={`tile${over === 'doc' ? ' tile--over' : ''}`} onClick={() => doc.current?.click()} {...drop('doc')}>
                 <span className="ico"><FileText size={26} strokeWidth={1.75} aria-hidden="true" /></span>
                 <b>{tr('Document')}</b>
                 <span>{tr('PDF or Word')}</span>
               </button>
-              {pick(doc, 'audio/*,.pdf,.docx,.txt', 'Choose a document or audio file')}
+              {pick(doc, 'audio/*,.pdf,.docx,.txt', tr('Choose a document or audio file'))}
               <button type="button" className="tile" disabled={busy} onClick={async () => send(await sampleLabel())}>
                 <span className="ico"><ScanLine size={26} strokeWidth={1.75} aria-hidden="true" /></span>
                 <b>{tr('Sample label')}</b>
-                <span>try it without a photo</span>
+                <span>{tr('try it without a photo')}</span>
               </button>
             </div>
           </section>
@@ -111,7 +111,7 @@ export function AddScreen(): React.JSX.Element {
             <h2 id="type-title">{tr('Or type it')}</h2>
             <label className="field">
               <span className="sr-only">{tr('Medicine, dose and how often')}</span>
-              <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Clarithromycin 500 mg twice daily for 7 days" />
+              <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder={tr('e.g. Clarithromycin 500 mg twice daily for 7 days')} />
             </label>
             <div className="row">
               <button type="button" className="btn" disabled={busy || !text.trim()} onClick={() => { const fd = new FormData(); fd.append('text', text); void run(fd); }}>

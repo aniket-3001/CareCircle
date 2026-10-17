@@ -33,7 +33,7 @@ export function Flags({ check }: { check: CheckResult }): React.JSX.Element {
               </b>
               <Pill tone={TONE[k]}>{SEVERITY[k].name.toLowerCase()}</Pill>
             </div>
-            <span className="muted small">Source: {f.source}. Discuss with a prescriber or pharmacist.</span>
+            <span className="muted small">{tr('Source:')} {f.source}. {tr('Discuss with a prescriber or pharmacist.')}</span>
             <code>{`(a:Drug)-[:INTERACTS {level:'${f.level}'}]-(b:Drug)`}</code>
           </div>
         );
