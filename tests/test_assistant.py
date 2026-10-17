@@ -198,3 +198,13 @@ async def test_a_question_about_what_the_record_says_is_answered_and_a_question_
         assert r["source"] == "refusal", (q, r["answer"][:80])
     r = await say(c, "what time of day is the record's entry for a medicine she does not take", now)
     assert r["source"] != "rules" or "The record for" not in r["answer"]
+
+
+async def test_a_side_effect_or_alcohol_question_about_a_medicine_on_the_record_is_refused_but_points_to_the_published_label(gm):
+    t, c, now = await seeded(gm)
+    for q in ("what are the side effects of metformin", "can she drink alcohol with metformin", "is metformin ok with food"):
+        r = await say(c, q, now)
+        assert r["source"] == "refusal" and "prescriber or pharmacist" in r["answer"] and "published label for Metformin" in r["answer"], q
+        assert "book icon" in r["answer"] and not scan_advice(r["answer"].replace("a prescriber or pharmacist who knows her has to answer that", ""))
+    r = await say(c, "what are the side effects", now)                                  # no medicine named: the plain refusal
+    assert r["source"] == "refusal" and "published label" not in r["answer"]

@@ -171,6 +171,7 @@ def _a_doses(f: Facts) -> str:
     return "Recorded as given: " + "; ".join(f"{_title(g['drug'])} for {g['slot']} by {_who(g['by'])}" for g in f.gives[:6]) + "."
 
 
+LABEL_TOPIC = re.compile(r"\b(side effects?|alcohol|wine|beer|grapefruit|food|empty stomach|drows\w*|dizz\w*|nause\w*|rash)\b", re.I)
 TIMING_WORDS = re.compile(r"\b(empty stomach|with (food|meals?)|before (food|meals?|bed)|after (food|meals?)|at what time|what time of day|when is)\b", re.I)
 ABOUT_THE_RECORD = re.compile(r"\b(list|record|recorded|written|label|says?|noted|prescribed|entered|typed|on file)\b", re.I)
 
@@ -286,6 +287,11 @@ def ask(question: str, facts: Facts, checker, generate=None, lang: str = "") -> 
     if lookup:
         return lookup
     if ADVICE_Q.search(q):
+        about = next((r["drug"] for r in facts.regimen if r["drug"] in low), None)
+        if about and LABEL_TOPIC.search(q):                      # side effects, alcohol, food: not ours to answer, but the published label is one tap away
+            return {"answer": (f"I can't say what to expect from {_title(about)} or what is fine with it for her: a prescriber or pharmacist who knows her has to answer that. "
+                               f"The published label for {_title(about)} (what its maker or regulator wrote, not advice for her) is behind the book icon next to it on Today, with a link to the full label."),
+                    "source": "refusal", "links": [{"tab": "today", "label": "Open Today"}]}
         return {"answer": REFUSAL, "source": "refusal", "links": []}
     drug = next((r["drug"] for r in facts.regimen if r["drug"] in low), None)
     if drug and not (UNSEEN.search(q) or DOSES.search(q)):
