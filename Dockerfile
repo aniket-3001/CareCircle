@@ -10,8 +10,8 @@ RUN npm run build
 FROM python:3.12-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 ffmpeg && rm -rf /var/lib/apt/lists/*
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt constraints.txt ./
+RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt
 ARG WITH_EMBEDDINGS=0
 RUN if [ "$WITH_EMBEDDINGS" = "1" ]; then pip install --no-cache-dir fastembed; fi   # optional: --build-arg WITH_EMBEDDINGS=1 and GRAPHMEM_EMBEDDINGS=1
 # speech model baked in so the first voice note does not wait on a download
