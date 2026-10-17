@@ -11,6 +11,7 @@ Interaction flags come from the shared reference graph (carecircle.checks) and a
 from __future__ import annotations
 
 import asyncio
+import functools
 import difflib
 import hashlib
 import os
@@ -66,6 +67,17 @@ def parse_slot(slot: str) -> tuple[str, int]:
     if not 2000 <= when.year <= 2100 or when.timestamp() * 1000 > now_ms() + 2 * 86_400_000:
         raise ValueError("a dose cannot be recorded as given more than a day or two ahead")
     return when.strftime("%Y-%m-%d %H:%M"), int(when.timestamp() * 1000)
+
+
+@functools.lru_cache(maxsize=8192)
+def _ingredient_of(name: str) -> str:
+    """Name -> ingredient, remembered: the fuzzy match against ~1,800 names is slow, a give looks up every name on the record, and the reference names do not
+    change while the server runs. (Without this, building the shared demo circle took 38 s and the server missed its start-up window.)"""
+    try:
+        top = checker().candidates(name, 1)
+    except Exception:
+        return name
+    return top[0]["name"] if top and top[0]["score"] >= 0.95 else name
 
 
 class CareMixin:
@@ -395,12 +407,7 @@ class CareMixin:
     def _ingredient(drug: str) -> str:
         """The ingredient a typed medicine name stands for ("Metformin HCl", "Glycomet" -> metformin), so the double-dose guard compares medicines and not spellings.
         Only a strong match counts (score 0.95 or more: an exact name, a salt form or a known alias); anything else stays as typed."""
-        d = norm(drug)
-        try:
-            top = checker().candidates(d, 1)
-        except Exception:
-            return d
-        return top[0]["name"] if top and top[0]["score"] >= 0.95 else d
+        return _ingredient_of(norm(drug))
 
     async def _kin(self, person: str, drug: str) -> tuple[str, list[str], list[str]]:
         """(ingredient, every name this person's confirmed entries use for it, the union of those entries' current times). Two products of one ingredient
