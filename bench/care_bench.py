@@ -123,11 +123,11 @@ async def b3(rounds, width=10):
     for a in ("c1", "c2"):
         await gm.grant(a, t, ("read", "write"))
     m = [gm.open("c1", t), gm.open("c2", t)]
-    await m[0].care_record("p", "metformin", dose_text="500 mg", freq_text="twice daily", at=int(time.time() * 1000) - 72 * H)     # a slot needs a medicine on record
-    day = time.strftime("%Y-%m-%d", time.gmtime())
-    assert rounds <= 1440, "one distinct slot per minute of the day"
+    await m[0].care_record("p", "metformin", dose_text="500 mg", freq_text="twice daily", at=int(time.time() * 1000) - (rounds + 3) * 24 * H)     # a slot needs a medicine on record
+    # one slot per day: with no times set, two gives within an hour of each other are the same dose (the 21:00 / 21:15 rule), so slots a minute apart would not be separate doses
+    days = [time.strftime("%Y-%m-%d", time.gmtime(time.time() - (r + 1) * 86400)) for r in range(rounds)]
     for r in range(rounds):
-        res = await asyncio.gather(*[m[i % 2].care_give("p", "metformin", f"{day} {r // 60:02d}:{r % 60:02d}") for i in range(width)])
+        res = await asyncio.gather(*[m[i % 2].care_give("p", "metformin", f"{days[r]} 08:00") for i in range(width)])
         wins.append(sum(x["given"] for x in res))
     await gm.db.drop_tenant(t)
     ctl = await gm._ctl(); await ctl.query("MATCH (n) WHERE n.id IN ['c1','c2',$t] DETACH DELETE n", {"t": t})
