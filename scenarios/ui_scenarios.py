@@ -68,7 +68,7 @@ def api_user(w, email, name="Someone"):
     r = w.http.post("/v1/auth/signin", json={"email": email, "password": PW})
     assert r.status_code == 200, r.text
     j = r.json()
-    return User(w, name, email, j["token"], j["account"]["id"])
+    return User(w, name, email, w._token(r), j["account"]["id"])
 
 
 def circle_of(u):

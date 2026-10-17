@@ -49,7 +49,7 @@ def a2(w: World, r):
 @scenario("A3", "Sessions: sign-out ends only that session; odd headers are handled; a deleted account's token is dead")
 def a3(w: World, r):
     u = w.user("Sess")
-    second = w.http.post("/v1/auth/signin", json={"email": u.email, "password": PW}).json()["token"]
+    second = w._token(w.http.post("/v1/auth/signin", json={"email": u.email, "password": PW}))
     r.check(w.http.get("/v1/account", headers={"Authorization": f"Bearer {second}"}).status_code == 200, "a second device is signed in")
     w.http.post("/v1/auth/signout", headers=u.h)
     r.check(u.get("/v1/account").status_code == 401, "the signed-out token is dead")
@@ -67,7 +67,7 @@ def a3(w: World, r):
     r.check(w.http.post("/v1/auth/signin", json={"email": v.email, "password": PW}).status_code == 401, "and so is its password")
     again = w.http.post("/v1/auth/signup", json={"email": v.email, "password": PW, "name": "Gone"})
     r.check(again.status_code == 200, "the email can be used again after deletion", again.text)
-    r.check(w.http.get("/v1/account/circles", headers={"Authorization": f"Bearer {again.json()['token']}"}).json() == [], "and the new account starts empty (no old circle comes back)")
+    r.check(w.http.get("/v1/account/circles", headers={"Authorization": f"Bearer {w._token(again)}"}).json() == [], "and the new account starts empty (no old circle comes back)")
 
 
 @scenario("C1", "Creating circles: odd names, many circles, two circles with the same name")

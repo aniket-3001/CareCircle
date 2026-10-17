@@ -67,6 +67,16 @@ class World:
             self.pool, self.client_id = COGNITO.split(":", 1)
             self.cog = boto3.client("cognito-idp", region_name=self.pool.split("_")[0])
 
+    def _token(self, r):
+        """The session token from a sign-in reply. A site with cookie sessions puts it only in an httpOnly cookie; a script (not a browser page) may read that
+        and send it as a bearer token. The jar is then emptied, so a request meant to carry no sign-in really carries none."""
+        tok = r.json()["token"]
+        if tok == "cookie":
+            tok = r.cookies.get("cc_session") or ""
+        self.http.cookies.clear()
+        assert tok.startswith("cs_"), "no session token in the reply"
+        return tok
+
     def user(self, name, pw=PW):
         email = f"{name.lower()}-{self.tag}-{rid(3)}@scenario.test"
         if COGNITO:
@@ -74,7 +84,7 @@ class World:
         r = self.http.post("/v1/auth/signup", json={"email": email, "password": pw, "name": name})
         assert r.status_code == 200, f"signup {name}: {r.status_code} {r.text[:120]}"
         j = r.json()
-        return User(self, name, email, j["token"], j["account"]["id"])
+        return User(self, name, email, self._token(r), j["account"]["id"])
 
     def _cognito_user(self, name, email, pw):
         self.cog.admin_create_user(UserPoolId=self.pool, Username=email, MessageAction="SUPPRESS",
@@ -85,7 +95,7 @@ class World:
         r = self.http.post("/v1/auth/exchange", json={"name": name}, headers={"Authorization": f"Bearer {tok}"})
         assert r.status_code == 200, f"exchange {name}: {r.status_code} {r.text[:120]}"
         j = r.json()
-        u = User(self, name, email, j["token"], j["account"]["id"])
+        u = User(self, name, email, self._token(r), j["account"]["id"])
         self.made.append(u)
         return u
 
