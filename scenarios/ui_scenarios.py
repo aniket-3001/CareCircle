@@ -530,6 +530,10 @@ def u15(w, b, r):
     c = circle_of(u)
     reg = {x["drug"] for x in u.ok(c, "care_regimen", person="mum")}
     r.check(reg == {"simvastatin"}, "the searched medicine, not the first guess, is what was saved", reg)
+    tab(pg, "History")
+    pg.get_by_test_id("show-source").first.click()
+    expect(pg.get_by_test_id("source-text").first).to_contain_text("Typed in by hand", timeout=10000)
+    r.check(True, "an entry typed in says it has no photo or document behind it")
     r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
     ctx.close()
 

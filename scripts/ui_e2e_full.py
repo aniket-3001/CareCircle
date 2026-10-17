@@ -195,6 +195,10 @@ with sync_playwright() as p:
     expect(pg.get_by_test_id("history-none")).to_be_visible(timeout=10000)
     pg.get_by_test_id("history-search").fill("")
     expect(pg.get_by_test_id("history-none")).to_have_count(0)
+    # an entry can show the text the server read it from (typed entries say there is none)
+    pg.get_by_test_id("show-source").first.click()
+    expect(pg.get_by_test_id("source-text").first).to_be_visible(timeout=10000)
+    print("7a entry source ok:", pg.get_by_test_id("source-text").first.inner_text()[:70].replace(chr(10), " "))
     with pg.expect_download(timeout=15000):
         pg.get_by_role("button", name="Export as FHIR (JSON)").click()
     pg.get_by_role("button", name="Remove for good").first.click()

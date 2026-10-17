@@ -65,3 +65,18 @@ async def test_a_caller_cannot_vouch_for_its_own_photo(gm):
         await m.care_store_source("typed", "anything")
     from graphmem import ops
     assert "care_store_source" not in ops.OPS                                                # callers cannot create sources through the API or MCP
+
+
+async def test_an_entry_can_show_the_text_it_was_read_from_and_a_typed_one_says_it_has_none(gm):
+    t = tid(gm, "src")
+    await gm.grant("ravi", t, ("read", "write"))
+    m = gm.open("ravi", t)
+    sid = await m.care_store_source("image", "Pharmacy\nWarfarin 5 mg at bedtime\nQty 30")
+    a = await m.care_record("asha", "warfarin", dose_text="5 mg", freq_text="bedtime", source_type="photo", quote="Warfarin 5 mg at bedtime", source_ref=sid)
+    b = await m.care_record("asha", "metformin", dose_text="500 mg", source_type="typed")
+    got = await m.care_entry_source(a["id"])
+    assert got["has_source"] and "Qty 30" in got["text"] and got["quote"] in got["text"] and got["kind"] and "not stored" in got["note"]
+    none = await m.care_entry_source(b["id"])
+    assert none["has_source"] is False and none["text"] == "" and "Typed in by hand" in none["note"]
+    with pytest.raises(KeyError):
+        await m.care_entry_source("dose_nope")

@@ -5,6 +5,7 @@ import { Hero } from '../components/Hero';
 import { PageHead } from '../components/PageHead';
 import { Pill } from '../components/Pill';
 import { Segmented } from '../components/Segmented';
+import { EntrySource } from '../components/EntrySource';
 import { Sheet } from '../components/Sheet';
 import type { TimelineEvent } from '../api/types';
 import { useToast } from '../components/Toast';
@@ -158,6 +159,7 @@ export function HistoryScreen(): React.JSX.Element {
                       <li key={`${e.at}-${i}`} data-kind={e.kind}>
                         <div>{e.text}</div>
                         {e.quote && <div className="item__sub">“{e.quote}”</div>}
+                        {(e.kind === 'record' || e.kind === 'stop') && e.dose && <EntrySource dose={e.dose} />}
                         <div className="item__sub" data-testid="when">{whenLocal(e.at)} · {e.ago}</div>
                         {(e.kind === 'record' || e.kind === 'stop') && e.dose && e.status === 'mistake' && (
                           <button type="button" className="btn btn--ghost btn--sm" style={{ paddingInline: 0 }} onClick={() => void restore(e.dose!)}><RotateCcw size={14} aria-hidden="true" /> {tr('Put it back')}</button>

@@ -48,6 +48,18 @@ export interface TodayItem {
   needs_second_carer: boolean;
 }
 
+export interface EntrySource {
+  id: string;
+  how_entered: string;
+  quote: string;
+  has_source: boolean;
+  kind: string | null;
+  text: string;
+  sha256: string | null;
+  read_at: number | null;
+  note: string;
+}
+
 export interface StockRow {
   dose_id: string;
   drug: string;

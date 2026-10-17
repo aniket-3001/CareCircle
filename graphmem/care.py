@@ -164,6 +164,19 @@ class CareMixin:
                       {"i": sid, "k": kind, "t": text, "h": hashlib.sha256(text.encode("utf-8")).hexdigest(), "by": norm(self.agent), "n": now_ms()})
         return sid
 
+    async def care_entry_source(self, dose_id: str) -> dict:
+        """What an entry was read from: the full text the server read from the photo, voice note or document (not the image itself, which is never kept),
+        the kind, and when. An entry typed in by hand has none."""
+        rows = await self._q("MATCH (x:Dose {id:$i}) OPTIONAL MATCH (x)-[:READ_FROM]->(s:Source) RETURN x.quote, x.source_type, s.kind, s.text, s.sha256, s.at",
+                             {"i": dose_id}, scope="read")
+        if not rows:
+            raise KeyError(dose_id)
+        quote, how, kind, text, sha, at = rows[0]
+        return {"id": dose_id, "how_entered": how, "quote": quote or "", "has_source": text is not None, "kind": kind, "text": text or "",
+                "sha256": sha, "read_at": at,
+                "note": "This is the text the server read, kept so the quoted line can be checked. The picture or recording itself is not stored." if text is not None
+                else "Typed in by hand, so there is no photo, voice note or document behind it."}
+
     async def _source(self, ref: str, kind: str) -> Optional[dict]:
         rows = await self._q("MATCH (s:Source {id:$i, kind:$k}) RETURN s.id, s.text", {"i": ref, "k": kind}, scope="read", checked=True)
         return {"id": rows[0][0], "text": rows[0][1]} if rows else None

@@ -163,4 +163,10 @@ export const HI_MORE: Record<string, string> = {
   "Count the doses in the pack and enter the number. Doses marked as given after that come off it. A pack can also be used another way, so check the pack itself.": "पैक की खुराकें गिनकर संख्या लिखें। उसके बाद 'दी गई' चिह्नित खुराकें इसमें से घटती जाती हैं। पैक किसी और तरह भी ख़त्म हो सकता है, इसलिए पैक खुद देखें।",
   "Search the medicine list": "दवा की सूची में खोजें",
   "type at least 2 letters": "कम से कम 2 अक्षर लिखें",
+  "Hide what it was read from": "जिससे पढ़ा गया वह छिपाएँ",
+  "Show what it was read from": "जिससे पढ़ा गया वह दिखाएँ",
+  "Loading…": "लोड हो रहा है…",
+  "Could not load it.": "लोड नहीं हो सका।",
+  "This is the text the server read, kept so the quoted line can be checked. The picture or recording itself is not stored.": "यह वह पाठ है जो सर्वर ने पढ़ा, ताकि उद्धृत पंक्ति जाँची जा सके। तस्वीर या रिकॉर्डिंग खुद नहीं रखी जाती।",
+  "Typed in by hand, so there is no photo, voice note or document behind it.": "हाथ से लिखा गया, इसलिए इसके पीछे कोई फ़ोटो, वॉइस नोट या दस्तावेज़ नहीं है।",
 };
