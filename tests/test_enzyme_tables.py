@@ -47,3 +47,15 @@ def test_the_reference_graph_records_its_version_so_start_up_reloads_an_older_sh
     g = FalkorDB().select_graph(reference.REF_GRAPH)
     got = g.ro_query("MATCH (m:Meta {key:'ref'}) RETURN m.version").result_set
     assert got and got[0][0] == reference.REF_VERSION
+
+
+def test_no_table_yields_a_fragment_of_a_footnote_and_cyclosporine_keeps_all_its_transporters():
+    """N8: '(a,b,d,,h,i)' (a double comma) was not recognised as a footnote marker, so the parser emitted 'b', 'd', 'h', 'i)' and 'cyclosporine (a' as medicines."""
+    from pathlib import Path
+    from carecircle import reference as R
+    f = R.parse_fda_cyp((Path(R.__file__).parent / "snapshot" / "fda_cyp.html").read_text(encoding="utf-8", errors="ignore"))
+    names = {x[0] for rows in f.values() for x in rows}
+    assert not [n for n in names if len(n) <= 2 or "(" in n or ")" in n or n.endswith(",")], sorted(n for n in names if len(n) <= 2 or "(" in n or ")" in n)
+    assert {t for d, t in f["transporter_inhibits"] if d == "cyclosporine"} == {"P-gp", "OATP1B1", "OATP1B3"}
+    assert R._drugs("cyclosporine (a,b,d,,h,i) , rifampicin (a,d,e,h) , verapamil (c,f,g)") == ["cyclosporine", "rifampicin", "verapamil"]
+    assert R._drugs("elacridar (GF120918) (a) , valspodar (PSC833)") == ["elacridar", "valspodar"]

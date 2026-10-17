@@ -48,7 +48,7 @@ def _cells(row_html: str) -> list[str]:
 
 
 def _drugs(cell: str) -> list[str]:
-    cell = re.sub(r"\(\s*[a-z](?:\s*,\s*[a-z])*\s*\)", " ", cell)          # footnote markers like (c,d)
+    cell = re.sub(r"\([^()]*\)", " ", cell)                                  # every bracketed group: footnote markers like (c,d) or (a,b,d,,h,i), and code names like (GF120918)
     out = []
     for part in cell.split(","):
         n = re.sub(r"^[sr]-", "", norm(part))
