@@ -35,3 +35,15 @@ async def test_the_database_under_test_is_the_pinned_version():
     expected = int(os.getenv("CC_EXPECT_DB_VERSION", PINNED_VERSION))          # only .github/workflows/compat.yml sets this: the suite on the next engine
     assert ver == expected, (f"this database is graph module {ver}, the project is pinned to {PINNED_VERSION}: "
                                    f"start the pinned image (see docker-compose.yml) instead of whatever `latest` is today")
+
+
+def test_every_way_of_running_it_persists_by_snapshots_only_and_the_docs_say_so():
+    """Production dropped the append-only file (FalkorDB 4.22.1 crashes replaying one); the README's quick start, the persistence check and the docs must not describe the old way."""
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parent.parent
+    for f in ("docker-compose.yml", "deploy/docker-compose.prod.yml", "scripts/check_persistence.py"):
+        text = (root / f).read_text(encoding="utf-8")
+        assert "--appendonly no" in text and "--appendonly yes" not in text, f
+    for f in ("docs/TRACK02.md", "docs/DETAILS.md", "README.md"):
+        text = (root / f).read_text(encoding="utf-8").lower()
+        assert "synced every second" not in text and "fsync everysec" not in text and "append-only persistence" not in text, f

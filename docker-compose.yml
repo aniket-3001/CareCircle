@@ -1,10 +1,10 @@
-# Durable deployment: FalkorDB with a named volume and append-only file, plus the API/UI.
+# Durable deployment: FalkorDB with a named volume and snapshots only (no append-only file, as in production), plus the API/UI.
 # Usage: GRAPHMEM_ADMIN_KEY=change-me docker compose up -d --build
 services:
   falkordb:
     image: falkordb/falkordb@sha256:b0bdcac2cbaff989e77cb0610439b7a9289e86de033ccbbd4368b66fb680ae7a   # FalkorDB 4.22.1, pinned by digest: production, CI and local development run the same database (tests/test_pinned_database.py)
     environment:
-      REDIS_ARGS: "--appendonly yes --appendfsync everysec"
+      REDIS_ARGS: "--appendonly no --save 60 1 --save 300 100"      # FalkorDB 4.22.1 can crash replaying an append-only file (docs/FALKORDB_CRASH.md)
     volumes: ["falkor-data:/var/lib/falkordb/data"]
     ports: ["${FALKORDB_PORT:-6379}:6379", "${BROWSER_PORT:-3000}:3000"]   # 3000 = FalkorDB Browser
     healthcheck:

@@ -24,7 +24,7 @@ Probing with bad input found four defects, now fixed and pinned by `test_6a` to 
 
 ## Persistence
 
-Production runs FalkorDB with an append-only file synced every second, on a named volume, with `restart: unless-stopped` (`deploy/docker-compose.prod.yml`), and snapshots to S3 every 6 hours. `scripts/check_persistence.py` proves it: it starts a throwaway FalkorDB with those same settings, writes history, facts, a skill outcome, a claimed task and a care record, restarts the container and reads everything back with a new client (all present, numbering continues), then kills the container hard (SIGKILL) and starts it again (31 of 31 events present; by design at most the last second could be lost).
+Production runs FalkorDB with snapshots only (a save after 60 s with a change or 300 s with 100; no append-only file, because FalkorDB 4.22.1 crashed replaying one, see `docs/FALKORDB_CRASH.md`), on a named volume, with `restart: unless-stopped` (`deploy/docker-compose.prod.yml`), and snapshots to S3 every 6 hours. `scripts/check_persistence.py` proves it: it starts a throwaway FalkorDB with those same settings, writes history, facts, a skill outcome, a claimed task and a care record, restarts the container and reads everything back with a new client (all present, numbering continues), then saves a snapshot, writes one more event and kills the container hard (SIGKILL): the 31 events in the snapshot are back, and the one written after it is reported as kept or lost, not promised (a hard crash can lose up to a minute of writes).
 
 ## Load test results
 
