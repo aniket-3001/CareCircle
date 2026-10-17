@@ -16,7 +16,7 @@ Care Circle keeps that picture in one FalkorDB graph. Each carer reaches it thro
 
 Live: **https://3-228-70-117.sslip.io** (press **Start a demo circle**; synthetic data only) · The same memory for any agent: **`POST /mcp`** on the same address ([Connect your agent stack](#connect-an-agent))
 
-![Today: the verdict tile and the flags, each with its source](docs/img/flags.png)
+![Care Circle, Today screen: the day's doses, then the verdict with its flag count](docs/img/ui-today.png)
 
 ## One story it was built around
 
@@ -41,6 +41,34 @@ Built with Claude as a coding assistant (see [AI use disclosure](#ai-use-disclos
 4. **Circle**: Meena has not acknowledged the change. Slide the time warp 13 hours: a reminder for Meena, then an escalation to Ravi, each exactly once.
 5. **Graph**: watch the circle assemble, click the clarithromycin node and the red line: both explain themselves in words. Open **Inspect the graph** below it for the cards **What the record hangs on** and **What belongs together**: PageRank, betweenness, groups and paths on this circle's own graph (for developers and judges).
 6. Point an agent at it: [Connect your agent stack](docs/DETAILS.md#connect-your-agent-stack). The full 90-second script is [The demo story](docs/DETAILS.md#the-demo-story-90-seconds).
+
+## What it looks like
+
+Taken from the live app at laptop width, with the synthetic demo circle (`scripts/take_screenshots.py` makes them again).
+
+**Add a medicine.** A label is read by OCR, the exact line each entry came from is quoted, and nothing is saved until a person confirms it.
+
+![Add screen: the text read from a sample label, the quoted line with a "quote verified" badge, and the proposed entry to confirm](docs/img/ui-add.png)
+
+**Every flag shows its source.** The pair, how severe the source rates it, which source, and the graph pattern behind it. Enzyme paths come from the FDA table and are shown separately.
+
+![Flags with their sources: a major pair, moderate pairs and enzyme paths, each with its source and the pattern in the graph](docs/img/ui-flags.png)
+
+**The circle as a graph, as stored in FalkorDB.** Carers, entries, medicines and the enzyme; the coral line is the major pair, the dashed blue one an enzyme path.
+
+![The circle as a graph: Ravi and Meena, Asha, five medicines, a major interaction in coral and an enzyme path in blue](docs/img/ui-graph.png)
+
+Click anything and it explains itself in plain words, with the line it was read from:
+
+![A selected entry: who recorded it, from what, and the quoted line checked against the source text](docs/img/ui-graph-explain.png)
+
+**Who has seen what.** Every change is shown to every carer; until someone acknowledges it they count as behind, and a medicine only one carer knows about is called out.
+
+![Circle screen: medicines only one carer knows about, and each carer's unseen changes](docs/img/ui-circle.png)
+
+**History.** Nothing is overwritten: slide back to see what the record and its flags said at any earlier moment, or read what happened in order, with the line each entry was read from.
+
+![History screen: the look-back slider with the flags as they were then, and a timeline of changes with the quoted line and a link to the text it was read from](docs/img/ui-history.png)
 
 ## What it does
 
