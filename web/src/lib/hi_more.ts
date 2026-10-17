@@ -221,4 +221,5 @@ export const HI_MORE: Record<string, string> = {
   "Those entries are NOT the same as when the line was kept: one was changed or removed.": "वे प्रविष्टियाँ वैसी नहीं हैं जैसी पंक्ति रखते समय थीं: कोई बदली या हटाई गई।",
   "That does not look like a kept line (a number, a colon and 64 letters or digits).": "यह रखी हुई पंक्ति जैसी नहीं दिखती (एक संख्या, कोलन और 64 अक्षर/अंक)।",
   "No entries yet.": "अभी कोई प्रविष्टि नहीं।",
+  "More: appointments, other doses, the week in counts, and the person’s say": "और: अपॉइंटमेंट, अन्य खुराकें, सप्ताह की गिनती, और व्यक्ति की राय",
 };

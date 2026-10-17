@@ -24,6 +24,9 @@ class Run(harness.Run):
 
 def tab(pg, name):
     pg.locator(".tabbar").get_by_text(name, exact=True).click()
+    if name == "Circle":                                         # the Circle screen keeps its secondary cards in one fold: open it
+        pg.get_by_test_id("circle-more").wait_for(timeout=15000)
+        pg.get_by_test_id("circle-more").evaluate("e => { e.open = true; }")
 
 
 def new_page(browser, width=1280, height=900, errs=None):

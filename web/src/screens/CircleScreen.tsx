@@ -96,10 +96,15 @@ export function CircleScreen(): React.JSX.Element {
           </Async>
           <Followups />
           <Handover />
-          <Outcomes />
-          <Consent />
-          <Appointments />
-          <Doses />
+          <details className="more" data-testid="circle-more">
+            <summary className="more__summary">{tr('More: appointments, other doses, the week in counts, and the person’s say')}</summary>
+            <div className="stack">
+              <Appointments />
+              <Doses />
+              <Outcomes />
+              <Consent />
+            </div>
+          </details>
         </div>
         <div className="col">
           {app.isDemo && (

@@ -385,3 +385,7 @@ code, .code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: 
 .faq { border: 1px solid var(--line); border-radius: 12px; padding: 0 14px; background: var(--card); }
 .faq summary { cursor: pointer; padding: 12px 0; font-weight: 700; color: var(--head); }
 .faq p { margin: 0 0 12px; color: var(--text); }
+
+.more { margin-top: var(--gap, 16px); }
+.more__summary { cursor: pointer; font-weight: 600; padding: 12px 4px; }
+.more[open] > .more__summary { margin-bottom: 8px; }
