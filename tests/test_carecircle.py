@@ -521,3 +521,30 @@ def test_field_in_quote_is_exact_about_numbers_and_short_units():
     assert field_in_quote("500 mg", "METFORMIN 500 MG TABLETS") and field_in_quote("5g", "Take 5 g daily") and field_in_quote("OD", "Metformin 500 mg OD")
     assert not field_in_quote("500 mg", "METFORMIN 1500 MG") and not field_in_quote("0.5 mg", "Risperidone 10.5 mg") and not field_in_quote("", "x")
     assert not field_in_quote("twice daily", "Warfarin 5 mg at bedtime")
+
+
+def test_a_two_medicine_quote_cannot_lend_one_strength_to_the_other(monkeypatch):
+    """A model quoted two lines and put glimepiride's '2 MG once daily' on metformin; the dose was in the quote, so it was 'verified'."""
+    text = "CITY PHARMACY\nMETFORMIN 500 MG TABLETS\nGLIMEPIRIDE 2 MG once daily"
+    monkeypatch.setattr(intake, "llm_proposals", lambda t: [
+        {"llm_drug": "metformin", "dose_text": "2 MG", "freq_text": "once daily", "quote": "METFORMIN 500 MG TABLETS\nGLIMEPIRIDE 2 MG once daily", "method": "bedrock"}])
+    got = {x["drug_candidates"][0]["name"]: x for x in intake.propose(text, Checker())}
+    assert got["metformin"]["dose_text"].replace(" ", "").lower() == "500mg" and got["metformin"]["method"] == "rules"
+    assert got["glimepiride"]["dose_text"].replace(" ", "").lower() == "2mg"
+
+
+def test_the_rule_reading_wins_when_a_model_disagrees_on_a_strength(monkeypatch):
+    """B7 saw a model replace a correct strength on 4 of 40 damaged labels. Even a one-line quote that says the model's number may not override the rules."""
+    text = "METFORMIN 500 MG TABLETS twice daily\nMETFORMIN 850 MG TABLETS"
+    monkeypatch.setattr(intake, "llm_proposals", lambda t: [
+        {"llm_drug": "metformin", "dose_text": "850 MG", "freq_text": "", "quote": "METFORMIN 850 MG TABLETS", "method": "bedrock"}])
+    got = [x for x in intake.propose(text, Checker()) if x["drug_candidates"][0]["name"] == "metformin"]
+    assert got and all(x["method"] == "rules" for x in got)
+
+
+def test_intake_model_has_its_own_off_switch(monkeypatch):
+    called = []
+    monkeypatch.setenv("CC_LLM", "1")
+    monkeypatch.setenv("CC_INTAKE_LLM", "0")
+    monkeypatch.setitem(__import__("sys").modules, "boto3", type("B", (), {"client": staticmethod(lambda *a, **k: called.append(1))}))
+    assert intake.llm_proposals("metformin 500 mg") == [] and not called

@@ -239,7 +239,7 @@ def redact_identifiers(text: str) -> str:
 def llm_proposals(text: str) -> list[dict]:
     """Bedrock Converse on the text only. Returns [] on any failure so the caller falls back to rules. Output is untrusted: strict shape + caps.
     The PICTURE is never sent: it shows the patient's and the doctor's names, and the text the OCR already read is all the model needs (B7: no model beat the rules on it)."""
-    if os.getenv("CC_LLM", "1") == "0":
+    if os.getenv("CC_LLM", "1") == "0" or os.getenv("CC_INTAKE_LLM", "1") == "0":      # the second switch turns off only this reader, not the helper
         return []
     try:
         import boto3
@@ -263,26 +263,40 @@ def llm_proposals(text: str) -> list[dict]:
 
 
 def propose(text: str, checker) -> list[dict]:
-    """Merge LLM and rule proposals. Each carries `verified` = its quote occurs in the independent source text. Unverified LLM items
-    are kept but flagged, never trusted. Drug names are always resolved to reference-graph candidates for a human to choose."""
+    """Merge LLM and rule proposals. Each carries `verified` = its quote occurs in the independent source text. Unverified LLM
+    items are kept but flagged, never trusted. Drug names are always resolved to reference-graph candidates for a human to choose.
+
+    The rules are the authority on dose and frequency. A model item is used only where the rules read nothing usable for that medicine, and only if its
+    quote names that one medicine: a quote that spans two medicines proves nothing about which one a strength belongs to ("METFORMIN 500 MG / GLIMEPIRIDE
+    2 MG once daily" would let metformin carry glimepiride's dose and still be "verified"). When the model and the rules disagree, the rules win."""
+    rules = rule_proposals(text, checker)
+    by_rule = {p["drug_candidates"][0]["name"]: p for p in rules}
     props = []
     for p in llm_proposals(text):
         named = p.pop("llm_drug")
         if not quote_in_source(named, p["quote"]):                # a quote that does not even contain the drug name proves nothing
             continue
-        for k in ("dose_text", "freq_text"):                      # a model may not put a dose or frequency on a line that does not say it: such a field is dropped,
-            if p[k] and not field_in_quote(p[k], p["quote"]):    # so the quote that is shown really contains everything shown beside it
-                p[k] = ""
         p["drug_candidates"] = checker.resolve(named, 3)
+        if not p["drug_candidates"]:
+            continue
+        mine = {c["name"] for c in p["drug_candidates"]}
+        if any(q["drug_candidates"][0]["name"] not in mine for q in rule_proposals(p["quote"], checker)):
+            continue                                              # the quote names another medicine too: which one owns the strength is not shown
+        for k in ("dose_text", "freq_text"):                      # a model may not put a dose or frequency on a line that does not say it
+            if p[k] and not field_in_quote(p[k], p["quote"]):
+                p[k] = ""
+        r = by_rule.get(p["drug_candidates"][0]["name"])
+        if r and (r["dose_text"] or r.get("combination") or not p["dose_text"]):
+            continue                                              # the rule reading has the dose (or the model adds none): rules win
         p["verified"] = bool(text) and quote_in_source(p["quote"], text)
-        if p["drug_candidates"]:
-            props.append(p)
-    have = {(p["drug_candidates"][0]["name"]) for p in props if p["verified"] and p["dose_text"]}   # a model item with no dose yields to the rule reading
-    for p in rule_proposals(text, checker):
-        if p["drug_candidates"][0]["name"] not in have:
-            p["verified"] = quote_in_source(p["quote"], text)
-            props = [q for q in props if not (q["drug_candidates"][0]["name"] == p["drug_candidates"][0]["name"] and not q["dose_text"])]
-            props.append(p)
+        props.append(p)
+    have = {p["drug_candidates"][0]["name"] for p in props}
+    for p in rules:
+        n = p["drug_candidates"][0]["name"]
+        if n in have and not p.get("combination"):                # a model item filled the dose the rules lacked
+            continue
+        p["verified"] = quote_in_source(p["quote"], text)
+        props.append(p)
     for p in props:
         p["needs_human"] = True                                  # always: nothing is written without a person confirming
     return props
