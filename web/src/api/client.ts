@@ -1,4 +1,4 @@
-import type { StockRow, Counts, Followup, FollowupSuggestion, Handover, AllergyCheck, Appointment, CareProfile, Visit, DrugInfo, Reading, Trend, Recalls, SoleKnowers,
+import type { Candidate, StockRow, Counts, Followup, FollowupSuggestion, Handover, AllergyCheck, Appointment, CareProfile, Visit, DrugInfo, Reading, Trend, Recalls, SoleKnowers,
   Account, AuthConfig, CareGraph, ChatMessage, CheckResult, Divergence, FhirBundle, GiveRecord, GiveResult, Hubs, GInfluence, GCommunities, GPath, IntakeResult, Invite, Member, Reminder, People,
   Profile, Receipt, RegimenEntry, Session, TimelineEvent, CircleInfo, TodayView,
 } from './types';
@@ -84,6 +84,7 @@ export function apiFor(s: Session) {
     forget: (dose_id: string, reason: string) => op<{ receipt: string; forgotten: boolean; sha256: string }>('care_forget', { dose_id, reason }),
     forgetPerson: (confirm: string) => op<{ receipt: string; forgotten: boolean; removed_entries: number }>('care_forget_person', { person: p, confirm }),
     today: (now: number) => op<TodayView>('care_today', { person: p, now }),
+    resolve: (text: string, n = 8) => op<Candidate[]>('care_drug_search', { text, n }),
     stock: (now: number) => op<StockRow[]>('care_stock', { person: p, now }),
     setStock: (dose_id: string, doses_left: number) => op<{ id: string; doses_left: number }>('care_stock_set', { dose_id, doses_left }),
     timezone: () => op<{ tz: string; set: boolean }>('care_timezone'),

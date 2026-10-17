@@ -161,4 +161,6 @@ export const HI_MORE: Record<string, string> = {
   "doses left in the pack": "पैक में बची खुराकें",
   "Save count": "गिनती सहेजें",
   "Count the doses in the pack and enter the number. Doses marked as given after that come off it. A pack can also be used another way, so check the pack itself.": "पैक की खुराकें गिनकर संख्या लिखें। उसके बाद 'दी गई' चिह्नित खुराकें इसमें से घटती जाती हैं। पैक किसी और तरह भी ख़त्म हो सकता है, इसलिए पैक खुद देखें।",
+  "Search the medicine list": "दवा की सूची में खोजें",
+  "type at least 2 letters": "कम से कम 2 अक्षर लिखें",
 };

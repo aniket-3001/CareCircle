@@ -83,6 +83,17 @@ class Checker:
                 out.append({"name": ing["name"], "score": 0.9, "via": ing["source"], "rxcui": ing["rxcui"]})
         return sorted(out, key=lambda c: -c["score"])[:n]
 
+    def search(self, text: str, n: int = 8) -> list[dict]:
+        """Medicines in the reference list whose name starts with, or contains, what was typed (a plain name search, for a person looking something up)."""
+        if self._names is None:
+            self._names = [r[0] for r in self.g.ro_query("MATCH (d:Drug) RETURN d.name").result_set]
+        t = norm(text)
+        if len(t) < 2:
+            return []
+        starts = sorted(x for x in self._names if x.startswith(t))
+        inside = sorted(x for x in self._names if t in x and not x.startswith(t))
+        return [{"name": x, "score": 1.0 if x.startswith(t) else 0.8} for x in (starts + inside)[:max(1, min(n, 20))]]
+
     def candidates(self, text: str, n: int = 3) -> list[dict]:
         """Top-n drug names for a noisy string (OCR output). The human picks one; nothing is auto-accepted."""
         if self._names is None:

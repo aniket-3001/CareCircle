@@ -257,6 +257,12 @@ class CareMixin:
         res["judgement"] = judgement(res)
         return res
 
+    async def care_drug_search(self, text: str, n: int = 8) -> list[dict]:
+        """Search the reference list by name (starts with, then contains). For a person who knows what the medicine is called."""
+        if self._guard:
+            await self._guard("read")
+        return await asyncio.to_thread(checker().search, text, n)
+
     async def care_resolve(self, text: str, n: int = 3) -> list[dict]:
         """Top-n drug name candidates for an OCR/voice string. Nothing is auto-accepted; a person chooses."""
         if self._guard:

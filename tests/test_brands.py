@@ -4,6 +4,8 @@ The review typed three ordinary Indian prescriptions into the live app: Telma-AM
 was swallowed into the line above it. Each lost ingredient left every interaction check while the card showed a "quote verified" badge."""
 import pytest
 
+from conftest import tid
+
 from carecircle import brands, intake
 from carecircle.checks import Checker
 
@@ -89,3 +91,14 @@ def test_what_goes_to_the_model_has_no_names_numbers_or_addresses_but_keeps_the_
     for gone in ("Asha", "Rao", "71", "98765", "Mehta", "mehta@", "Park Road"):
         assert gone not in out, gone
     assert "Tab Telma-AM 40/5 once daily" in out and "Warfarin 5 mg at bedtime" in out
+
+
+async def test_the_medicine_list_can_be_searched_by_part_of_a_name(gm):
+    t = tid(gm, "srch")
+    await gm.grant("ravi", t, ("read",))
+    m = gm.open("ravi", t)
+    got = [x["name"] for x in await m.care_drug_search("simvast")]
+    assert "simvastatin" in got and all("simvast" in n for n in got)
+    starts = [x["name"] for x in await m.care_drug_search("metf")]
+    assert starts and starts[0].startswith("metf")
+    assert await m.care_drug_search("s") == [] and await m.care_drug_search("zzzzqqq") == []

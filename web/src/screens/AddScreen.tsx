@@ -1,8 +1,8 @@
 import { Camera, FileText, Mic, ScanLine, Square } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { sampleLabel } from '../api/client';
-import type { IntakeResult, Proposal } from '../api/types';
+import type { Candidate, IntakeResult, Proposal } from '../api/types';
 import { PageHead } from '../components/PageHead';
 import { Pill, Spinner } from '../components/Pill';
 import { useToast } from '../components/Toast';
@@ -146,9 +146,20 @@ export function ProposalCard({ p, kind, sourceText, sourceId = '', goToday = tru
   const toast = useToast();
   const [pick, setPick] = useState(p.drug_candidates[0]?.name ?? '');
   const [typed, setTyped] = useState('');
+  const [query, setQuery] = useState('');
+  const [found, setFound] = useState<Candidate[]>([]);
   const OTHER = '__other__';
+  // Search the whole reference list by name (the proposals above are only the best few guesses from the photo or voice note).
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setFound([]); return; }
+    const h = setTimeout(() => { void app.api.resolve(q).then((r) => setFound(r)).catch(() => setFound([])); }, 300);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+  const choices = [...p.drug_candidates, ...found.filter((f) => !p.drug_candidates.some((c) => c.name === f.name))];
   const drug = pick === OTHER ? typed.trim().toLowerCase() : pick;
-  const picked = p.drug_candidates.find((c) => c.name === pick);
+  const picked = choices.find((c) => c.name === pick);
   const unchecked = pick === OTHER || !!picked?.unchecked;
   const [dose, setDose] = useState(p.dose_text);
   const [freq, setFreq] = useState(p.freq_text);
@@ -187,7 +198,7 @@ export function ProposalCard({ p, kind, sourceText, sourceId = '', goToday = tru
         <label className="field">
           {tr('Medicine (pick the right one)')}
           <select value={pick} onChange={(e) => setPick(e.target.value)}>
-            {p.drug_candidates.map((c) => <option key={c.name} value={c.name}>{title(c.name)}{c.unchecked ? ` (${tr('not checked')})` : ''}</option>)}
+            {choices.map((c) => <option key={c.name} value={c.name}>{title(c.name)}{c.unchecked ? ` (${tr('not checked')})` : ''}</option>)}
             <option value={OTHER}>{tr('Another medicine: type its name')}</option>
           </select>
         </label>
@@ -208,6 +219,10 @@ export function ProposalCard({ p, kind, sourceText, sourceId = '', goToday = tru
         <label className="field">
           {tr('How often as written')}
           <input type="text" value={freq} onChange={(e) => setFreq(e.target.value)} />
+        </label>
+        <label className="field">
+          {tr('Search the medicine list')}
+          <input type="search" value={query} maxLength={60} onChange={(e) => setQuery(e.target.value)} placeholder={tr('type at least 2 letters')} data-testid="drug-search" />
         </label>
       </div>
       {unchecked && <p className="muted small" data-testid="unchecked-note">{tr('If this medicine is not in our reference data it is recorded, but nothing is checked for it, and the verdict says so.')}</p>}

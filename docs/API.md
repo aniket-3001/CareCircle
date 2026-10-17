@@ -103,6 +103,7 @@ Content-Type: application/json
 | `care_graph` | read | `person`*, `include_history`, `now` | The circle as a graph: nodes and edges, each with plain-language metadata (read scope). |
 | `care_timeline` | read | `person`*, `limit`, `now` | Everything that happened for this person, newest first, as plain sentences. |
 | `care_history_digest` | read | `person`*, `upto` | A fingerprint of what was written about a person: each entry's fixed fields are chained (hash of the one before + this one), oldest first. |
+| `care_drug_search` | read | `text`*, `n` | Search the reference list by name (starts with, then contains). For a person who knows what the medicine is called. |
 | `care_stock_set` | write | `dose_id`*, `doses_left`* | Record how many doses are left in the pack of this entry (counted by a person, today). Doses marked given after this are taken off it. |
 | `care_stock` | read | `person`*, `now` | For each current entry with a pack count: the doses left now (the count minus the doses marked given since it was counted) and, when it has fixed |
 | `care_receipt_check` | admin | `receipt`*, `drug`, `dose_text`, `freq_text`, `quote`, `by`, `at` | Does a copy someone kept (the medicine, strength, frequency, quoted line, writer and time) match what a dose receipt says was erased? Admin only. |

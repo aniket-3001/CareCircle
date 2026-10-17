@@ -508,5 +508,31 @@ def main():
     return failed
 
 
+@scenario("U15", "The medicine picker can search the whole list, not only the best three guesses")
+def u15(w, b, r):
+    errs = []
+    ctx, pg = new_page(b, errs=errs)
+    email = f"u15-{rid()}@scenario.test"
+    ui_signup(pg, "Seeker", email)
+    ui_circle(pg, "Mum's medicines", "Mum")
+    expect(pg.get_by_text("Nothing on record yet")).to_be_visible()
+    tab(pg, "Add")
+    pg.get_by_placeholder("e.g. Clarithromycin 500 mg twice daily for 7 days").fill("Warfarin 5 mg at bedtime")
+    pg.get_by_role("button", name="Read it").click()
+    expect(pg.get_by_test_id("proposal")).to_have_count(1, timeout=20000)
+    pg.get_by_test_id("drug-search").fill("simvast")
+    expect(pg.get_by_test_id("proposal").locator("option", has_text="Simvastatin")).to_have_count(1, timeout=10000)
+    r.check(True, "typing part of a name offers it from the whole list")
+    pg.get_by_test_id("proposal").locator("select").select_option(label="Simvastatin")
+    pg.get_by_role("button", name="Confirm and save").first.click()
+    pg.wait_for_timeout(1500)
+    u = api_user(w, email)
+    c = circle_of(u)
+    reg = {x["drug"] for x in u.ok(c, "care_regimen", person="mum")}
+    r.check(reg == {"simvastatin"}, "the searched medicine, not the first guess, is what was saved", reg)
+    r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
+    ctx.close()
+
+
 if __name__ == "__main__":
     sys.exit(1 if main() else 0)
