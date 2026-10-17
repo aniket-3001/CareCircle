@@ -353,10 +353,10 @@ class CareMixin:
             latest: dict[str, tuple] = {}
             for row in changes:                                                      # ordered by time: the last row per medicine and product is where it stands now
                 latest[(row[1], row[5])] = row
-            miss = [(i, d, a, at) for i, d, a, at, by, _p in latest.values() if i not in acked and norm(by) != c]
-            ws = [heavy.get(d, 0.3) for _, d, _, _ in miss]
-            ages = [(t - at) / H for *_, at in miss]
-            out[c] = {"unacknowledged": [{"dose": i, "drug": d, "action": a, "age_hours": round((t - at) / H, 1)} for i, d, a, at in miss],
+            miss = [(i, d, a, at, pr) for i, d, a, at, by, pr in latest.values() if i not in acked and norm(by) != c]
+            ws = [heavy.get(m[1], 0.3) for m in miss]
+            ages = [(t - m[3]) / H for m in miss]
+            out[c] = {"unacknowledged": [{"dose": i, "drug": d, "action": a, "age_hours": round((t - at) / H, 1), "product": pr} for i, d, a, at, pr in miss],
                       "divergence": risk.divergence(ws, ages) if miss else 0.0}
         worst = max(out, key=lambda k: out[k]["divergence"], default=None)
         return {"carers": out, "most_out_of_date": worst if worst and out[worst]["divergence"] > 0 else None,

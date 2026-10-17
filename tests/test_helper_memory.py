@@ -93,3 +93,14 @@ async def test_a_question_that_stands_alone_is_answered_as_before(gm):
     for q, src in (("What medicines are on record?", "rules"), ("how does it work", "rules"), ("What can you do?", "rules")):
         out = await ask(ravi, q)
         assert out["source"] == src and "Which medicine do you mean" not in out["text"], (q, out)
+
+
+async def test_two_brands_of_one_molecule_are_told_apart_in_the_helpers_answers(gm):
+    """With Storvas and Atorva both on record, 'not yet seen' used to list 'Atorvastatin' twice with nothing to tell the lines apart."""
+    ravi, meena = await circle(gm, flagged=False)
+    await ravi.care_record("asha", "atorvastatin", dose_text="10 mg", freq_text="at night", product="storvas")
+    await ravi.care_record("asha", "atorvastatin", dose_text="20 mg", freq_text="at night", product="atorva")
+    seen = (await ask(ravi, "Who has not seen the latest changes?"))["text"]
+    assert "Atorvastatin (Storvas)" in seen and "Atorvastatin (Atorva)" in seen, seen
+    listed = (await ask(ravi, "What medicines are on record?"))["text"]
+    assert "Atorvastatin (Storvas) 10 mg" in listed and "Atorvastatin (Atorva) 20 mg" in listed, listed

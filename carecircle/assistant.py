@@ -56,6 +56,12 @@ def _title(s: str) -> str:
     return shown_name(s)
 
 
+def _named(drug: str, product: str = "") -> str:
+    """A medicine as people read it: with the brand it was recorded under when it has one ("Atorvastatin (Storvas)"), so two brands of one molecule are not the same line twice."""
+    from graphmem.textcheck import product_name
+    return f"{_title(drug)} ({product_name(product)})" if product else _title(drug)
+
+
 def _who(agent: str) -> str:
     return _title((agent or "").split("-")[0]) or "Someone"
 
@@ -127,7 +133,7 @@ def _a_unseen(f: Facts) -> str:
     for carer, v in f.div["carers"].items():
         u = v["unacknowledged"]
         if u:
-            lines.append(f"{_who(carer)} has not yet seen: " + "; ".join(f"{_title(x['drug'])} ({_h(x['age_hours'])} h ago)" for x in u) + ".")
+            lines.append(f"{_who(carer)} has not yet seen: " + "; ".join(f"{_named(x['drug'], x.get('product', ''))} ({_h(x['age_hours'])} h ago)" for x in u) + ".")
     if not lines:
         return "Everyone in the circle has seen every change on record."
     return " ".join(lines) + " They can open the Circle tab and press \"I have seen this\"."
@@ -136,7 +142,7 @@ def _a_unseen(f: Facts) -> str:
 def _a_regimen(f: Facts) -> str:
     if not f.regimen:
         return f"Nothing is on record for {_title(f.person)} yet. You can add a medicine from a photo, a voice note, a document or by typing it."
-    items = "; ".join(f"{_title(r['drug'])} {r['dose_text']} {r['freq_text']}".strip() for r in f.regimen)
+    items = "; ".join(f"{_named(r['drug'], r.get('product', ''))} {r['dose_text']} {r['freq_text']}".strip() for r in f.regimen)
     return f"On record for {_title(f.person)} now ({len(f.regimen)}): {items}."
 
 
@@ -393,7 +399,7 @@ def _a_unseen_for(f: Facts, carer: str) -> str:
     u = f.div["carers"][carer]["unacknowledged"]
     if not u:
         return f"{_who(carer)} has seen every change on record."
-    return f"{_who(carer)} has not yet seen: " + "; ".join(f"{_title(x['drug'])} ({_h(x['age_hours'])} h ago)" for x in u) + "."
+    return f"{_who(carer)} has not yet seen: " + "; ".join(f"{_named(x['drug'], x.get('product', ''))} ({_h(x['age_hours'])} h ago)" for x in u) + "."
 
 
 def _listed(last: dict) -> str:
