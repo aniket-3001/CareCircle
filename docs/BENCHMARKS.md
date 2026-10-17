@@ -97,3 +97,16 @@ What it does not show. The labels are synthetic, flat, horizontal, generic-name 
 What Mem0 did here: it kept 170 of the 183 events as memories (in 10 of the 20 circles it merged or dropped at least one), and the retrieved memories then had to be reasoned over by a model. What the race rows mean: Care Circle has one atomic claim per dose slot, so one caller wins and the rest are told who was first; Mem0 has no such operation, so all ten writes are accepted and nothing says who was first.
 
 **What this does not show.** It is one question on tiny circles, which is the easiest case for the systems that read text. Both baselines used a mid-sized model (Nova Pro) and a plain prompt that lets the model reason and then give an `ANSWER:` line; a stronger model, a tuned prompt or tuned Mem0 settings would very likely score higher, and I did not try them. Mem0 is a general personal-memory store that was never meant to answer this question, so the table says what it takes to ask it, not that Mem0 is poor at what it is for. A first version of this script parsed the models' answers badly and made the full-context baseline look like 1/20; that was my parser, found by reading the raw replies, and fixed before any number above was recorded. Mem0's own Bedrock adapter sent a malformed request for Nova in version 2.2.1, so Mem0 was run through its LiteLLM route to the same model. Cognee was not run: it needs its own LLM key setup and a graph store, and a result I could not check would not belong in a table of results.
+
+## B7: does a model structure label text better than the rules alone?
+
+`bench/llm_compare.py` (17 Oct 2026, seed 7): 40 medicines from the reference graph, each drawn as a label at three levels of damage and read by the real OCR (120 labels), then turned into proposals by the real `intake.propose` once per model. Scored as in the intake benchmark. Every proposal from a model must still pass the quote check against the OCR text.
+
+| reader | clean: top-1 / strength | moderate: top-1 / strength | harsh: top-1 / strength | time per label |
+|---|---|---|---|---|
+| rules only (no model) | 40 / 40 | 40 / 40 | 38 / 34 | 0.03 s |
+| Amazon Nova Pro | 40 / 40 | 40 / 40 | 38 / **30** | 1.5 s |
+| Claude Haiku 4.5 | 40 / 40 | 40 / 40 | 38 / 34 | 0.95 s |
+| Claude Sonnet 4.5 | 40 / 40 | 40 / 40 | 38 / 34 | 0.95 s |
+
+Reading it plainly: on synthetic labels the rules already read what the OCR read, so **no model improved on them**; Nova made the strength worse on the damaged labels (30 against 34 of 40: it returned a strength the rules had right), and both Claude models matched the rules exactly and ran about a third faster than Nova. The labels carry generic names only. What a model could add on real photographs (brand names, curved bottles, handwriting, a line the OCR split in two) is exactly what this benchmark cannot measure, so it neither shows that a model helps in practice nor that it does not. Claude Opus 4.5 was reachable and was left out as slower and dearer for the same task; newer Claude models (Sonnet 5, Opus 4.7 to 5.5, Fable, Haiku 5.5) are listed on Bedrock but were refused for this AWS account.
