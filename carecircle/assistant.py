@@ -140,13 +140,22 @@ def _a_regimen(f: Facts) -> str:
     return f"On record for {_title(f.person)} now ({len(f.regimen)}): {items}."
 
 
+def _flags_shown(f: Facts, q: str) -> list:
+    """The flags an answer lists, in the order it lists them. A question naming both medicines of a pair gets that pair."""
+    c = f.check
+    pairs = c["direct"] + c["enzyme_paths"]
+    low = q.lower()
+    meds = lambda x: [d for d in (x.get("drugs") or [x.get("x", ""), x.get("y", "")]) if d]            # noqa: E731
+    both = [x for x in pairs if len(meds(x)) > 1 and all(d in low for d in meds(x))]
+    named = [x for x in pairs if any(d in low for d in meds(x))]
+    return (both or named or sorted(c["direct"], key=lambda x: {"major": 0, "moderate": 1, "minor": 2}.get(x["level"].lower(), 3)) + c["enzyme_paths"])[:4]
+
+
 def _a_flags(f: Facts, q: str) -> str:
     c = f.check
     if not f.regimen:
         return "Nothing is on record yet, so there is nothing to check."
-    pairs = c["direct"] + c["enzyme_paths"]
-    named = [x for x in pairs if any(d in q.lower() for d in (x.get("drugs") or [x.get("x", ""), x.get("y", "")]) if d)]
-    shown = (named or sorted(c["direct"], key=lambda x: {"major": 0, "moderate": 1, "minor": 2}.get(x["level"].lower(), 3)) + c["enzyme_paths"])[:4]
+    shown = _flags_shown(f, q)
     if not shown:
         extra = f" {len(c['unrated'])} pair(s) are listed by the source without a severity." if c["unrated"] else ""
         return f"{c['judgement']['statement']}{extra}"
@@ -264,8 +273,8 @@ def ask_model(question: str, facts: Facts, generate=None) -> Optional[str]:
 
 
 # ------------------------------------------------------------------ the entry point
-def ask(question: str, facts: Facts, checker, generate=None, lang: str = "") -> dict:
-    """{answer, source: rules|model|refusal|proposal, proposals?, links?}. Pure: no writes."""
+def _ask_plain(question: str, facts: Facts, checker, generate=None, lang: str = "", allow_model: bool = True) -> dict:
+    """One question on its own, as if it were the first. {answer, source: rules|model|refusal|proposal, proposals?, links?}. Pure: no writes."""
     q = " ".join((question or "").split())[:MAX_Q]
     if not q:
         return {"answer": HELP, "source": "rules", "links": []}
@@ -298,6 +307,8 @@ def ask(question: str, facts: Facts, checker, generate=None, lang: str = "") -> 
                     "source": "refusal", "links": [{"tab": "today", "label": "Open Today"}]}
         return {"answer": REFUSAL, "source": "refusal", "links": []}
     drug = next((r["drug"] for r in facts.regimen if r["drug"] in low), None)
+    if sum(1 for r in facts.regimen if r["drug"] in low) >= 2 and FLAGS.search(q) and not (UNSEEN.search(q) or DOSES.search(q)):
+        return {"answer": _a_flags(facts, q), "source": "rules", "links": [{"tab": "today", "label": "Open Today"}, {"tab": "graph", "label": "Open Graph"}]}        # a pair: its flag, not one medicine's
     if drug and not (UNSEEN.search(q) or DOSES.search(q)):
         return {"answer": _a_drug(facts, drug), "source": "rules", "links": [{"tab": "graph", "label": "See it in the graph"}]}
     if SOLE.search(q):
@@ -314,7 +325,132 @@ def ask(question: str, facts: Facts, checker, generate=None, lang: str = "") -> 
         return {"answer": HELP, "source": "rules", "links": []}
     if REGIMEN.search(q):
         return {"answer": _a_regimen(facts), "source": "rules", "links": [{"tab": "today", "label": "Open Today"}]}
-    said = ask_model(q, facts, generate)
+    said = ask_model(q, facts, generate) if allow_model else None
     if said:
         return {"answer": said, "source": "model", "links": []}
     return {"answer": "I can't answer that from the record. " + HELP, "source": "rules", "links": []}
+
+
+# ------------------------------------------------------------------ remembering the conversation
+ORDINAL = re.compile(r"\bthe\s+(first|second|third|fourth|last|1st|2nd|3rd|4th)(\s+(one|item|entry|flag|pair|medicine|medication|thing))?\b", re.I)
+_ORD = {"first": 0, "1st": 0, "second": 1, "2nd": 1, "third": 2, "3rd": 2, "fourth": 3, "4th": 3, "last": -1}
+SWAP = re.compile(r"^\s*(?:(?:and|but|so)\s+)?(?:(?:what|how)\s+about\s+|and\s+)([A-Za-z][A-Za-z' -]{0,30}?)\s*\??\s*$", re.I)
+PRONOUN = re.compile(r"\b(it|that one|this one)\b", re.I)
+CONTEXT_HOURS = 24            # a follow-up is read against the last answer only if it was given within a day
+
+
+def _item_names(it) -> str:
+    if isinstance(it, dict):
+        return " and ".join(_title(x) for x in (it.get("drugs") or [it.get("drug", "")]) if x)
+    return _title(str(it))
+
+
+def _ctx_of(q: str, f: Facts, out: dict) -> dict:
+    """What an answer was about, in the order it listed things: the next question may refer to it ('the second one', 'and Ravi?', 'it'). Kept with the answer in the
+    circle's graph, so it is there on any device and after a restart. Only an answer from the record has one; a refusal or a model answer leaves nothing to refer to."""
+    if out.get("source") != "rules":
+        return {}
+    low = q.lower()
+    drug = next((r["drug"] for r in f.regimen if r["drug"] in low), None)
+    if sum(1 for r in f.regimen if r["drug"] in low) >= 2 and FLAGS.search(q) and not (UNSEEN.search(q) or DOSES.search(q)):
+        return {"topic": "flags", "items": [{"drugs": x.get("drugs") or [x.get("x", ""), x.get("y", "")]} for x in _flags_shown(f, q)]}
+    if drug and not (UNSEEN.search(q) or DOSES.search(q)):
+        return {"topic": "drug", "drugs": [drug], "items": [{"drug": drug}]}
+    if SOLE.search(q):
+        return {"topic": "sole", "items": [{"drug": x["drug"]} for x in (getattr(f, "sole", None) or {"sole": []})["sole"][:6]]}
+    if UNSEEN.search(q):
+        items = [{"drug": u["drug"], "carer": carer} for carer, v in f.div["carers"].items() for u in v["unacknowledged"]]
+        return {"topic": "unseen", "items": items, "carers": sorted({i["carer"] for i in items})}
+    if FLAGS.search(q):
+        return {"topic": "flags", "items": [{"drugs": x.get("drugs") or [x.get("x", ""), x.get("y", "")]} for x in _flags_shown(f, q)]}
+    if DOSES.search(q):
+        return {"topic": "doses", "items": [{"drug": g["drug"]} for g in f.gives[:6]]}
+    if RECENT.search(q):
+        return {"topic": "recent", "items": []}
+    if REGIMEN.search(q):
+        return {"topic": "regimen", "items": [{"drug": r["drug"]} for r in f.regimen], "drugs": [r["drug"] for r in f.regimen]}
+    return {}
+
+
+def _last_ctx(history, now: int) -> dict:
+    """The context of the carer's most recent answer, if it was given within CONTEXT_HOURS."""
+    for h in reversed(history or []):
+        if h.get("role") == "assistant":
+            if h.get("ctx") and (now - int(h.get("at") or 0)) <= CONTEXT_HOURS * 3_600_000:
+                return h["ctx"]
+            return {}
+    return {}
+
+
+def _carer_named(f: Facts, subject: str) -> Optional[str]:
+    s = subject.strip().lower()
+    return next((c for c in f.div["carers"] if _who(c).lower() == s or c.split("-")[0].lower() == s), None)
+
+
+def _a_unseen_for(f: Facts, carer: str) -> str:
+    u = f.div["carers"][carer]["unacknowledged"]
+    if not u:
+        return f"{_who(carer)} has seen every change on record."
+    return f"{_who(carer)} has not yet seen: " + "; ".join(f"{_title(x['drug'])} ({_h(x['age_hours'])} h ago)" for x in u) + "."
+
+
+def _listed(last: dict) -> str:
+    items = [_item_names(i) for i in (last.get("items") or [])]
+    return "; ".join(items)
+
+
+def _followup(q: str, f: Facts, last: dict):
+    """A question that leans on the one before it: ('rewrite', a question that stands alone), ('answer', text) or ('clarify', a question back). Never a guess: when what
+    it refers to cannot be told, the helper asks which one. Returns None for a question that stands on its own."""
+    low = q.lower()
+    m = ORDINAL.search(q)
+    if m:
+        items = last.get("items") or []
+        idx = _ORD[m.group(1).lower()]
+        if not items:
+            return ("clarify", "I'm not sure which one you mean: I have not listed anything yet in this chat. Say the medicine's name and I will answer.")
+        if not (-len(items) <= idx < len(items)):
+            return ("clarify", f"I only listed {len(items)}: {_listed(last)}. Which one do you mean? Say its name.")
+        return ("rewrite", q[:m.start()] + _item_names(items[idx]).lower() + q[m.end():])
+    s = SWAP.match(q)
+    if s:
+        subject = s.group(1)
+        carer, drug = _carer_named(f, subject), next((r["drug"] for r in f.regimen if r["drug"] == subject.strip().lower()), None)
+        if carer and last.get("topic") == "unseen":
+            return ("answer", _a_unseen_for(f, carer))
+        if carer and last.get("topic") in ("doses", "recent"):
+            mine = [g for g in f.gives if g["by"] == carer][:6] if last["topic"] == "doses" else []
+            if last["topic"] == "doses":
+                return ("answer", ("Recorded as given by " + _who(carer) + ": " + "; ".join(f"{_title(g['drug'])} for {g['slot']}" for g in mine) + ".") if mine else f"No doses are recorded as given by {_who(carer)}.")
+        if drug:
+            return ("rewrite", f"what is on record for {drug}")
+        if carer:
+            return ("clarify", f"Do you want to know what {_who(carer)} has not yet seen, or what {_who(carer)} recorded? Ask it in full and I will answer.")
+        return ("clarify", f"I'm not sure what you want to know about {subject.strip()}. Ask it in full, for example \"what is on record for warfarin\" or \"what has Ravi not seen\".")
+    if PRONOUN.search(q) and not any(r["drug"] in low for r in f.regimen) and not (HELPQ.search(q) or UNSEEN.search(q) or SOLE.search(q)):
+        drugs = sorted(set(last.get("drugs") or []))
+        if len(drugs) == 1:
+            return ("rewrite", PRONOUN.sub(drugs[0], q, count=1))
+        return ("clarify", "Which medicine do you mean? Say its name and I will answer.")
+    return None
+
+
+def ask(question: str, facts: Facts, checker, generate=None, lang: str = "", history=None) -> dict:
+    """A question, read in the light of the carer's last turns. {answer, source, links, ctx, ...}.
+    A follow-up ('and Ravi?', 'why is the second one flagged?', 'did anyone give it?') is read against what the last answer was about. If what it refers to cannot be
+    told, the answer is a question back, never a guess, and a model is never asked to guess it. The advice check runs on every follow-up exactly as on a first
+    question: 'should she take the second one?' is refused whether or not the helper can tell which one."""
+    q = " ".join((question or "").split())[:MAX_Q]
+    if not q or lang == "hi" or re.search("[ऀ-ॿ]", q) or EMERGENCY.search(q) or ADD.match(q):
+        return _ask_plain(question, facts, checker, generate, lang)
+    last = _last_ctx(history, facts.now)
+    ref = _followup(q, facts, last)
+    advice = bool(ADVICE_Q.search(q))
+    if ref and ref[0] in ("clarify", "answer") and not advice:
+        return {"answer": ref[1], "source": "rules", "links": [], "ctx": last}                 # asking again keeps what we were talking about
+    if ref and ref[0] == "rewrite":
+        q = ref[1]
+    unresolved = bool(ORDINAL.search(question) or SWAP.match(question) or PRONOUN.search(question)) and not (ref and ref[0] == "rewrite")
+    out = _ask_plain(q, facts, checker, generate, lang, allow_model=not unresolved)
+    out["ctx"] = last if (ref and ref[0] == "rewrite" and ORDINAL.search(question)) else _ctx_of(q, facts, out)       # explaining one item of a list does not replace the list
+    return out

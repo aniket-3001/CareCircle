@@ -208,7 +208,7 @@ card with a big number and a face, white hairline cards, dashed add tiles, a flo
 | Readings next to medicine changes | circle graph (`Measurement`, `Dose`) | tests, browser walk-through |
 | Appointments, conditions, allergy cross-check | circle graph | tests, browser walk-through |
 | Recalls, label text, name lookup | RxNorm and openFDA, name only, cached in `cc_ref` | tests with the network faked; **CI stays offline; `CC_LIVE=1 pytest tests/test_live_sources.py` calls the real services (passed 2026-10-16)** |
-| Helper (English and Hindi) | rules over the circle's facts; guarded model fallback (English only) | tests incl. advice refusals |
+| Helper (English and Hindi) | rules over the circle's facts, reading the carer's last turns for follow-ups (English; asks which one when a reference is unclear); guarded model fallback (English only) | tests incl. advice refusals |
 | Schema upgrades | versioned migrations per circle graph | tests |
 
 **Not measured:** OCR/voice accuracy at scale or on home-quality photos and accents, severity accuracy against clinical truth, any patient outcome.

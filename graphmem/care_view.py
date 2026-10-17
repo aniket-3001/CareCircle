@@ -409,7 +409,8 @@ class CareViewMixin:
     async def care_chat_ask(self, person: str, question: str, now: Optional[int] = None, daily_limit: int = 60, lang: str = "") -> dict:
         """Ask the helper assistant about this circle. Both sides of the exchange are stored for the asking carer, so the chat is there on any device.
 
-        Answers come from the circle's own record (rules first, then a guarded model); the assistant never changes anything and never advises."""
+        Answers come from the circle's own record (rules first, then a guarded model); the assistant never changes anything and never advises.
+        It reads this carer's last turns, so a follow-up ('and Ravi?', 'why is the second one flagged?') is read against what it just listed; when what a follow-up refers to cannot be told it asks which one, and the advice check applies to every follow-up."""
         import os
         from carecircle import assistant
         from .care import checker
@@ -420,14 +421,16 @@ class CareViewMixin:
         if used >= daily_limit:
             raise ValueError(f"You have used today's {daily_limit} questions for the assistant. It resets tomorrow.")
         facts = await assistant.gather(self, person, t)
-        out = await asyncio.to_thread(assistant.ask, question, facts, checker(), None, lang)
+        recent = await self._q("MATCH (m:ChatMsg {by:$me}) RETURN m.role, m.text, m.ctx, m.at ORDER BY m.at DESC LIMIT 6", {"me": me}, scope="read")
+        history = [{"role": r[0], "text": r[1], "ctx": json.loads(r[2]) if r[2] else {}, "at": r[3]} for r in reversed(recent)]
+        out = await asyncio.to_thread(assistant.ask, question, facts, checker(), None, lang, history)
         qid, aid = new_id("msg"), new_id("msg")
         links = json.dumps(out.get("links", []))
         props = json.dumps(out.get("proposals", []))
         await self._q("""CREATE (:ChatMsg {id:$q, by:$me, day:$d, role:'user', text:$qt, at:$t, links:'[]', props:'[]', source:''}),
-                         (:ChatMsg {id:$a, by:$me, day:$d, role:'assistant', text:$at, at:$t2, links:$l, props:$p, source:$s, ptext:$pt})""",
+                         (:ChatMsg {id:$a, by:$me, day:$d, role:'assistant', text:$at, at:$t2, links:$l, props:$p, source:$s, ptext:$pt, ctx:$cx})""",
                       {"q": qid, "a": aid, "me": me, "d": day, "qt": " ".join(question.split())[:300], "at": out["answer"], "t": t, "t2": t + 1,
-                       "l": links, "p": props, "s": out["source"], "pt": out.get("text", "")})
+                       "l": links, "p": props, "s": out["source"], "pt": out.get("text", ""), "cx": json.dumps(out.get("ctx") or {})})
         return {"id": aid, "role": "assistant", "text": out["answer"], "source": out["source"], "at": t + 1, "links": out.get("links", []),
                 "proposals": out.get("proposals", []), "proposal_text": out.get("text", ""), "left_today": max(0, daily_limit - used - 1)}
 
