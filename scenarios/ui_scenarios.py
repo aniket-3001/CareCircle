@@ -456,7 +456,7 @@ def u13(w, b, r):
     r.check("about 4" in pg.get_by_test_id("pack-left").first.inner_text(), "a counted pack says how many days it lasts, as an estimate", pg.get_by_test_id("pack-left").first.inner_text())
     tab(pg, "Circle")
     pg.get_by_test_id("outcomes").locator("summary").click()
-    expect(pg.get_by_test_id("out-given")).to_contain_text("1 of", timeout=15000)
+    expect(pg.get_by_test_id("out-given")).to_contain_text("doses due were marked as given", timeout=15000)      # the numbers depend on the hour the scenario runs: a slot still inside its window is not due yet
     r.check("doses due were marked as given" in pg.get_by_test_id("out-given").inner_text(), "the week in counts shows doses marked against doses due", pg.get_by_test_id("out-given").inner_text())
     r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
     ctx.close()
