@@ -41,3 +41,5 @@ docker stop dbfix && docker rm dbfix && $C up -d falkordb && $C up -d api
 ```
 
 Anything written after the snapshot and only in the crashing log is lost (that time, nothing: the log was older than the snapshot).
+
+The cause, a one-command reproduction and a draft report are in [`docs/FALKORDB_CRASH.md`](../docs/FALKORDB_CRASH.md). Since then the database no longer keeps an append-only log (snapshots every 60 seconds with a change), so this particular failure has no log to replay; to restore from the latest copy instead, use the S3 file or the EBS snapshot below.

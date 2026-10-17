@@ -1,13 +1,22 @@
 # Production-style stack: only Caddy (HTTPS) is exposed; FalkorDB and the app stay on the internal network.
 # Usage: DOMAIN=1-2-3-4.sslip.io GRAPHMEM_ADMIN_KEY=... docker compose -f deploy/docker-compose.prod.yml up -d --build
 # On AWS the app uses the instance role for Bedrock, so no keys are passed.
+x-logging: &logging              # container logs rotate: three files of 10 MB each per container, so they cannot fill the disk
+  driver: json-file
+  options: {max-size: "10m", max-file: "3"}
+
 services:
   falkordb:
     image: falkordb/falkordb@sha256:b0bdcac2cbaff989e77cb0610439b7a9289e86de033ccbbd4368b66fb680ae7a   # FalkorDB 4.22.1, pinned by digest: production, CI and local development run the same database (tests/test_pinned_database.py)
     environment:
-      REDIS_ARGS: "--appendonly yes --appendfsync everysec ${GRAPHMEM_DB_PASSWORD:+--requirepass ${GRAPHMEM_DB_PASSWORD}}"   # a password on the database itself when GRAPHMEM_DB_PASSWORD is set in deploy/.env
+      # Snapshots only (a save after 60 s with any change, or 300 s with 100): no append-only log. FalkorDB 4.22.1 crashes replaying a log in which a graph was deleted and then written again
+      # under the same name (docs/DETAILS.md, Operations; deploy/RESTORE.md), and this app does that on purpose (demo circles are rotated). A hard crash can lose the last minute; each
+      # deploy takes a backup first, and S3 and EBS snapshots sit behind that. A password on the database itself when GRAPHMEM_DB_PASSWORD is set in the environment.
+      REDIS_ARGS: "--appendonly no --save 60 1 --save 300 100 ${GRAPHMEM_DB_PASSWORD:+--requirepass ${GRAPHMEM_DB_PASSWORD}}"
       REDISCLI_AUTH: ${GRAPHMEM_DB_PASSWORD:-}          # lets the health check below authenticate
     volumes: ["falkor-data:/var/lib/falkordb/data"]
+    mem_limit: 2g                    # the host has 7.8 GB; a runaway query is stopped by the app's own caps first, and cannot take the host down
+    logging: *logging
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -35,6 +44,8 @@ services:
       AWS_REGION: ${AWS_REGION:-us-east-1}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     volumes: ["ref-data:/app/data/ref"]
+    mem_limit: 3g                    # the speech and OCR models live here: a runaway job is killed and restarted, not the whole host
+    logging: *logging
     depends_on:
       falkordb: {condition: service_healthy}
     restart: unless-stopped
@@ -43,6 +54,8 @@ services:
     command: caddy reverse-proxy --from ${DOMAIN:?set DOMAIN} --to api:8000
     ports: ["80:80", "443:443"]
     volumes: ["caddy-data:/data"]
+    mem_limit: 256m
+    logging: *logging
     depends_on: [api]
     restart: unless-stopped
 volumes:
