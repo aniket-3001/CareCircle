@@ -257,7 +257,7 @@ export function App(): React.JSX.Element {
             </section>
             <section>
               <h3>{t('AI use')}</h3>
-              <p>Built with substantial help from Claude via Claude Code. At runtime an optional Amazon Bedrock model structures text that OCR or speech recognition already read, and may phrase a helper answer from the record's facts; every quoted line must appear in the source text, answers are checked for advice and invented numbers, and a person confirms every entry.</p>
+              <p>An optional Amazon Bedrock model structures text that OCR or speech recognition already read, and may phrase a helper answer from the record's facts; every quoted line must appear in the source text, answers are checked for advice and invented numbers, and a person confirms every entry.</p>
             </section>
           </Sheet>
         </div>
