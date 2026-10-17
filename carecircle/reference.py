@@ -17,6 +17,7 @@ from pathlib import Path
 from .curated import CURATED_SUBSTRATES
 
 REF_GRAPH = "cc_ref"
+REF_VERSION = 2          # bump when the shape of the reference graph changes: start-up reloads it when the stored version is older (2: laboratory and transporter tables)
 DATA = Path(__file__).resolve().parent.parent / "data" / "ref"
 
 
@@ -148,6 +149,7 @@ def load(host: str = "localhost", port: int = 6379, data_dir: Path = DATA) -> di
     sub += [{"d": d, "e": e, "src": "curated (unverified)"} for d, e, *_ in CURATED_SUBSTRATES]
     g.query("UNWIND $r AS x MATCH (d:Drug {name:x.d}) MATCH (e:Enzyme {name:x.e}) "
             "CREATE (d)-[:SUBSTRATE_OF {source:x.src}]->(e)", {"r": sub})
+    g.query("MERGE (m:Meta {key:'ref'}) SET m.version = $v, m.loaded_at = timestamp()", {"v": REF_VERSION})
     return {"drugs": len(names), "interacts": len(rows), "enzymes": len(enzymes), "transporters": len(transporters), "fda": {k: len(v) for k, v in fda.items()}}
 
 

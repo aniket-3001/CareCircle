@@ -14,7 +14,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def ref_ready() -> bool:
     try:
         g = FalkorDB(host=HOST, port=PORT, password=os.getenv("GRAPHMEM_DB_PASSWORD") or None).select_graph("cc_ref")
-        return g.ro_query("MATCH (d:Drug) RETURN count(d)").result_set[0][0] > 1000
+        from carecircle.reference import REF_VERSION
+        if g.ro_query("MATCH (d:Drug) RETURN count(d)").result_set[0][0] <= 1000:
+            return False
+        have = g.ro_query("MATCH (m:Meta {key:'ref'}) RETURN m.version").result_set
+        return bool(have) and have[0][0] >= REF_VERSION               # an older shape is reloaded before the API starts
     except Exception:
         return False
 
