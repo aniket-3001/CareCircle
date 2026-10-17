@@ -101,3 +101,75 @@ async def test_the_loop_needs_no_telegram_token_when_web_push_is_on(monkeypatch)
     assert reminders.wanted() is True
     monkeypatch.delenv("CC_VAPID_PUBLIC")
     assert reminders.wanted() is False
+
+
+class FakePush:
+    """Stands in for carecircle.webpush inside the delivery loop: each call answers from a script of per-device outcomes."""
+    def __init__(self, script):
+        self.script, self.calls = list(script), 0
+
+    def enabled(self):
+        return True
+
+    async def push_status(self, gm, agent, text, tab="circle"):
+        self.calls += 1
+        return self.script.pop(0) if self.script else {"sent": 0, "failed": 0, "gone": 0}
+
+
+async def test_a_web_push_the_service_refused_is_handed_back_and_delivered_on_the_next_pass(gm):
+    """N4: a 503 or a timeout made push return 0 without raising, the loop read that as 'no device', and the reminder stayed used up."""
+    t, m = await circle(gm, link=False)
+    day = date(2026, 10, 17)
+    now = at(day, "08:10")
+    r = Reminders(gm, None)
+    fake = FakePush([{"sent": 0, "failed": 1, "gone": 0}, {"sent": 1, "failed": 0, "gone": 0}])
+    n = (await m.care_slot_nudges("asha", now=now))
+    assert n and n[0]["notify"] == "ravi"
+    assert await r._send(m, n[0], {"ravi"}, {}, fake) == 0                          # the push service answered 503: nothing delivered
+    again = await m.care_slot_nudges("asha", now=now + 60_000)
+    assert [x["claim"] for x in again] == [n[0]["claim"]]                           # handed back: produced again
+    assert await r._send(m, again[0], {"ravi"}, {}, fake) == 1
+    assert await m.care_slot_nudges("asha", now=now + 120_000) == []                # delivered once, not again
+
+
+async def test_a_device_that_is_gone_or_no_device_is_nowhere_to_go_and_not_retried(gm):
+    t, m = await circle(gm, link=False)
+    now = at(date(2026, 10, 17), "08:10")
+    r = Reminders(gm, None)
+    n = (await m.care_slot_nudges("asha", now=now))
+    assert await r._send(m, n[0], {"ravi"}, {}, FakePush([{"sent": 0, "failed": 0, "gone": 1}])) == 0
+    assert await m.care_slot_nudges("asha", now=now + 60_000) == []                 # the push service said unsubscribed: not retried for ever
+
+
+async def test_push_status_counts_a_service_failure_apart_from_a_gone_device(monkeypatch):
+    from carecircle import webpush
+    monkeypatch.setattr(webpush, "enabled", lambda: True)
+
+    async def subs(gm, agent):
+        return [{"endpoint": f"https://fcm.googleapis.com/{i}", "p256dh": "k", "auth": "a"} for i in range(3)]
+
+    async def gone(gm, agent, endpoint="") -> int:
+        return 1
+    outcomes = iter([None, False, True])
+    monkeypatch.setattr(webpush, "subscriptions", subs)
+    monkeypatch.setattr(webpush, "unsubscribe", gone)
+    monkeypatch.setattr(webpush, "_send_one", lambda sub, payload: next(outcomes))
+    assert await webpush.push_status(None, "ravi", "x") == {"sent": 1, "failed": 1, "gone": 1}
+
+
+async def test_the_preview_does_not_call_a_handed_back_or_given_up_reminder_delivered(gm):
+    """H21 claimed this and the preview said 'delivered' for a reminder whose send had failed."""
+    t = tid(gm, "rv")
+    for a in ("ravi", "meena"):
+        await gm.grant(a, t, ("read", "write", "admin"))
+    ra, rb = gm.open("ravi", t), gm.open("meena", t)
+    await rb.care_record("asha", "metformin", dose_text="500 mg", freq_text="daily", at=1_000)
+    await ra.care_record("asha", "warfarin", dose_text="5 mg", freq_text="daily", at=2_000)
+    now = 2_000 + 6 * H
+    sent = await ra.care_nudges("asha", now=now)
+    assert sent and {x["notify"]: x["delivered"] for x in await ra.care_reminders("asha", now=now)}[sent[0]["notify"]] is True      # claimed and not handed back: sent
+    await ra.care_nudge_release(sent[0]["claim"], MAX_TRIES)
+    assert {x["notify"]: x["delivered"] for x in await ra.care_reminders("asha", now=now)}[sent[0]["notify"]] is False      # handed back: not delivered
+    for _ in range(MAX_TRIES + 1):
+        await ra.care_nudge_release(sent[0]["claim"], MAX_TRIES)
+    assert {x["notify"]: x["delivered"] for x in await ra.care_reminders("asha", now=now)}[sent[0]["notify"]] is False      # given up: still not delivered

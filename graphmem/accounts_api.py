@@ -190,8 +190,8 @@ def mount(app: FastAPI, gm: GraphMem, agent_id, demo_on: bool) -> Accounts:
 
     @app.post("/v1/push/test")
     async def push_test(agent: str = Depends(agent_id)):
-        n = await webpush.push(gm, agent, "Notifications are on. You will get reminders about changes you have not yet seen.")
-        return {"sent": n}
+        r = await webpush.push_status(gm, agent, "Notifications are on. You will get reminders about changes you have not yet seen.")
+        return {"sent": r["sent"], "failed": r["failed"]}
 
     @app.delete("/v1/push/subscribe")
     async def push_unsubscribe(agent: str = Depends(agent_id)):

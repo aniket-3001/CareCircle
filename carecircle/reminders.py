@@ -95,10 +95,9 @@ class Reminders:
             if agent.lower() == n["notify"] and webpush.enabled():
                 tried += 1
                 try:
-                    k = await webpush.push(self.gm, agent, text)
-                    got += k
-                    if k == 0:
-                        pass                                        # no device allowed notifications: that is "nowhere to go", not a failure
+                    r = await webpush.push_status(self.gm, agent, text)
+                    got += r["sent"]
+                    failed += r["failed"]                           # a 503 or a timeout is a failure to retry; a device that is gone, or none allowed, is "nowhere to go"
                 except Exception as e:
                     failed += 1
                     print("reminder push error", type(e).__name__, flush=True)

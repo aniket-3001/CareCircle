@@ -364,6 +364,8 @@ class CareMixin:
             await self._guard("write")
         rows = await self._q("MATCH (n:Nudge {key:$k}) WHERE coalesce(n.tries, 0) < $m SET n.fresh = true, n.tries = coalesce(n.tries, 0) + 1 RETURN n.tries",
                              {"k": claim, "m": max_tries}, checked=True)
+        if not rows:
+            await self._q("MATCH (n:Nudge {key:$k}) SET n.gave_up = true", {"k": claim}, checked=True)       # kept used, but not delivered: the preview must not say it was
         return bool(rows)
 
     async def care_reminders(self, person: str, now: Optional[int] = None, remind_after_h: float = 4, escalate_after_h: float = 12) -> list[dict]:
@@ -379,7 +381,7 @@ class CareMixin:
                     todo += [("escalate", o) for o in div["carers"] if o != carer]
                 for kind, to in todo:
                     key = f"{kind}|{carer}|{u['dose']}|{to}"
-                    sent = (await self._q("MATCH (n:Nudge {key:$k}) RETURN count(n)", {"k": key}, scope="read"))[0][0] > 0
+                    sent = (await self._q("MATCH (n:Nudge {key:$k}) WHERE n.fresh = false AND coalesce(n.gave_up, false) = false RETURN count(n)", {"k": key}, scope="read"))[0][0] > 0
                     facts = {"drug": u["drug"], "hours": u["age_hours"], "carer": carer}
                     tpl = (f"{carer.split(chr(45))[0].capitalize()} has not yet seen the change to {u['drug']} made {u['age_hours']} hours ago. Please check with them.") if kind == "escalate" else (
                           f"The change to {u['drug']} made {u['age_hours']} hours ago is not yet acknowledged. Please open it and confirm.")

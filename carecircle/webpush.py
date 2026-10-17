@@ -112,15 +112,24 @@ def _send_one(sub: dict, payload: dict) -> Optional[bool]:
         return None
 
 
-async def push(gm, agent: str, text: str, tab: str = "circle") -> int:
-    """Send one notification to every device this account allowed. Returns how many were delivered."""
+async def push_status(gm, agent: str, text: str, tab: str = "circle") -> dict:
+    """Send one notification to every device this account allowed. {sent, failed, gone}: `failed` counts devices whose push service did not take it (a 5xx, a
+    timeout, a refused connection), which is NOT the same as having no device, and `gone` those it reported unsubscribed (removed)."""
+    out = {"sent": 0, "failed": 0, "gone": 0}
     if not enabled():
-        return 0
-    sent = 0
+        return out
     for sub in await subscriptions(gm, agent):
         ok = await asyncio.to_thread(_send_one, sub, {"title": "Care Circle", "body": text, "tab": tab})
         if ok:
-            sent += 1
+            out["sent"] += 1
         elif ok is False:
+            out["gone"] += 1
             await unsubscribe(gm, agent, sub["endpoint"])
-    return sent
+        else:
+            out["failed"] += 1
+    return out
+
+
+async def push(gm, agent: str, text: str, tab: str = "circle") -> int:
+    """How many devices were delivered to (see push_status for the ones that failed)."""
+    return (await push_status(gm, agent, text, tab))["sent"]
