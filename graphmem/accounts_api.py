@@ -136,7 +136,7 @@ def mount(app: FastAPI, gm: GraphMem, agent_id, demo_on: bool) -> Accounts:
     async def auth_config():
         return {"provider": "cognito" if cfg else "local",
                 "cognito": {"region": cfg.region, "userPoolId": cfg.pool_id, "clientId": cfg.client_id} if cfg else None,
-                "demo_accounts": [{"email": e, "name": n, "password": DEMO_PASSWORD} for e, n in DEMO_ACCOUNTS] if demo_on else [],
+                "demo_accounts": [{"email": e, "name": n, "password": DEMO_PASSWORD} for e, n in DEMO_ACCOUNTS] if demo_on and not cfg else [],      # never beside Cognito: a published password there is a Cognito login
                 "password_rule": "At least 8 characters, with a letter and a number.", "cookie_sessions": COOKIE_MODE}
 
     @app.post("/v1/auth/signup")
@@ -159,6 +159,8 @@ def mount(app: FastAPI, gm: GraphMem, agent_id, demo_on: bool) -> Accounts:
             claims = cog.verify_id_token(_bearer(authorization), cfg)
         except ValueError:
             raise AuthProblem("Your sign-in could not be checked. Sign in again.", 401)
+        if claims["email"].strip().lower() in {e for e, _ in DEMO_ACCOUNTS}:           # a Cognito user with the public demo password holds tokens Cognito itself honours (ChangePassword, DeleteUser, GlobalSignOut), which this server cannot veto
+            raise AuthProblem("The shared demo accounts are not available with Amazon Cognito sign-in. Use Start a demo circle, or create your own account.", 403)
         if not await acc.hit(f"exchange|{claims['sub']}", 30, 900):
             raise AuthProblem("Too many tries. Wait a few minutes.", 429)
         return await session_for(await acc.upsert_cognito(claims["email"], claims["sub"], b.name or claims.get("name", "")), request, response)
@@ -241,6 +243,7 @@ def mount(app: FastAPI, gm: GraphMem, agent_id, demo_on: bool) -> Accounts:
 
     @app.post("/v1/account/signout-all")
     async def signout_all(agent: str = Depends(agent_id)):
+        await not_shared_demo(agent, "signing out of all devices")                   # it would end every other visitor's session on the same account
         return await acc.sign_out_everywhere(agent)
 
     @app.get("/v1/account/export")

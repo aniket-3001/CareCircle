@@ -435,3 +435,31 @@ async def test_the_demo_circle_is_built_on_an_empty_graph_even_if_an_old_one_was
         for email, _ in accmod.DEMO_ACCOUNTS:
             await ctl.query("MATCH (a:Account {email:$e}) OPTIONAL MATCH (a)<-[:OF]-(s:Session) DETACH DELETE s, a", {"e": email})
             await ctl.query("MATCH (g:Agent) WHERE g.id STARTS WITH $p DETACH DELETE g", {"p": email.split("@")[0].split(".")[0] + "-"})
+
+
+async def test_shared_demo_accounts_cannot_sign_everyone_out(client, gm):
+    """'Sign out of all devices' was hidden for the shared demo accounts but open on the API: one visitor ended every other visitor's session."""
+    from carecircle import demo
+    accs = accmod.Accounts(gm)
+    try:
+        await demo.seed_shared(gm, accs)
+        d = (await client.get("/v1/auth/config")).json()["demo_accounts"][0]
+        one = (await client.post("/v1/auth/signin", json={"email": d["email"], "password": d["password"]})).json()["token"]
+        two = (await client.post("/v1/auth/signin", json={"email": d["email"], "password": d["password"]})).json()["token"]
+        assert (await client.post("/v1/account/signout-all", headers=auth(one))).status_code == 403
+        assert (await client.get("/v1/account", headers=auth(two))).status_code == 200
+    finally:
+        await gm.db.drop_tenant(accmod.SHARED_CIRCLE)
+        ctl = await gm._ctl()
+        await ctl.query("MATCH (t:Tenant {id:$c}) DETACH DELETE t", {"c": accmod.SHARED_CIRCLE})
+        for email, _ in accmod.DEMO_ACCOUNTS:
+            await ctl.query("MATCH (a:Account {email:$e}) OPTIONAL MATCH (a)<-[:OF]-(s:Session) DETACH DELETE s, a", {"e": email})
+
+
+async def test_with_cognito_the_shared_demo_accounts_are_neither_published_nor_exchanged(cognito_client):
+    """Beside Cognito, a published password is a Cognito login: its holder gets tokens for Cognito's own ChangePassword / DeleteUser, which this server never sees."""
+    c = cognito_client
+    assert (await c.get("/v1/auth/config")).json()["demo_accounts"] == []
+    for email, _ in accmod.DEMO_ACCOUNTS:
+        r = await c.post("/v1/auth/exchange", json={}, headers=auth(_token(c.key, email=email)))
+        assert r.status_code == 403
