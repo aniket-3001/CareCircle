@@ -43,11 +43,28 @@ def b1():
     return out
 
 
+def _sql_staleness(entries, authored, acks, carers):
+    """The same question answered with SQLite: an entries table and an acknowledgements table, the current entry per medicine by a window function.
+    It is here so the benchmark can say plainly that a table does this job too."""
+    import sqlite3
+    db = sqlite3.connect(":memory:")
+    db.execute("CREATE TABLE entries(id TEXT, drug TEXT, at INTEGER, ord INTEGER, author TEXT)")
+    db.execute("CREATE TABLE acks(carer TEXT, id TEXT)")
+    db.executemany("INSERT INTO entries VALUES(?,?,?,?,?)", [(did, d, at, o, authored[did]) for d, at, o, did in entries])
+    db.executemany("INSERT INTO acks VALUES(?,?)", [(a, i) for a, s in acks.items() for i in s])
+    out = {}
+    for a in carers:
+        rows = db.execute("""SELECT id FROM (SELECT id, author, ROW_NUMBER() OVER (PARTITION BY drug ORDER BY at DESC, ord DESC) AS rn FROM entries)
+                              WHERE rn = 1 AND author <> ? AND id NOT IN (SELECT id FROM acks WHERE carer = ?)""", (a, a)).fetchall()
+        out[a] = {r[0] for r in rows}
+    return out
+
+
 async def b2(circles, seed):
     rng = random.Random(seed)
     gm = GraphMem(Db())
     drugs = ["warfarin", "simvastatin", "clarithromycin", "metformin", "amlodipine", "fluconazole", "omeprazole", "metoprolol"]
-    ok_set = ok_rank = base_ok = 0
+    ok_set = ok_rank = base_ok = sql_ok = 0
     made = []
     try:
         for c in range(circles):
@@ -88,6 +105,7 @@ async def b2(circles, seed):
             ok_set += all({u["dose"] for u in got[a]["unacknowledged"]} == truth[a] for a in carers)
             tr = sorted(carers, key=lambda a: (-len(truth[a]), a))[0] if any(truth.values()) else None
             ok_rank += (tr is None) or (len(truth[(await m["c1"].care_divergence("p"))["most_out_of_date"] or tr]) >= max(len(v) for v in truth.values()) - 1)
+            sql_ok += _sql_staleness(entries, authored, acks, carers) == truth    # a fair baseline: two plain tables and one query
             last = ids[-1]                                              # baseline: only the most recent change, whatever medicine it was about
             base_ok += all(({last} - acks[a] if authored[last] != a else set()) == truth[a] for a in carers)
     finally:
@@ -97,7 +115,7 @@ async def b2(circles, seed):
         await ctl.query("MATCH (n) WHERE (n:Agent OR n:Tenant) AND (n.id IN ['c1','c2','c3'] OR n.id STARTS WITH 'b2-') DETACH DELETE n")
         await ctl.query("MATCH (k:ApiKey) WHERE NOT ()-[:HAS_KEY]->(k) DELETE k")
     return dict(circles=circles, exact_match_with_oracle=f"{ok_set}/{circles}", most_stale_carer_plausible=f"{ok_rank}/{circles}",
-                baseline_last_change_only_exact=f"{base_ok}/{circles}")
+                baseline_last_change_only_exact=f"{base_ok}/{circles}", baseline_two_sql_tables_exact=f"{sql_ok}/{circles}")
 
 
 async def b3(rounds, width=10):

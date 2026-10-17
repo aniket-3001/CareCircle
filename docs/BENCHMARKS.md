@@ -17,7 +17,7 @@ they are shown as unrated, never as safe. Caveat: "also listed" cross-checks agr
 
 ## B2 Carer-staleness query vs an independent oracle
 40 generated circles (3 carers, 3-8 changes, random acknowledgements). The Cypher-based query returns exactly the oracle's set of
-unacknowledged changes for every carer in **40/40** circles. Baseline "only track each carer's most recent change" is exact in **4/40**.
+unacknowledged changes for every carer in **40/40** circles. A weak baseline ("only track each carer's most recent change") is exact in **4/40**. A fair baseline, two SQLite tables (entries, acknowledgements) and one window-function query, is exact in **40/40**: this benchmark shows the graph query is correct, not that a table could not do it.
 The oracle states the rule independently of the code: a carer is behind on a medicine when the entry that stands now (by date) is someone else's and they have not seen it. Entries typed again unchanged record nothing, and a medicine can only be stopped once it is on the record. (The benchmark was re-run after the scenario fixes, which tightened these rules; it had gone out of date, and the oracle was brought in line with the rules as documented in `docs/SCENARIOS.md`, not with whatever the code returned.)
 This shows correctness of the graph query against an independently written oracle; it does not show clinical benefit.
 

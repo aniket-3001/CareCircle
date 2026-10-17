@@ -61,7 +61,7 @@ The reference knowledge (about 218,000 interaction pairs, enzyme links), every c
 | Feature | What the graph does | Without it |
 |---|---|---|
 | Interaction check | `(a:Drug)-[:INTERACTS {level}]-(b:Drug)` over the regimen, plus a 2-hop enzyme path `(x)-[:INHIBITS]->(:Enzyme)<-[:SUBSTRATE_OF]-(y)` | no shared knowledge to check against |
-| Who has not seen a change | `(:Carer)-[:ACKED]->(:Dose)` absence per carer; age-weighted divergence | a simple baseline that only remembers each carer's latest change misses unseen changes in most of the 40 generated circles (it is exact in 4/40); the graph query matches an independent oracle in 40/40. A table of acknowledgements does the same job, so this is correctness, not a claim that only a graph can do it |
+| Who has not seen a change | `(:Carer)-[:ACKED]->(:Dose)` absence per carer; age-weighted divergence | the graph query matches an independent oracle in 40/40 generated circles. A weak baseline (only the latest change) is exact in 4/40, but a fair one, two SQL tables and one window-function query, is also exact in 40/40 (`bench/care_bench.py`). So this is correctness, and a table could do it; the graph's part here is that it sits with the rest of the record |
 | History, "what did we know then?" | `Dose -[:SUPERSEDES]-> Dose` with `valid_from/valid_to`; as-of queries | overwrites lose the past |
 | No double dose | one `MERGE (:Give {key})` claim per slot, single atomic query | two carers both think they gave it (one winner in each of 100 test rounds of 10 concurrent claims on one engine; a database-level atomic claim, not a proof) |
 | Verified intake | each entry keeps `source_type` and the exact `quote` from the OCR/transcript | an unexplained entry |
@@ -239,7 +239,7 @@ card with a big number and a face, white hairline cards, dashed add tiles, a flo
 
 ## Measured (one laptop; B-series and load test repeated 7 times each, see `docs/BENCHMARKS.md`)
 - **Enzyme-path rule vs DDInter:** of 38 pairs flagged through FDA substrates, 31 are also in DDInter, all moderate/major; the rule recovers 61 of 145 moderate/major pairs between the same drug sets (42%): precise but narrow, so it supplements the direct lookup.
-- **Carer staleness (graph query vs independent oracle):** exact in 40/40 generated circles; a "last change only" baseline is exact in 4/40 (it is the simplest log, not the best possible non-graph design).
+- **Carer staleness (graph query vs independent oracle):** exact in 40/40 generated circles; the weak "last change only" baseline is exact in 4/40; a fair two-table SQL baseline is exact in 40/40, so this result does not favour the graph over a table.
 - **Double-dose guard:** one winner in 100 of 100 test rounds of 10 concurrent claims (single process, one engine).
 
 - **Interaction check latency:** 16 ms median (range 12-18 over 7 runs) and 20 ms at the 95th percentile (range 16-24), for a 10-medicine regimen (direct pairs, enzyme paths and combined weight in three reads), warm, one process, FalkorDB 4.22.1 (`bench/care_bench.py`, B5). The exact results (B1-B3) were identical in all 7 runs.
