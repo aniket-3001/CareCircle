@@ -20,10 +20,11 @@ Live: **https://3-228-70-117.sslip.io** (press **Start a demo circle**; syntheti
 
 ## Why it is different
 
+- **It does the daily job.** A written "twice daily" becomes suggested clock times that a person confirms; **Today** then lists each dose slot, who marked it given, and what is not marked yet, and a second carer who taps the same slot is told who got there first. A short course ends on its last day, and a pack count says about how many days of doses are left.
 - **One memory for the whole circle.** Not a chat per person: one graph that says what is on record now, what it replaced, and which carer has not yet seen the change.
 - **Every flag shows its work.** The source (DDInter 2.0 or the FDA table), the edge it came from, and the exact line of the photo or voice note that produced the entry. A pair the source lists without a severity is shown *unrated*, never "safe".
 - **Code decides, AI only structures.** A model may turn OCR or a transcript into *proposed* fields; each proposal's quote must appear in the text that was read, and nothing reaches the regimen until a person confirms it. It never decides an interaction or a dose.
-- **The graph is the product.** Reference knowledge (224,449 interaction pairs, enzyme links), every circle's history, who has seen what, the once-per-slot dose guard and the access grants all live in FalkorDB, one graph per circle.
+- **The graph holds the record.** Reference knowledge (224,449 interaction pairs, enzyme links), every circle's history, who has seen what, the once-per-slot dose guard and the access grants all live in FalkorDB, one graph per circle.
 - **Agents can use the same memory.** An MCP endpoint, LangChain and LlamaIndex tools and graph algorithms (paths, PageRank, betweenness, communities) run on a circle's graph, with the same keys and read-only checks.
 
 Built with Claude as a coding assistant (see [AI use disclosure](#ai-use-disclosure)).
@@ -34,7 +35,7 @@ Built with Claude as a coding assistant (see [AI use disclosure](#ai-use-disclos
 2. **Add**, then **Sample label**: a synthetic pharmacy label is read by OCR. You see the proposed entry, the exact line it came from and a *quote verified* badge. Nothing is saved yet. Confirm it.
 3. **Today** now flags clarithromycin with atorvastatin as *major*, with the enzyme path behind it. Open the flag to see the source.
 4. **Circle**: Meena has not acknowledged the change. Slide the time warp 13 hours: a reminder for Meena, then an escalation to Ravi, each exactly once.
-5. **Graph**: watch the circle assemble, click the clarithromycin node and the red line: both explain themselves in words. Below it, the cards **What the record hangs on** and **What belongs together** run PageRank, betweenness, groups and paths on this circle's own graph.
+5. **Graph**: watch the circle assemble, click the clarithromycin node and the red line: both explain themselves in words. Open **Inspect the graph** below it for the cards **What the record hangs on** and **What belongs together**: PageRank, betweenness, groups and paths on this circle's own graph (for developers and judges).
 6. Point an agent at it: [Connect your agent stack](#connect-your-agent-stack). The full 90-second script is [The demo story](#the-demo-story-90-seconds).
 
 ## What it does
