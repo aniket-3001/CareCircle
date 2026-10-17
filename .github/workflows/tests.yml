@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
-      - run: pip install -r requirements.txt -r requirements-integrations.txt -c constraints.txt
+      - run: pip install --require-hashes -r requirements-ci.lock
       - uses: actions/cache@v4            # the DDInter portal is slow and sometimes down: keep the verified copy (scripts/fetch_reference.py checks it against its manifest)
         with:
           path: data/ref
