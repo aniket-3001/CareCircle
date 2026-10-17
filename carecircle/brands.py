@@ -94,13 +94,24 @@ def set_table(table: dict, from_graph: bool = False) -> None:
 set_table(COMBINATIONS)
 
 
+_SEP = r"[\s\-_.]*"
+_STRENGTH = r"(?:\d+(?:\.\d+)?(?:/\d+(?:\.\d+)?)?\s*(?:mg|mcg)?" + _SEP + r")?"
+
+
+def _pattern(brand: str) -> str:
+    """The brand as it may be printed: case, spaces and hyphens do not matter, and a strength may sit between its parts ("Telma 40 AM" for Telma-AM), as
+    prescriptions are often written. The strength stays inside the matched span, so the quote still occurs in the source exactly."""
+    parts = [squash(p) for p in re.split(r"[\s\-_.]+", brand) if squash(p)]
+    return r"(?<![a-z0-9])" + (_SEP + _STRENGTH).join(_SEP.join(re.escape(ch) for ch in p) for p in parts) + r"(?![a-z])"
+
+
 def find(text: str) -> list[tuple[str, list[str], int, int]]:
     """Every combination brand named in `text`, as (brand, ingredients, start, end) in the ORIGINAL text. Case, spaces and hyphens do not matter
     ("Telma AM", "TELMA-AM", "telmaam"). A name must stand on its own: it is not taken from inside a longer word."""
     out, taken = [], []
     for key in _ORDER:
         brand, ingredients = _INDEX[key]
-        pattern = r"(?<![a-z0-9])" + r"[\s\-_.]*".join(re.escape(ch) for ch in key) + r"(?![a-z])"
+        pattern = _pattern(brand)
         for m in re.finditer(pattern, text.lower()):
             if any(m.start() < e and s < m.end() for s, e in taken):
                 continue

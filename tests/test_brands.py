@@ -185,3 +185,24 @@ def test_a_brand_added_only_to_the_graph_is_found_by_the_reader(ch):
     finally:
         ch.g.query("MATCH (b:Brand {key:'zzcombo'}) DETACH DELETE b")
         ch.load_brands()
+
+
+@pytest.mark.parametrize("text, kept", [
+    ("Telma-AM 40 once daily\nAmlodipine 5 mg at night", {("Telma-AM", "telmisartan"), ("Telma-AM", "amlodipine"), ("", "amlodipine")}),
+    ("Amlodipine 5 mg at night\nTelma-AM 40 once daily", {("Telma-AM", "telmisartan"), ("Telma-AM", "amlodipine"), ("", "amlodipine")}),
+    ("Glycomet-GP 1\nMetformin 500 mg twice daily", {("Glycomet-GP", "metformin"), ("Glycomet-GP", "glimepiride"), ("", "metformin")}),
+    ("Metformin 500 mg twice daily\nGlycomet-GP 1", {("Glycomet-GP", "metformin"), ("Glycomet-GP", "glimepiride"), ("", "metformin")}),
+    ("Shelcal\nCalcirol-D3\nOnce weekly", {("Shelcal", "calcium carbonate"), ("Shelcal", "cholecalciferol"), ("Calcirol-D3", "cholecalciferol")}),
+    ("Telma 40 AM\nonce daily", {("Telma-AM", "telmisartan"), ("Telma-AM", "amlodipine")}),
+])
+def test_no_ingredient_is_lost_to_the_order_of_the_lines(text, kept):
+    """A later plain line used to delete an earlier proposal for the same medicine that had no dose (a combination's ingredient never has one)."""
+    got = {(p.get("combination", ""), p["drug_candidates"][0]["name"]) for p in intake.propose(text, Checker())}
+    assert got == kept, text
+
+
+def test_a_four_line_prescription_loses_nothing_and_the_unlisted_one_is_flagged():
+    got = intake.propose("Rx\nTelma 40 AM\nonce daily\nStamlo Beta\n1 tab night", Checker())
+    names = {(p.get("combination", ""), p["drug_candidates"][0]["name"]) for p in got}
+    assert {("Telma-AM", "telmisartan"), ("Telma-AM", "amlodipine")} <= names
+    assert any(p.get("possible_combination") == "Stamlo Beta" for p in got)        # the one the table does not list is flagged, not dropped
