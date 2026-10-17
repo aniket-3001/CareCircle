@@ -161,9 +161,10 @@ def load(host: str = "localhost", port: int = 6379, data_dir: Path = DATA) -> di
     g.query("CREATE INDEX FOR (b:Brand) ON (b.key)")
     g.query("CREATE INDEX FOR (i:Ingredient) ON (i.name)")
     for brand, ings in COMBINATIONS.items():                         # (:Brand)-[:CONTAINS {pos}]->(:Ingredient)-[:IS]->(:Drug): the ingredient is linked to the interaction data where the data has it
-        g.query("MERGE (b:Brand {key:$k}) SET b.name = $n, b.source = $s WITH b UNWIND range(0, size($i) - 1) AS p "
-                "MERGE (i:Ingredient {name:$i[p]}) CREATE (b)-[:CONTAINS {pos:p}]->(i)", {"k": squash(brand), "n": brand, "s": BRAND_SOURCE, "i": ings})
-    g.query("MATCH (i:Ingredient) MATCH (d:Drug {name:i.name}) MERGE (i)-[:IS]->(d)")
+        g.query("MERGE (b:Brand {key:$k}) SET b.name = $n, b.source = $s", {"k": squash(brand), "n": brand, "s": BRAND_SOURCE})
+        g.query("MATCH (b:Brand {key:$k}) UNWIND $r AS x MERGE (i:Ingredient {name:x.i}) CREATE (b)-[:CONTAINS {pos:x.p}]->(i)",
+                {"k": squash(brand), "r": [{"i": i, "p": p} for p, i in enumerate(ings)]})
+    g.query("UNWIND $n AS x MATCH (i:Ingredient {name:x}) MATCH (d:Drug {name:x}) MERGE (i)-[:IS]->(d)", {"n": sorted({i for ings in COMBINATIONS.values() for i in ings})})
     g.query("MERGE (m:Meta {key:'ref'}) SET m.version = $v, m.loaded_at = timestamp()", {"v": REF_VERSION})
     return {"drugs": len(names), "interacts": len(rows), "enzymes": len(enzymes), "transporters": len(transporters), "classes": len(CLASS_TABLE), "brands": len(COMBINATIONS), "fda": {k: len(v) for k, v in fda.items()}}
 
