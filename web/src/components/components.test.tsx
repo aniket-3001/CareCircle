@@ -46,6 +46,22 @@ describe('Flags', () => {
   });
 });
 
+describe('Flags: laboratory findings', () => {
+  const lab = { kind: 'enzyme_path', path: 'quinidine -INHIBITS(in vitro)-> P-gp <-SUBSTRATE_OF- digoxin', meaning: 'quinidine may raise exposure of digoxin through the P-gp transporter (a laboratory finding, not shown in people)',
+    weight: 0.1, also_in_ddinter: false, source: 'FDA transporter in vitro table (laboratory finding); substrate: FDA', x: 'quinidine', y: 'digoxin', enzyme: 'P-gp', relation: 'INHIBITS', strength: 'in vitro', target: 'transporter' };
+  it('labels a transporter path as a lab finding and says so in words', () => {
+    const out = html(<Flags check={check({ enzyme_paths: [lab] })} />);
+    expect(out).toContain('transporter path');
+    expect(out).toContain('lab finding');
+    expect(out).toContain('not shown in people');
+  });
+  it('a laboratory finding alone colours the page as minor, not moderate', async () => {
+    const { worstSeverity } = await import('../design/levels');
+    expect(worstSeverity(check({ enzyme_paths: [lab] }))).toBe('minor');
+    expect(worstSeverity(check({ enzyme_paths: [lab, { ...lab, strength: 'strong' }] }))).toBe('moderate');
+  });
+});
+
 describe('Hero (the status card)', () => {
   it('with no flags is neutral and carries the not-a-statement-of-safety line', () => {
     const out = html(<Hero check={check()} chips={[]} />);

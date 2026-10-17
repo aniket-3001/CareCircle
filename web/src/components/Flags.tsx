@@ -43,7 +43,7 @@ export function Flags({ check }: { check: CheckResult }): React.JSX.Element {
           <div className="row row--wrap">
             <b>{f.meaning.charAt(0).toUpperCase() + f.meaning.slice(1)}</b>
             <Pill tone="info">
-              <Route size={12} aria-hidden="true" /> enzyme path
+              <Route size={12} aria-hidden="true" /> {f.target === 'transporter' ? 'transporter path' : 'enzyme path'}{f.strength === 'in vitro' ? ' · lab finding' : ''}
             </Pill>
           </div>
           <span className="muted small">

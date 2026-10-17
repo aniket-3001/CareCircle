@@ -131,6 +131,8 @@ export interface EnzymePath {
   enzyme: string;
   relation: 'INHIBITS' | 'INDUCES';
   strength: string;
+  /** 'transporter' when the shared protein is a transporter rather than a liver enzyme. */
+  target?: 'enzyme' | 'transporter';
 }
 
 export interface Judgement {

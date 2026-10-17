@@ -39,5 +39,5 @@ The review that prompted this log observed that the product guarded against the 
 - **A pharmacist link that was forwarded.** Whoever holds the link can read it until it expires or is closed; the owner sees how many times it was opened, not by whom.
 - **A reminder whose every channel keeps failing.** After five tries it is left used; nobody is told it was dropped. The Circle screen still shows the dose as not marked.
 - **Cookie sessions are off on the live site.** Until `CC_COOKIE_SESSIONS=1` is set there, the session token sits in the browser's storage and an injected script could read it; the page has no known injection, and React escapes what it renders, but that is the residual risk.
-- **Interaction data that is wrong or missing.** DDInter has a quarter of its pairs without a severity, and the enzyme layer touches 32 of 1,833 medicines (README, "Limits").
+- **Interaction data that is wrong or missing.** DDInter has a quarter of its pairs without a severity, and the enzyme layer touches 32 of 1,833 medicines from clinical tables, 63 counting laboratory findings (README, "Limits").
 - **Real-world accuracy of photo and voice reading.** Measured on synthetic labels and a handful of real photos only (`docs/BENCHMARKS.md`, B4 and B4b).

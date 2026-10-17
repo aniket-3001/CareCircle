@@ -56,10 +56,16 @@ def _drugs(cell: str) -> list[str]:
     return out
 
 
+def _enzyme_name(cell: str) -> str:
+    """'CYP3A4/5' -> 'CYP3A' (the name the clinical tables and the rest of the graph use); 'CYP2C19' stays."""
+    n = re.sub(r"\s*\(.*", "", cell).strip().upper()
+    return "CYP3A" if n.startswith("CYP3A") else n
+
+
 def parse_fda_cyp(html_text: str) -> dict:
     """Index tables only. Returns {'inhibits': [(drug, enzyme, 'strong'|'moderate')], 'induces': [...], 'substrates': [(drug, enzyme)]}."""
     tables = re.findall(r"<table.*?</table>", html_text, re.S)
-    out = {"inhibits": [], "induces": [], "substrates": []}
+    out = {"inhibits": [], "induces": [], "substrates": [], "vitro_inhibits": [], "vitro_induces": [], "transporter_substrates": [], "transporter_inhibits": []}
     for t in tables:
         rows = [_cells(r) for r in re.findall(r"<tr.*?</tr>", t, re.S)]
         if not rows:
@@ -75,6 +81,19 @@ def parse_fda_cyp(html_text: str) -> dict:
                 for i, strength in ((1, "strong"), (2, "moderate")):
                     for d in _drugs(r[i]) if len(r) > i else []:
                         out["inhibits"].append((d, enzyme_col(r[0]), strength))
+        elif head.strip() in ("enzyme inhibitor", "enzyme inducer"):                       # Tables 1-2 and 1-3: laboratory (in vitro) findings, a weaker kind of evidence
+            key = "vitro_inhibits" if head.strip().endswith("inhibitor") else "vitro_induces"
+            for r in rows[1:]:
+                for d in _drugs(r[1]) if len(r) > 1 else []:
+                    out[key].append((d, _enzyme_name(r[0]), "in vitro"))
+        elif head.strip() in ("transporter gene substrate", "transporter gene inhibitor"):       # Tables 3-1 and 3-2: transporter proteins that move medicines in and out of cells
+            key = "transporter_substrates" if head.strip().endswith("substrate") else "transporter_inhibits"
+            for r in rows[1:]:
+                if len(r) < 3:
+                    continue
+                for tname in [x.strip() for x in re.split(r"[,\n]", r[0]) if x.strip()]:
+                    for d in _drugs(r[2]):
+                        out[key].append((d, tname.upper() if tname.upper() != "P-GP" else "P-gp"))
         elif "strong inducers" in head:
             for r in rows[1:]:
                 for i, strength in ((1, "strong"), (2, "moderate")):
@@ -94,6 +113,7 @@ def load(host: str = "localhost", port: int = 6379, data_dir: Path = DATA) -> di
     g.query("CREATE INDEX FOR (e:Enzyme) ON (e.name)")
     pairs = parse_ddinter(sorted(data_dir.glob("ddinter_*.csv")))
     names = sorted({x for a, b, _ in pairs for x in (a, b)})
+    base = set(names)                                              # medicines DDInter knows: the in vitro and transporter tables only add edges between these
     fda = parse_fda_cyp((data_dir / "fda_cyp.html").read_text(encoding="utf-8", errors="ignore"))
     for d, *_ in fda["inhibits"] + fda["induces"] + [(s[0],) for s in fda["substrates"]] + [(s[0],) for s in CURATED_SUBSTRATES]:
         names.append(d)
@@ -109,17 +129,26 @@ def load(host: str = "localhost", port: int = 6379, data_dir: Path = DATA) -> di
     for i in range(0, len(sym), 2000):
         g.query("UNWIND $r AS x MATCH (a:Drug {name:x.a}) MATCH (b:Drug {name:x.b}) "
                 "CREATE (a)-[:HAZARD {w:x.w}]->(b) CREATE (b)-[:HAZARD {w:x.w}]->(a)", {"r": sym[i:i + 2000]})
-    enzymes = sorted({e for _, e, *_ in fda["inhibits"] + fda["induces"]} | {e for _, e in fda["substrates"]} | {e for _, e, *_ in CURATED_SUBSTRATES})
-    g.query("UNWIND $r AS n MERGE (:Enzyme {name:n})", {"r": enzymes})
-    for rel, items in (("INHIBITS", fda["inhibits"]), ("INDUCES", fda["induces"])):
+    vitro_i = [(d, e, s) for d, e, s in fda["vitro_inhibits"] if d in base]
+    vitro_u = [(d, e, s) for d, e, s in fda["vitro_induces"] if d in base]
+    t_sub = [(d, t) for d, t in fda["transporter_substrates"] if d in base]
+    t_inh = [(d, t) for d, t in fda["transporter_inhibits"] if d in base]
+    enzymes = sorted({e for _, e, *_ in fda["inhibits"] + fda["induces"] + vitro_i + vitro_u} | {e for _, e in fda["substrates"]} | {e for _, e, *_ in CURATED_SUBSTRATES})
+    transporters = sorted({t for _, t in t_sub + t_inh})
+    g.query("UNWIND $r AS n MERGE (:Enzyme {name:n, kind:'enzyme'})", {"r": enzymes})
+    g.query("UNWIND $r AS n MERGE (:Enzyme {name:n, kind:'transporter'})", {"r": transporters})             # a transporter is stored beside the enzymes: the same traversal finds both
+    for rel, items, src in (("INHIBITS", fda["inhibits"], "FDA CYP index table"), ("INDUCES", fda["induces"], "FDA CYP index table"),
+                            ("INHIBITS", vitro_i, "FDA in vitro table (laboratory finding)"), ("INDUCES", vitro_u, "FDA in vitro table (laboratory finding)"),
+                            ("INHIBITS", [(d, t, "in vitro") for d, t in t_inh], "FDA transporter in vitro table (laboratory finding)")):
         g.query(f"UNWIND $r AS x MATCH (d:Drug {{name:x.d}}) MATCH (e:Enzyme {{name:x.e}}) "
-                f"CREATE (d)-[:{rel} {{strength:x.s, source:'FDA CYP index table'}}]->(e)",
-                {"r": [{"d": d, "e": e, "s": s} for d, e, s in items]})
+                f"CREATE (d)-[:{rel} {{strength:x.s, source:$src}}]->(e)",
+                {"r": [{"d": d, "e": e, "s": s} for d, e, s in items], "src": src})
     sub = [{"d": d, "e": e, "src": "FDA CYP index table"} for d, e in fda["substrates"]]
+    sub += [{"d": d, "e": t, "src": "FDA transporter in vitro table (laboratory finding)"} for d, t in t_sub]
     sub += [{"d": d, "e": e, "src": "curated (unverified)"} for d, e, *_ in CURATED_SUBSTRATES]
     g.query("UNWIND $r AS x MATCH (d:Drug {name:x.d}) MATCH (e:Enzyme {name:x.e}) "
             "CREATE (d)-[:SUBSTRATE_OF {source:x.src}]->(e)", {"r": sub})
-    return {"drugs": len(names), "interacts": len(rows), "enzymes": len(enzymes), "fda": {k: len(v) for k, v in fda.items()}}
+    return {"drugs": len(names), "interacts": len(rows), "enzymes": len(enzymes), "transporters": len(transporters), "fda": {k: len(v) for k, v in fda.items()}}
 
 
 if __name__ == "__main__":

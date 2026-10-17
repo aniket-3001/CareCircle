@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 
 import difflib
 
@@ -16,7 +17,7 @@ DIRECT = ("MATCH (a:Drug)-[i:INTERACTS]-(b:Drug) WHERE a.name IN $d AND b.name I
 # inhibitor/inducer X of enzyme E and substrate Y of E, both in the list, and no direct DDInter row already covers the pair
 MECH = ("MATCH (x:Drug)-[m:INHIBITS|INDUCES]->(e:Enzyme)<-[s:SUBSTRATE_OF]-(y:Drug) "
         "WHERE x.name IN $d AND y.name IN $d AND x.name <> y.name "
-        "RETURN x.name, type(m), m.strength, e.name, y.name, s.source")
+        "RETURN x.name, type(m), m.strength, e.name, y.name, s.source, m.source, e.kind")
 KNOWN = "MATCH (d:Drug) WHERE d.name IN $d RETURN d.name"
 NOTICE = "Flags are for discussion with a prescriber or pharmacist. Different references may disagree. Absence of a flag is not a statement of safety."
 
@@ -40,17 +41,27 @@ class Checker:
                 item["weight"] = w
                 direct.append(item); weights.append(w)
         mech, seen_paths = [], set()
-        for x, rel, strength, enz, y, src in self.g.ro_query(MECH, {"d": d}).result_set:
+        rows = sorted(self.g.ro_query(MECH, {"d": d}).result_set, key=lambda r: ({"strong": 0, "moderate": 1, "in vitro": 2}.get(r[2], 3), r[0], r[4], r[3]))      # clinical evidence first: a laboratory finding never replaces it
+        for x, rel, strength, enz, y, src, msrc, ekind in rows:
             w = ENZYME_WEIGHT[strength]
             kind = "raise exposure of" if rel == "INHIBITS" else "lower exposure of"
+            transporter = ekind == "transporter"
+            vitro = strength == "in vitro"
             key = tuple(sorted((x, y)))
             if (x, rel, enz, y) in seen_paths:
                 continue
             seen_paths.add((x, rel, enz, y))
+            if transporter:                                       # one flag per pair and relation, naming every transporter they share (not one line per protein)
+                same = next((m for m in mech if m["x"] == x and m["y"] == y and m["relation"] == rel and m["target"] == "transporter"), None)
+                if same is not None:
+                    same.setdefault("also_via", []).append(enz)
+                    same["meaning"] = same["meaning"].replace(" transporter", f" transporter (also {', '.join(same['also_via'])})", 1) if len(same["also_via"]) == 1                         else re.sub(r"\(also [^)]*\)", f"(also {', '.join(same['also_via'])})", same["meaning"], count=1)
+                    continue
             mech.append({"kind": "enzyme_path", "path": f"{x} -{rel}({strength})-> {enz} <-SUBSTRATE_OF- {y}",
-                         "meaning": f"{x} may {kind} {y} via {enz}", "weight": w, "also_in_ddinter": key in pairs,
-                         "x": x, "y": y, "enzyme": enz, "relation": rel, "strength": strength,
-                         "source": f"FDA CYP index table; substrate: {src}"})
+                         "meaning": (f"{x} may {kind} {y} via {enz}" if not transporter else f"{x} may {kind} {y} through the {enz} transporter")
+                                    + (" (a laboratory finding, not shown in people)" if vitro else ""), "weight": w, "also_in_ddinter": key in pairs,
+                         "x": x, "y": y, "enzyme": enz, "relation": rel, "strength": strength, "target": "transporter" if transporter else "enzyme",
+                         "source": f"{msrc or 'FDA CYP index table'}; substrate: {src}"})
             weights.append(w) if key not in pairs else None
         n_known = len(known)
         total = n_known * (n_known - 1) // 2

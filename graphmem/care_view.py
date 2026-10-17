@@ -31,6 +31,15 @@ ENZYMES = {
     "CYP1A2": "A liver enzyme that clears caffeine and a number of other medicines.",
     "CYP2B6": "A liver enzyme involved in clearing several antiviral and mood medicines.",
     "CYP2C8": "A liver enzyme that clears some diabetes and cancer medicines.",
+    "P-gp": "A pump in the gut, liver and kidney walls that pushes some medicines out of cells, which changes how much reaches the blood.",
+    "BCRP": "A pump in the gut and liver that pushes some medicines out of cells.",
+    "OATP1B1": "A transporter that carries some medicines (many cholesterol medicines among them) from the blood into the liver.",
+    "OATP1B3": "A transporter that carries some medicines from the blood into the liver.",
+    "OAT1": "A kidney transporter that moves some medicines from the blood into the urine.",
+    "OAT3": "A kidney transporter that moves some medicines from the blood into the urine.",
+    "OCT2": "A kidney transporter that moves some medicines (metformin among them) from the blood into the urine.",
+    "MATE1": "A kidney transporter that moves some medicines out into the urine.",
+    "MATE-2K": "A kidney transporter that moves some medicines out into the urine.",
 }
 SOURCE_WORDS = {"typed": "typed in", "photo": "read from a photo", "voice": "from a voice note", "document": "from a document"}
 
@@ -171,13 +180,14 @@ class CareViewMixin:
         for f in check["enzyme_paths"]:
             enz = f"enzyme:{f['enzyme']}"
             if enz not in nodes:
-                node(enz, "enzyme", f["enzyme"], ENZYMES.get(f["enzyme"], "A liver enzyme that processes some medicines."),
-                     [["What it is", ENZYMES.get(f["enzyme"], "A liver enzyme.")], ["Source", "FDA drug-interaction index table (not exhaustive)"]],
+                what = ENZYMES.get(f["enzyme"], "A transporter that moves some medicines in and out of cells." if f.get("target") == "transporter" else "A liver enzyme that processes some medicines.")
+                node(enz, "enzyme", f["enzyme"], what,
+                     [["What it is", what], ["Source", "FDA drug-interaction tables (not exhaustive)"]],
                      "(:Drug)-[:INHIBITS|INDUCES]->(:Enzyme)<-[:SUBSTRATE_OF]-(:Drug)", current=True)
             verb = "slows" if f["relation"] == "INHIBITS" else "speeds up"
             edge(f"drug:{f['x']}", enz, "inhibits" if f["relation"] == "INHIBITS" else "induces", f["relation"].lower(),
                  f"{_title(f['x'])} {verb} {f['enzyme']} ({f['strength']}).",
-                 [["Medicine", _title(f["x"])], ["Effect on the enzyme", f"{verb} it ({f['strength']})"], ["Source", "FDA CYP index table"]],
+                 [["Medicine", _title(f["x"])], ["Effect on the enzyme", f"{verb} it ({f['strength']})"], ["Source", f["source"].split("; ")[0]]],
                  weight=f["weight"])
             edge(f"drug:{f['y']}", enz, "substrate", "cleared by",
                  f"{_title(f['y'])} is cleared by {f['enzyme']}.", [["Source", f["source"].split("; ")[-1]]], weight=0)

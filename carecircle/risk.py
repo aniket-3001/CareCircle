@@ -9,7 +9,7 @@ import math
 # Assumption (not a clinical standard): relative weight of each DDInter severity label in the combined regimen risk.
 SEVERITY_WEIGHT = {"minor": 0.1, "moderate": 0.3, "major": 0.7}
 # FDA classes for enzyme-mediated flags (strong inhibitors raise exposure >=5-fold, moderate >=2-fold): same scale, assumption.
-ENZYME_WEIGHT = {"strong": 0.7, "moderate": 0.3}
+ENZYME_WEIGHT = {"strong": 0.7, "moderate": 0.3, "in vitro": 0.1}      # "in vitro" = seen in a laboratory, not shown in people: the lowest weight
 # Carer belief decay: assumption, shown in the UI.
 HALF_LIFE_HOURS = 72.0
 
