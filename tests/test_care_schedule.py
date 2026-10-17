@@ -205,7 +205,7 @@ async def test_the_one_click_demo_circle_opens_with_a_checklist_not_an_empty_one
     d = await demo.start(gm)
     gm._created.append(d["circle"])
     m = gm.open(d["agents"]["ravi"], d["circle"])
-    today = await m.care_today(d["person"], at(date(2026, 10, 17), "09:00"))
+    today = await m.care_today(d["person"])                                  # now: the demo entries are recorded as of the moment it starts
     assert today["unscheduled"] == [] and len(today["items"]) == 5
     assert {"08:00", "20:00"} <= {i["time"] for i in today["items"] if i["drug"] == "metformin"}
     assert [i["time"] for i in today["items"]] == sorted(i["time"] for i in today["items"])
