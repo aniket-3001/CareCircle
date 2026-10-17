@@ -13,7 +13,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def ref_ready() -> bool:
     try:
-        g = FalkorDB(host=HOST, port=PORT).select_graph("cc_ref")
+        g = FalkorDB(host=HOST, port=PORT, password=os.getenv("GRAPHMEM_DB_PASSWORD") or None).select_graph("cc_ref")
         return g.ro_query("MATCH (d:Drug) RETURN count(d)").result_set[0][0] > 1000
     except Exception:
         return False
@@ -21,7 +21,7 @@ def ref_ready() -> bool:
 
 for _ in range(60):                                   # wait for FalkorDB
     try:
-        FalkorDB(host=HOST, port=PORT).list_graphs()
+        FalkorDB(host=HOST, port=PORT, password=os.getenv("GRAPHMEM_DB_PASSWORD") or None).list_graphs()
         break
     except Exception:
         time.sleep(1)

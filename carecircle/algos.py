@@ -6,6 +6,8 @@
 """
 from __future__ import annotations
 
+import os
+
 from falkordb import FalkorDB
 
 from .reference import REF_GRAPH, norm
@@ -19,7 +21,7 @@ Q_REG = ("MATCH (a:Drug)-[h:HAZARD]->(b:Drug) WHERE a.name IN $d AND b.name IN $
 
 class Algos:
     def __init__(self, host="localhost", port=6379):
-        self.g = FalkorDB(host=host, port=port).select_graph(REF_GRAPH)
+        self.g = FalkorDB(host=host, port=port, password=os.getenv("GRAPHMEM_DB_PASSWORD") or None).select_graph(REF_GRAPH)
 
     def _run(self, q, p):
         return {"cypher": " ".join(q.split()), "rows": self.g.ro_query(q, p).result_set}

@@ -122,8 +122,9 @@ class RetryingGraph:
 class Db:
     def __init__(self, host: str = "localhost", port: int = 6379, max_connections: int = 64,
                  ro_password: Optional[str] = None):
+        # GRAPHMEM_DB_PASSWORD: the database itself requires a password (Redis requirepass), so another container or a stray port cannot read it.
         pool = BlockingConnectionPool(host=host, port=port, max_connections=max_connections,
-                                      timeout=30, decode_responses=True)
+                                      timeout=30, decode_responses=True, password=os.getenv("GRAPHMEM_DB_PASSWORD") or None)
         self.client = FalkorDB(connection_pool=pool)
         # Optional database-level ACL: read-scope operations run as a Redis user that may only call GRAPH.RO_QUERY, so even a
         # bug in a read path cannot write. Enabled by GRAPHMEM_RO_PASSWORD; the user is created on first use (needs the default user).

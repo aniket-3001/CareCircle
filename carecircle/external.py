@@ -35,7 +35,7 @@ def _ref():
     if _store is None:
         from falkordb import FalkorDB
         from .reference import REF_GRAPH
-        _store = FalkorDB(host=os.getenv("FALKORDB_HOST", "localhost"), port=int(os.getenv("FALKORDB_PORT", "6379"))).select_graph(REF_GRAPH)
+        _store = FalkorDB(host=os.getenv("FALKORDB_HOST", "localhost"), port=int(os.getenv("FALKORDB_PORT", "6379")), password=os.getenv("GRAPHMEM_DB_PASSWORD") or None).select_graph(REF_GRAPH)
     return _store
 
 

@@ -262,6 +262,9 @@ card with a big number and a face, white hairline cards, dashed add tiles, a flo
 **Not measured:** OCR/voice accuracy at scale or on home-quality photos and accents, severity accuracy against clinical truth, any patient outcome.
 
 ## Operations
+
+**This is a demo deployment, not a production service for real patients.** It is one instance, one process (API, reminder loop and Telegram poller together), one database, no multi-worker setup, an in-memory rate limiter, and no clinical or regulatory review. What is in place: an update is deployed only after the tests pass, the previous commit is remembered and restored if the site does not answer afterwards, the database can require its own password (`GRAPHMEM_DB_PASSWORD` in `deploy/.env`; the app and the loaders send it), reads run as a database user that can only call `GRAPH.RO_QUERY`, and Python dependencies are pinned in `constraints.txt`.
+
 Every push to `main` runs the tests, the web build and a headless-Chrome walk-through of the demo, and only then deploys to the instance (GitHub OIDC to AWS Systems Manager, no stored keys).
 FalkorDB is snapshotted to a private S3 bucket every 6 hours, CloudWatch alarms reboot or recover the instance, and a scheduled workflow checks `/healthz` (`deploy/RESTORE.md`).
 FalkorDB itself has no query time or memory limit, so the app sets one on first connect (15 s default, 60 s ceiling, 1 GiB per query; tunable with `GRAPHMEM_QUERY_TIMEOUT_MS`, `GRAPHMEM_QUERY_TIMEOUT_MAX_MS`, `GRAPHMEM_QUERY_MEM_BYTES`, `0` = off). A query that hits a cap is stopped, a write inside it is rolled back, and the caller gets a 503 that says to ask for less. `GET /admin/db` (admin key) shows the caps in force, graph counts, memory and the slowest queries with every string value removed.

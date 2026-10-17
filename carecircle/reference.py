@@ -7,6 +7,8 @@ Sources and licences are stored ON the edges (`source`), so every flag can say w
 """
 from __future__ import annotations
 
+import os
+
 import csv
 import html
 import re
@@ -83,7 +85,7 @@ def parse_fda_cyp(html_text: str) -> dict:
 
 def load(host: str = "localhost", port: int = 6379, data_dir: Path = DATA) -> dict:
     from falkordb import FalkorDB
-    g = FalkorDB(host=host, port=port).select_graph(REF_GRAPH)
+    g = FalkorDB(host=host, port=port, password=os.getenv("GRAPHMEM_DB_PASSWORD") or None).select_graph(REF_GRAPH)
     try:
         g.delete()
     except Exception:

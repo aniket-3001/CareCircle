@@ -1,6 +1,8 @@
 """Interaction checks over the shared reference graph. Reads only (GRAPH.RO_QUERY). Never says 'safe' and never advises."""
 from __future__ import annotations
 
+import os
+
 import difflib
 
 from falkordb import FalkorDB
@@ -21,7 +23,7 @@ NOTICE = "Flags are for discussion with a prescriber or pharmacist. Different re
 
 class Checker:
     def __init__(self, host="localhost", port=6379):
-        self.g = FalkorDB(host=host, port=port).select_graph(REF_GRAPH)
+        self.g = FalkorDB(host=host, port=port, password=os.getenv("GRAPHMEM_DB_PASSWORD") or None).select_graph(REF_GRAPH)
 
     def check(self, drugs: list[str]) -> dict:
         d = sorted({norm(x) for x in drugs if x})

@@ -11,3 +11,10 @@ def test_prod_compose_turns_on_the_read_only_database_user_and_names_the_baked_s
     baked = re.search(r"WhisperModel\('(\w+)'", (ROOT / "Dockerfile").read_text(encoding="utf-8")).group(1)
     assert re.search(rf"CC_WHISPER:\s*{baked}\b", prod)
     assert f'"CC_WHISPER", "{baked}"' in (ROOT / "carecircle/intake.py").read_text(encoding="utf-8")        # the code default agrees with the image too
+
+
+def test_prod_compose_can_put_a_password_on_the_database_and_the_app_sends_it():
+    prod = (ROOT / "deploy/docker-compose.prod.yml").read_text(encoding="utf-8")
+    assert "--requirepass" in prod and re.search(r"GRAPHMEM_DB_PASSWORD:\s*\$\{GRAPHMEM_DB_PASSWORD", prod) and "REDISCLI_AUTH" in prod   # the health check authenticates too
+    for f in ("graphmem/db.py", "carecircle/checks.py", "carecircle/algos.py", "carecircle/reference.py", "carecircle/external.py"):
+        assert "GRAPHMEM_DB_PASSWORD" in (ROOT / f).read_text(encoding="utf-8"), f           # every place that opens a connection
