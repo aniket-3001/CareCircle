@@ -99,6 +99,7 @@ export function apiFor(s: Session) {
     reviews: () => op<Review[]>('care_pharmacist_reviews', { person: p }),
     digest: (upto = 0) => op<Digest>('care_history_digest', { person: p, upto }),
     chain: () => op<ChainCheck>('care_chain_verify', { person: p }),
+    adoptChain: () => op<{ adopted: number }>('care_chain_adopt', {}),
     stock: (now: number) => op<StockRow[]>('care_stock', { person: p, now }),
     setStock: (dose_id: string, doses_left: number) => op<{ id: string; doses_left: number }>('care_stock_set', { dose_id, doses_left }),
     timezone: () => op<{ tz: string; set: boolean }>('care_timezone'),

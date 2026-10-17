@@ -7,7 +7,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 W="$(mktemp -d)"
 PORT="${PORT:-18081}"
 export COMPOSE_PROJECT="ccrollbackdrill"
-cleanup() { docker compose -p "$COMPOSE_PROJECT" -f "$W/deploy/docker-compose.prod.yml" --env-file "$W/deploy/.env" down -v >/dev/null 2>&1; rm -rf "$W"; }
+cleanup() { docker compose -p "$COMPOSE_PROJECT" down -v >/dev/null 2>&1; cd /; rm -rf "$W"; }
 trap cleanup EXIT
 mkdir -p "$W/deploy" && cd "$W" && git init -q && git config user.email drill@example.invalid && git config user.name drill
 cp "$HERE/rollback.sh" deploy/rollback.sh

@@ -292,4 +292,6 @@ export const HI_MORE: Record<string, string> = {
   "Discuss with a prescriber or pharmacist.": "डॉक्टर या फ़ार्मासिस्ट से चर्चा करें।",
   "Press Enter for details.": "विवरण के लिए Enter दबाएँ।",
   "person cared for": "जिसकी देखभाल हो रही है",
+  "older entries were added to the log later, so they are covered only from then on": "पुरानी प्रविष्टियाँ बाद में लॉग में जोड़ी गईं, इसलिए वे केवल तभी से सुरक्षित हैं",
+  "Add the older entries to the log": "पुरानी प्रविष्टियाँ लॉग में जोड़ें",
 };

@@ -92,7 +92,7 @@ export interface PatientView {
 
 export interface Digest { entries: number; of: number; head: string; checkpoints: { n: number; hash: string }[]; note: string }
 
-export interface ChainCheck { ok: boolean; events: number; entries_logged: number; entries_not_logged: number; first_problem: { seq: number; why: string } | null; head: string; note: string }
+export interface ChainCheck { ok: boolean; events: number; entries_logged: number; entries_adopted: number; entries_not_logged: number; first_problem: { seq: number; why: string } | null; head: string; note: string }
 
 export interface StockRow {
   dose_id: string;

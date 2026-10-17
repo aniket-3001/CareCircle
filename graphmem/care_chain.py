@@ -78,7 +78,7 @@ class CareChainMixin:
         evs = await self._q("MATCH (e:Event) RETURN e.seq, e.kind, e.ref, e.by, e.at, e.body, e.prev, e.hash ORDER BY e.seq", scope="read")
         head = await self._q("MATCH (h:Chain {k:'head'}) RETURN h.seq, h.hash", scope="read")
         key = await self._receipt_key()
-        prev, bad, entries = GENESIS, None, 0
+        prev, bad, entries, adopted = GENESIS, None, 0, 0
         for n, (seq, kind, ref, by, at, body, p, h) in enumerate(evs, 1):
             if seq != n:
                 bad = {"seq": n, "why": "an event is missing or out of order"}
@@ -87,20 +87,33 @@ class CareChainMixin:
                 bad = {"seq": seq, "why": "this event was changed after it was written"}
                 break
             prev = h
-            if kind == "entry":
+            if kind in ("entry", "adopted"):
                 entries += 1
+                adopted += kind == "adopted"
                 now = await self._q(f"MATCH (x:Dose {{id:$id}}) RETURN {ENTRY_FIELDS}", {"id": ref}, scope="read")
                 if now and entry_body(key, *now[0]) != body:
                     bad = {"seq": seq, "why": "the entry was changed after it was logged"}
                     break
         if bad is None and head and (head[0][0] != len(evs) or head[0][1] != prev):
             bad = {"seq": len(evs), "why": "the end of the log does not match its last event (events were removed)"}
-        logged = {e[2] for e in evs if e[1] == "entry"}
+        logged = {e[2] for e in evs if e[1] in ("entry", "adopted")}
         all_ids = {r[0] for r in await self._q("MATCH (x:Dose) RETURN x.id", scope="read")}
-        return {"ok": bad is None, "events": len(evs), "entries_logged": entries, "entries_not_logged": len(all_ids - logged),
+        return {"ok": bad is None, "events": len(evs), "entries_logged": entries, "entries_adopted": adopted, "entries_not_logged": len(all_ids - logged),
                 "first_problem": bad, "head": prev if evs else "",
                 "note": "Checks the log is unbroken and that each logged entry still reads as it did. It does not show an entry is true, and it cannot see an entry that was never logged "
-                        "(entries from before the log began are counted)."}
+                        "(entries from before the log began are counted). An entry added to the log late ('adopted') is covered from that moment on; nothing can show what it said before."}
+
+    async def care_chain_adopt(self) -> dict:
+        """Put entries that were written before the log began into it, as they read now, marked 'adopted'. From then on a change to them is caught; what they said
+        before is not knowable (there was nothing to compare with), and the event records who adopted them and when, so it cannot pass for an original write."""
+        done = {e[0] for e in await self._q("MATCH (e:Event) WHERE e.kind IN ['entry','adopted'] RETURN e.ref", scope="read")}
+        rows = await self._q(f"MATCH (x:Dose) RETURN x.id, {ENTRY_FIELDS} ORDER BY x.created_at, x.id", scope="read")
+        key, n = await self._receipt_key(), 0
+        for r in rows:
+            if r[0] not in done:
+                await self._chain_append("adopted", r[0], entry_body(key, *r[1:]))
+                n += 1
+        return {"adopted": n, "note": "Entries from before the log began were added to it as they read now; changes to them are caught from this moment."}
 
     async def care_chain_events(self, limit: int = 50) -> list[dict]:
         """The newest events of the log (what kind, which entry, who, when; never the content)."""

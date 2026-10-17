@@ -40,9 +40,14 @@ export function Fingerprint(): React.JSX.Element {
             {chain && (
               <p role="status" data-testid="chain-verdict">
                 {chain.ok
-                  ? `${t('The log is unbroken')}: ${chain.events} ${t('events')}, ${chain.entries_logged} ${t('entries, each still as it was written')}.${chain.entries_not_logged > 0 ? ` ${chain.entries_not_logged} ${t('older entries are from before the log began')}.` : ''}`
+                  ? `${t('The log is unbroken')}: ${chain.events} ${t('events')}, ${chain.entries_logged} ${t('entries, each still as it was written')}.${chain.entries_not_logged > 0 ? ` ${chain.entries_not_logged} ${t('older entries are from before the log began')}.` : ''}${chain.entries_adopted > 0 ? ` ${chain.entries_adopted} ${t('older entries were added to the log later, so they are covered only from then on')}.` : ''}`
                   : `${t('The log is NOT intact')}: ${chain.first_problem?.why ?? ''} (${t('event')} ${chain.first_problem?.seq ?? ''}).`}
               </p>
+            )}
+            {chain?.ok && chain.entries_not_logged > 0 && (
+              <div className="row">
+                <button type="button" className="btn btn--ghost btn--sm" onClick={() => void app.api.adoptChain().then(() => app.api.chain().then(setChain))} data-testid="chain-adopt">{t('Add the older entries to the log')}</button>
+              </div>
             )}
             {verdict && <p role="status" data-testid="fingerprint-verdict">{verdict === 'same' ? t('Those entries are exactly as they were.') : verdict === 'different' ? t('Those entries are NOT the same as when the line was kept: one was changed or removed.') : t('That does not look like a kept line (a number, a colon and 64 letters or digits).')}</p>}
           </>

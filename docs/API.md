@@ -105,6 +105,7 @@ Content-Type: application/json
 | `care_history_digest` | read | `person`*, `upto` | A fingerprint of what was written about a person: each entry's fixed fields are chained (hash of the one before + this one), oldest first. |
 | `care_chain_verify` | read | `person` | Walk the log from the start and say whether it is intact, and whether each logged entry still matches what is stored now. |
 | `care_chain_events` | read | `limit` | The newest events of the log (what kind, which entry, who, when; never the content). |
+| `care_chain_adopt` | write | none | Put entries that were written before the log began into it, as they read now, marked 'adopted'. From then on a change to them is caught; what they said |
 | `care_pharmacist_reviews` | read | `person`* | Notes written back from a share link, newest first. The name is whatever was typed: it is not checked. |
 | `care_consent_set` | write | `person`*, `status`*, `who`, `note` | Write down whether the person knows this record exists and agrees to it, who answered, and when. Newest entry stands; older ones stay in the history. |
 | `care_consent` | read | `person`* | The current answer (newest) and the history. 'not_asked' when nothing was written down. |

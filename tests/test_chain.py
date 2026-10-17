@@ -74,3 +74,19 @@ async def test_erasing_the_person_empties_the_log_and_everything_else_about_them
         assert (await o._q(f"MATCH (n:{label}) RETURN count(n)", scope="read"))[0][0] == 0, label
     v = await o.care_chain_verify()
     assert v["ok"] and v["events"] == 1 and (await o.care_chain_events())[0]["kind"] == "erase_person"          # one event: that it was erased
+
+
+async def test_entries_from_before_the_log_can_be_adopted_and_are_then_covered(gm):
+    o, c = await make(gm, "ch-adopt")
+    a = await o.care_record("asha", "warfarin", dose_text="5 mg", freq_text="bedtime", source_type="typed")
+    await o._q("MATCH (e:Event) DETACH DELETE e", scope="admin")                                # as if the entry predates the log
+    await o._q("MATCH (h:Chain) DELETE h", scope="admin")
+    v = await o.care_chain_verify()
+    assert v["ok"] and v["entries_not_logged"] == 1 and v["entries_adopted"] == 0
+    assert (await c.care_chain_adopt())["adopted"] == 1                                         # a plain carer can do it; the event says who
+    assert (await c.care_chain_adopt())["adopted"] == 0                                         # once only
+    v = await o.care_chain_verify()
+    assert v["ok"] and v["entries_not_logged"] == 0 and v["entries_adopted"] == 1 and v["entries_logged"] == 1
+    assert [e["kind"] for e in await o.care_chain_events()] == ["adopted"] and (await o.care_chain_events())[0]["by"] == "c"
+    await o._q("MATCH (x:Dose {id:$i}) SET x.dose_text = '50 mg'", {"i": a["id"]}, scope="admin")   # a later quiet change to the adopted entry
+    assert (await o.care_chain_verify())["first_problem"]["why"].startswith("the entry was changed")
