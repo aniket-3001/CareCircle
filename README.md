@@ -18,6 +18,10 @@ Live: **https://3-228-70-117.sslip.io** (press **Start a demo circle**; syntheti
 
 ![Today: the verdict tile and the flags, each with its source](docs/img/flags.png)
 
+## One story it was built around
+
+A cardiologist writes **Telma-AM** (telmisartan with amlodipine). A second doctor, months later, writes plain **amlodipine** for the ankle swelling. On the shelf they are two different boxes; in the body it is amlodipine twice. Care Circle reads the Telma-AM line as *two* ingredients (a hand-written brand list, marked unverified, with "check the pack"), keeps the plain amlodipine as its own entry, and then shows both under the same ingredient with the words "this may be the same medicine from two sources", plus who recorded each and from which quoted line. It says nothing about what to do: the card ends with "discuss with a prescriber or pharmacist". (Browser scenario U14 walks exactly this; `tests/test_duplicates.py` holds the rule.)
+
 ## Why it is different
 
 - **It does the daily job.** A written "twice daily" becomes suggested clock times that a person confirms; **Today** then lists each dose slot, who marked it given, and what is not marked yet, and a second carer who taps the same slot is told who got there first. A short course ends on its last day, and a pack count says about how many days of doses are left.
