@@ -34,7 +34,8 @@ def test_every_named_test_exists():
 REPRODUCTIONS = {
     "H1": ["tests/test_brands.py::test_no_ingredient_is_lost_to_the_order_of_the_lines",
            "tests/test_brands.py::test_a_known_brand_with_an_unlisted_suffix_is_flagged_not_read_as_the_plain_brand",
-           "tests/test_brands.py::test_a_four_line_prescription_loses_nothing_and_the_unlisted_one_is_flagged"],
+           "tests/test_brands.py::test_a_four_line_prescription_loses_nothing_and_the_unlisted_one_is_flagged",
+           "tests/test_brand_product.py::test_b6_every_spelling_of_an_unlisted_suffix_is_kept_and_flagged"],
     "H3": ["tests/test_carecircle.py::test_a_two_medicine_quote_cannot_lend_one_strength_to_the_other",
            "tests/test_carecircle.py::test_the_rule_reading_wins_when_a_model_disagrees_on_a_strength"],
     "H6": ["tests/test_care_schedule.py::test_two_gives_sent_together_with_no_times_set_are_one_dose",
@@ -43,7 +44,9 @@ REPRODUCTIONS = {
            "tests/test_tablet_tick.py::test_two_carers_ticking_one_tablet_at_once_have_exactly_one_winner_and_never_split_it"],
     "H17": ["tests/test_carecircle.py::test_bot_saves_a_combination_as_its_own_product_and_never_over_a_plain_entry",
             "tests/test_care_schedule.py::test_a_combination_is_one_row_with_its_name_and_strength_and_one_tick",
-            "tests/test_brands.py::test_no_ingredient_is_lost_to_the_order_of_the_lines"],
+            "tests/test_brands.py::test_no_ingredient_is_lost_to_the_order_of_the_lines",
+            "tests/test_brand_product.py::test_b1_two_brands_of_one_molecule_are_two_entries_and_a_possible_duplicate",
+            "tests/test_brand_product.py::test_b2_a_possible_combination_saved_next_to_the_plain_medicine_does_not_overwrite_it"],
     "H21": ["tests/test_reminders.py::test_a_web_push_the_service_refused_is_handed_back_and_delivered_on_the_next_pass"],
 }
 

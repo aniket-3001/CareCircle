@@ -31,3 +31,10 @@ def test_the_live_cookie_setting_is_what_the_docs_say():
     """The compose default is off and the live deployment turns it on; the docs say both, so a reader of the compose file is not surprised."""
     assert "${CC_COOKIE_SESSIONS:-0}" in (ROOT / "deploy/docker-compose.prod.yml").read_text(encoding="utf-8")
     assert "on in the live deployment" in text("docs/DETAILS.md")
+
+
+def test_no_doc_promises_a_crash_loses_only_the_last_second():
+    """Production keeps snapshots only (no append-only file since 17 Oct): a hard crash can lose up to a minute. 'At most the last second' was the old setting."""
+    for f in DOCS + ["deploy/RESTORE.md"]:
+        t = text(f)
+        assert "at most the last second" not in t and "loses at most the last second" not in t, f
