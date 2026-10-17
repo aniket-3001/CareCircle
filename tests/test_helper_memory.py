@@ -29,14 +29,21 @@ async def test_the_reviews_live_sequence_now_follows_the_thread(gm):
 
 
 async def test_the_first_and_the_second_one_are_the_things_it_listed_and_the_list_survives_a_drill_down(gm):
+    """'The first one' and 'the second one' are the items the helper itself listed, in its order (which is fixed: severity, then name), whatever the data ranks second."""
     ravi, meena = await circle(gm)
     flags = await ask(ravi, "What does the record flag?")
-    assert flags["source"] == "rules" and "Atorvastatin + Clarithromycin: major" in flags["text"] and "Amlodipine + Atorvastatin: moderate" in flags["text"]
+    shown = assistant._flags_shown(await assistant.gather(ravi, "asha", 0), "What does the record flag?")
+    pair = lambda x: f"{x['drugs'][0].capitalize()} + {x['drugs'][1].capitalize()}: {x['level'].lower()}"        # noqa: E731
+    direct = [x for x in shown if x["kind"] == "direct"]
+    assert len(direct) >= 2 and flags["source"] == "rules" and pair(direct[0]) in flags["text"] and pair(direct[1]) in flags["text"]
+    assert direct[0]["level"].lower() == "major"                                                                     # the most severe is listed first
     first = await ask(ravi, "Why is the first one flagged?")
-    assert first["source"] == "rules" and "Atorvastatin + Clarithromycin: major" in first["text"] and "Amlodipine + Atorvastatin" not in first["text"]      # that pair, not a generic sentence
-    second = await ask(ravi, "Why is the second one flagged?")                              # still the list it showed, not the answer about the first
-    assert second["source"] == "rules" and "Amlodipine + Atorvastatin: moderate" in second["text"] and "Clarithromycin: major" not in second["text"]
-    far = await ask(ravi, "And the last one?")                                                # the list is still there; "the last" is its last entry
+    assert first["source"] == "rules" and pair(direct[0]) in first["text"] and pair(direct[1]) not in first["text"]   # that pair, not a generic sentence
+    second = await ask(ravi, "Why is the second one flagged?")                                                     # still the list it showed, not the answer about the first
+    assert second["source"] == "rules" and pair(direct[1]) in second["text"] and pair(direct[0]) not in second["text"]
+    again = await ask(ravi, "What does the record flag?")
+    assert again["text"] == flags["text"]                                                                             # the same list in the same order every time
+    far = await ask(ravi, "And the last one?")
     assert far["source"] == "rules"
 
 

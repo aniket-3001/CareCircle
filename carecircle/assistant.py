@@ -148,7 +148,9 @@ def _flags_shown(f: Facts, q: str) -> list:
     meds = lambda x: [d for d in (x.get("drugs") or [x.get("x", ""), x.get("y", "")]) if d]            # noqa: E731
     both = [x for x in pairs if len(meds(x)) > 1 and all(d in low for d in meds(x))]
     named = [x for x in pairs if any(d in low for d in meds(x))]
-    return (both or named or sorted(c["direct"], key=lambda x: {"major": 0, "moderate": 1, "minor": 2}.get(x["level"].lower(), 3)) + c["enzyme_paths"])[:4]
+    rank = lambda x: ({"major": 0, "moderate": 1, "minor": 2}.get(x["level"].lower(), 3), tuple(sorted(x["drugs"])))      # noqa: E731  - a fixed order, so "the second one" is the same one every time
+    paths = sorted(c["enzyme_paths"], key=lambda x: (x.get("x", ""), x.get("y", ""), x.get("meaning", "")))
+    return (both or named or sorted(c["direct"], key=rank) + paths)[:4]
 
 
 def _a_flags(f: Facts, q: str) -> str:
