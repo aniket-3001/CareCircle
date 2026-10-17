@@ -14,9 +14,10 @@
 from __future__ import annotations
 
 import os
+import secrets
 from typing import Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import Field
 
@@ -80,6 +81,26 @@ class Delete(Clean):
     confirm: str = Field(max_length=254)
 
 
+COOKIE_MODE = os.getenv("CC_COOKIE_SESSIONS", "0") == "1"       # sign-in sets an httpOnly session cookie (page scripts cannot read it) instead of handing the token to the page
+SESSION_COOKIE, CSRF_COOKIE = "cc_session", "cc_csrf"
+MAX_AGE = 30 * 24 * 3600
+
+
+def _secure(request: Request) -> bool:
+    return request.url.scheme == "https" or request.headers.get("x-forwarded-proto", "") == "https"
+
+
+def set_session_cookies(request: Request, response: Response, token: str) -> None:
+    secure = _secure(request)
+    response.set_cookie(SESSION_COOKIE, token, max_age=MAX_AGE, httponly=True, secure=secure, samesite="lax", path="/")
+    response.set_cookie(CSRF_COOKIE, secrets.token_urlsafe(24), max_age=MAX_AGE, httponly=False, secure=secure, samesite="lax", path="/")   # the page echoes this in a header
+
+
+def clear_session_cookies(response: Response) -> None:
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    response.delete_cookie(CSRF_COOKIE, path="/")
+
+
 def _bearer(h: Optional[str]) -> str:
     return h.split(" ", 1)[1].strip() if h and h.lower().startswith("bearer ") else ""
 
@@ -103,8 +124,12 @@ def mount(app: FastAPI, gm: GraphMem, agent_id, demo_on: bool) -> Accounts:
         except Exception as e:                      # never keep the app from starting
             print("demo account seeding failed:", type(e).__name__, e, flush=True)
 
-    async def session_for(row: dict) -> dict:
-        return {"token": await acc.new_session(row["agent"]), "account": acc.public(row)}
+    async def session_for(row: dict, request: Request, response: Response) -> dict:
+        token = await acc.new_session(row["agent"])
+        if COOKIE_MODE:
+            set_session_cookies(request, response, token)
+            return {"token": "cookie", "account": acc.public(row)}              # the real token travels only in the httpOnly cookie
+        return {"token": token, "account": acc.public(row)}
 
     # -------------------------------------------------------------- sign-in
     @app.get("/v1/auth/config")
@@ -112,22 +137,22 @@ def mount(app: FastAPI, gm: GraphMem, agent_id, demo_on: bool) -> Accounts:
         return {"provider": "cognito" if cfg else "local",
                 "cognito": {"region": cfg.region, "userPoolId": cfg.pool_id, "clientId": cfg.client_id} if cfg else None,
                 "demo_accounts": [{"email": e, "name": n, "password": DEMO_PASSWORD} for e, n in DEMO_ACCOUNTS] if demo_on else [],
-                "password_rule": "At least 8 characters, with a letter and a number."}
+                "password_rule": "At least 8 characters, with a letter and a number.", "cookie_sessions": COOKIE_MODE}
 
     @app.post("/v1/auth/signup")
-    async def signup(b: SignUp):
+    async def signup(b: SignUp, request: Request, response: Response):
         if cfg:
             raise AuthProblem("Create your account on the sign-up page (Amazon Cognito sends the confirmation code).")
-        return await session_for(await acc.signup_local(b.email, b.password, b.name))
+        return await session_for(await acc.signup_local(b.email, b.password, b.name), request, response)
 
     @app.post("/v1/auth/signin")
-    async def signin(b: SignIn):
+    async def signin(b: SignIn, request: Request, response: Response):
         if cfg:
             raise AuthProblem("Sign in through Amazon Cognito on the sign-in page.", 404)
-        return await session_for(await acc.verify_password(b.email, b.password))
+        return await session_for(await acc.verify_password(b.email, b.password), request, response)
 
     @app.post("/v1/auth/exchange")
-    async def exchange(b: Exchange, authorization: Optional[str] = Header(None)):
+    async def exchange(b: Exchange, request: Request, response: Response, authorization: Optional[str] = Header(None)):
         if not cfg:
             raise AuthProblem("Cognito sign-in is not switched on here.", 404)
         try:
@@ -136,11 +161,12 @@ def mount(app: FastAPI, gm: GraphMem, agent_id, demo_on: bool) -> Accounts:
             raise AuthProblem("Your sign-in could not be checked. Sign in again.", 401)
         if not await acc.hit(f"exchange|{claims['sub']}", 30, 900):
             raise AuthProblem("Too many tries. Wait a few minutes.", 429)
-        return await session_for(await acc.upsert_cognito(claims["email"], claims["sub"], b.name or claims.get("name", "")))
+        return await session_for(await acc.upsert_cognito(claims["email"], claims["sub"], b.name or claims.get("name", "")), request, response)
 
     @app.post("/v1/auth/signout")
-    async def signout(authorization: Optional[str] = Header(None)):
-        await acc.end_session(_bearer(authorization))
+    async def signout(request: Request, response: Response, authorization: Optional[str] = Header(None)):
+        await acc.end_session(_bearer(authorization) or request.cookies.get(SESSION_COOKIE, ""))
+        clear_session_cookies(response)
         return {"ok": True}
 
     # -------------------------------------------------------------- browser notifications (Web Push)
@@ -193,9 +219,9 @@ def mount(app: FastAPI, gm: GraphMem, agent_id, demo_on: bool) -> Accounts:
         return await profile(agent)
 
     @app.post("/v1/account/password")
-    async def password(b: Password, agent: str = Depends(agent_id), authorization: Optional[str] = Header(None)):
+    async def password(request: Request, b: Password, agent: str = Depends(agent_id), authorization: Optional[str] = Header(None)):
         await not_shared_demo(agent, "changing the password")
-        await acc.change_password(agent, b.old, b.new, _bearer(authorization))
+        await acc.change_password(agent, b.old, b.new, _bearer(authorization) or request.cookies.get(SESSION_COOKIE, ""))      # the session making the change stays signed in
         return {"ok": True}
 
     @app.delete("/v1/account")

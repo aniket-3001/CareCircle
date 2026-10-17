@@ -1,5 +1,6 @@
 import { Bell, BellOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { authHeaders } from '../api/client';
 import { tr } from '../lib/i18n';
 import { useApp } from '../state';
 import { useToast } from './Toast';
@@ -35,9 +36,9 @@ export function PushToggle(): React.JSX.Element | null {
       await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(key) as BufferSource });
       const j = sub.toJSON();
-      const r = await fetch('/v1/push/subscribe', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify({ endpoint: j.endpoint, p256dh: j.keys?.p256dh, auth: j.keys?.auth }) });
+      const r = await fetch('/v1/push/subscribe', { method: 'POST', headers: authHeaders(token, { 'content-type': 'application/json' }), body: JSON.stringify({ endpoint: j.endpoint, p256dh: j.keys?.p256dh, auth: j.keys?.auth }) });
       if (!r.ok) throw new Error('The server did not accept the subscription.');
-      const t = await fetch('/v1/push/test', { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+      const t = await fetch('/v1/push/test', { method: 'POST', headers: authHeaders(token) });
       const sent = t.ok ? ((await t.json()) as { sent?: number }).sent ?? 0 : 0;
       setOn(true);
       toast(sent > 0 ? tr('Notifications are on for this browser.') : tr('Notifications are on, but the test message did not arrive. Reminders may not reach this browser.'));
@@ -50,7 +51,7 @@ export function PushToggle(): React.JSX.Element | null {
     try {
       const reg = await navigator.serviceWorker.getRegistration('/sw.js');
       await (await reg?.pushManager.getSubscription())?.unsubscribe();
-      await fetch('/v1/push/subscribe', { method: 'DELETE', headers: { authorization: `Bearer ${token}` } });
+      await fetch('/v1/push/subscribe', { method: 'DELETE', headers: authHeaders(token) });
       setOn(false);
       toast(tr('Notifications are off for this browser.'));
     } finally { setBusy(false); }

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import collections
 import hmac
+from urllib.parse import urlparse
 import ipaddress
 import os
 import time
@@ -166,7 +167,18 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
 
     async def agent_id(request: Request, authorization: Optional[str] = Header(None)) -> str:
         ip = client_ip(request)
-        who = await gm.authenticate(_bearer(authorization))
+        token = authorization[7:].strip() if authorization and authorization.lower().startswith("bearer ") else ""
+        if not token and accounts_api.COOKIE_MODE:                                  # a signed-in browser: the session is in an httpOnly cookie
+            token = request.cookies.get(accounts_api.SESSION_COOKIE, "")
+            if token and request.method not in ("GET", "HEAD", "OPTIONS"):
+                sent, kept = request.headers.get("x-cc-csrf", ""), request.cookies.get(accounts_api.CSRF_COOKIE, "")
+                origin = request.headers.get("origin", "")
+                same_site = not origin or urlparse(origin).netloc == request.headers.get("host", "")
+                if not (sent and kept and hmac.compare_digest(sent, kept) and same_site):
+                    raise HTTPException(403, "missing or wrong CSRF token")      # a page on another site cannot send the header or read the cookie
+        if not token:
+            raise HTTPException(401, "missing bearer token")
+        who = await gm.authenticate(token)
         if not who:
             if not bad_auth.allow(ip):
                 raise HTTPException(429, "too many failed attempts")

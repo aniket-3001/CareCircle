@@ -12,6 +12,7 @@ import { ToastProvider } from './components/Toast';
 import { levelVars, worstSeverity, type SeverityKey } from './design/levels';
 import { nameOf } from './lib/format';
 import { setLang, useLang, useT } from './lib/i18n';
+import { authHeaders } from './api/client';
 import { loadSession, saveSession } from './lib/session';
 import { setTheme, useTheme } from './lib/theme';
 import { Onboarding } from './screens/Onboarding';
@@ -64,7 +65,7 @@ export function App(): React.JSX.Element {
 
   const signOut = useCallback(async () => {
     if (session?.account) {
-      await fetch('/v1/auth/signout', { method: 'POST', headers: { authorization: `Bearer ${session.keys.me}` } }).catch(() => undefined);
+      await fetch('/v1/auth/signout', { method: 'POST', headers: authHeaders(session.keys.me) }).catch(() => undefined);
       if (session.account.provider === 'cognito' && session.account.tokens) {
         const { cognito } = await import('./lib/cognito');
         const cfg = await fetch('/v1/auth/config').then((r) => r.json() as Promise<{ cognito: { region: string; userPoolId: string; clientId: string } | null }>).catch(() => null);

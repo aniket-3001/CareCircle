@@ -18,7 +18,13 @@ async function parse<T>(r: Response): Promise<T> {
   return (j.result ?? (j as unknown)) as T;
 }
 
-const bearer = (token: string) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
+/** The session token is the word 'cookie' when the server keeps the session in an httpOnly cookie (the page then never holds the token): requests carry the cookie
+ *  by themselves, and a state-changing one also echoes the readable CSRF cookie in a header, which a page on another site cannot do. */
+export const COOKIE = 'cookie';
+const csrf = (): string => (typeof document === 'undefined' ? '' : (/(?:^|;\s*)cc_csrf=([^;]+)/.exec(document.cookie)?.[1] ?? ''));
+export const authHeaders = (token: string, extra: Record<string, string> = {}): Record<string, string> =>
+  token === COOKIE ? { ...extra, 'x-cc-csrf': csrf() } : { ...extra, authorization: `Bearer ${token}` };
+const bearer = (token: string) => authHeaders(token, { 'content-type': 'application/json' });
 /** A 401 on a request that carried a token means the session has ended (signed out elsewhere, password changed, expired): tell the app once, so it can go back to sign-in. */
 const ended = (r: Response): Response => {
   if (r.status === 401 && typeof window !== 'undefined') window.dispatchEvent(new Event('cc-session-ended'));
@@ -108,7 +114,7 @@ export function apiFor(s: Session) {
     clearChat: () => op<{ cleared: boolean }>('care_chat_clear'),
     members: () => get<Member[]>(`/v1/circles/${encodeURIComponent(s.circle)}/members`, token),
     intake: async (body: FormData): Promise<IntakeResult> => {
-      const r = await fetch(`${base}/intake`, { method: 'POST', headers: { authorization: `Bearer ${token}` }, body });
+      const r = await fetch(`${base}/intake`, { method: 'POST', headers: authHeaders(token), body });
       return parse<IntakeResult>(r);
     },
   };
