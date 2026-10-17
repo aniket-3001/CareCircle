@@ -44,7 +44,8 @@ def r2(w: World, r):
     for days, val in ((18, 2.0), (15, 2.2), (12, 2.4), (8, 3.0), (5, 3.2), (2, 3.4)):
         priya.ok(c, "care_measure", person="mum", kind="inr", value=val, at=now - days * DAY)
     t = priya.ok(c, "care_trend", person="mum", kind="inr", drug="warfarin", now=now)
-    text = str(t).lower()
+    import re
+    text = re.sub(r"\b[a-z]+[-_][0-9a-f]{6,}\b", " ", str(t).lower())        # random ids and account names ("meas_72f129a710fc4b") are not words: a hex id can spell "bad" by chance
     r.check(len(t.get("series", [])) == 6, "all six readings are in the series", t)
     r.check(any(k in t for k in ("changes", "markers", "around")), "the dose change is marked on the same timeline", list(t))
     for word in ("improv", "worse", "good", "bad", "normal", "should", "recommend", "dangerous", "safe"):

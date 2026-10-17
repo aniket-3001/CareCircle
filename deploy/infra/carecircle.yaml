@@ -1,0 +1,275 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Care Circle on one EC2 instance: Docker Compose (FalkorDB, the API, Caddy for HTTPS), settings from Parameter Store, backups to S3 and to EBS snapshots,
+  an outside health check that raises an alarm. Rebuilds the stack that was made by hand on 15-16 Oct 2026 (README, Operations).
+  This is a demonstration deployment: one instance, one availability zone, no replica.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: The VPC to use (the default VPC is fine).
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: A public subnet in that VPC (it must hand out a public address and have a route to an internet gateway).
+  InstanceType:
+    Type: String
+    Default: t3.large
+  VolumeSizeGiB:
+    Type: Number
+    Default: 40
+  AmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id
+    Description: Ubuntu 24.04 LTS (the version the stack was built on).
+  RepoUrl:
+    Type: String
+    Default: https://github.com/aniket-3001/CareCircle
+  RepoBranch:
+    Type: String
+    Default: main
+  SettingsPath:
+    Type: String
+    Default: /carecircle/prod
+    Description: >
+      Parameter Store path holding the settings (DOMAIN, GRAPHMEM_ADMIN_KEY, GRAPHMEM_RO_PASSWORD, and optionally GRAPHMEM_DB_PASSWORD, TELEGRAM_BOT_TOKEN,
+      CC_COGNITO_*, CC_VAPID_*, CC_COOKIE_SESSIONS). DOMAIN is replaced at boot by the one derived from this stack's own address.
+  BackupBucketName:
+    Type: String
+    Default: ""
+    Description: An existing S3 bucket for database backups. Leave empty to create one (kept when the stack is deleted).
+  RestoreFromBackup:
+    Type: String
+    AllowedValues: ["true", "false"]
+    Default: "false"
+    Description: "true: on first boot, load the newest database copy from the backup bucket (needs BackupBucketName of a bucket that has copies)."
+  AlertEmail:
+    Type: String
+    Default: ""
+    Description: An address to email when the site stops answering (AWS sends a confirmation message first). Empty = no email subscription.
+
+Conditions:
+  CreateBucket: !Equals [!Ref BackupBucketName, ""]
+  HasEmail: !Not [!Equals [!Ref AlertEmail, ""]]
+
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+    Condition: CreateBucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration: {BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: [{ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}}]
+      LifecycleConfiguration:
+        Rules: [{Id: expire-database-copies, Status: Enabled, Prefix: falkordb/, ExpirationInDays: 14}]
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Care Circle web (80 for the certificate challenge and redirect, 443 for the site); nothing else is open, there is no SSH
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0}
+        - {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0}
+        - {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIpv6: "::/0"}
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: [{Effect: Allow, Principal: {Service: ec2.amazonaws.com}, Action: "sts:AssumeRole"}]
+      ManagedPolicyArns: [arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore]     # shell access through Session Manager, no SSH
+      Policies:
+        - PolicyName: care-circle
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - {Effect: Allow, Action: ["bedrock:InvokeModel"], Resource: "*"}
+              - Effect: Allow
+                Action: ["s3:PutObject", "s3:GetObject", "s3:ListBucket"]
+                Resource:
+                  - !If [CreateBucket, !GetAtt Bucket.Arn, !Sub "arn:aws:s3:::${BackupBucketName}"]
+                  - !If [CreateBucket, !Sub "${Bucket.Arn}/*", !Sub "arn:aws:s3:::${BackupBucketName}/*"]
+              - Effect: Allow
+                Action: ["ssm:GetParametersByPath", "ssm:GetParameters", "ssm:GetParameter"]
+                Resource:
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SettingsPath}"
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SettingsPath}/*"
+              - {Effect: Allow, Action: "kms:Decrypt", Resource: "*", Condition: {StringEquals: {"kms:ViaService": !Sub "ssm.${AWS::Region}.amazonaws.com"}}}
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  Address:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmiId
+      InstanceType: !Ref InstanceType
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds: [!Ref SecurityGroup]
+      IamInstanceProfile: !Ref InstanceProfile
+      MetadataOptions: {HttpTokens: required, HttpPutResponseHopLimit: 2, HttpEndpoint: enabled}       # tokens required; hop limit 2 so the containers can reach the role
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs: {VolumeSize: !Ref VolumeSizeGiB, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true}
+      Tags:
+        - {Key: Name, Value: !Sub "${AWS::StackName}"}
+        - {Key: Backup, Value: carecircle}                              # the snapshot policy below picks instances by this tag
+      UserData:
+        Fn::Base64: !Sub
+          - |
+            #!/bin/bash
+            # First boot: Docker, the code, the settings from Parameter Store, the stack, a backup schedule. Output goes to /var/log/cc-bootstrap.log.
+            exec > >(tee -a /var/log/cc-bootstrap.log) 2>&1
+            set -euxo pipefail
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y ca-certificates curl git docker.io docker-compose-v2 cron
+            systemctl enable --now docker cron
+            if [ ! -f /swapfile ]; then fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo '/swapfile none swap sw 0 0' >> /etc/fstab; fi
+            [ -d /opt/cc/.git ] || git clone --branch "${RepoBranch}" "${RepoUrl}" /opt/cc
+            cd /opt/cc
+            export AWS_REGION="${AWS::Region}" SSM_PREFIX="${SettingsPath}" ENV_FILE=/opt/cc/deploy/.env
+            bash deploy/render_env.sh
+            grep -q '^GRAPHMEM_ADMIN_KEY=.' deploy/.env || { echo "the settings at ${SettingsPath} are missing"; exit 1; }
+            sed -i '/^DOMAIN=/d' deploy/.env && echo "DOMAIN=${Dashed}.sslip.io" >> deploy/.env     # this stack's own address, not the one in the store
+            echo "BACKUP_BUCKET=${Bucket}" >> /etc/cc-backup.env
+            if [ "${RestoreFromBackup}" = "true" ]; then
+              docker volume create deploy_falkor-data
+              KEY=$(docker run --rm --network host -e AWS_DEFAULT_REGION=${AWS::Region} amazon/aws-cli s3api list-objects-v2 --bucket "${Bucket}" --prefix falkordb/ --query 'sort_by(Contents,&LastModified)[-1].Key' --output text)
+              if [ -n "$KEY" ] && [ "$KEY" != "None" ]; then
+                docker run --rm --network host -e AWS_DEFAULT_REGION=${AWS::Region} -v deploy_falkor-data:/data amazon/aws-cli s3 cp "s3://${Bucket}/$KEY" /data/dump.rdb
+                echo "restored $KEY"
+              fi
+            fi
+            docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
+            echo "17 */6 * * * root BACKUP_BUCKET=${Bucket} bash /opt/cc/deploy/backup.sh >> /var/log/cc-backup.log 2>&1" > /etc/cron.d/cc-backup
+            chmod 644 /etc/cron.d/cc-backup
+            echo "bootstrap finished"
+          - Dashed: !Join ["-", !Split [".", !Ref Address]]
+            Bucket: !If [CreateBucket, !Ref Bucket, !Ref BackupBucketName]
+
+  AddressAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt Address.AllocationId
+      InstanceId: !Ref Instance
+
+  SnapshotRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement: [{Effect: Allow, Principal: {Service: dlm.amazonaws.com}, Action: "sts:AssumeRole"}]
+      ManagedPolicyArns: [arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole]
+
+  SnapshotPolicy:
+    Type: AWS::DLM::LifecyclePolicy
+    Properties:
+      Description: !Sub "${AWS::StackName} daily EBS snapshot keep 7"
+      State: ENABLED
+      ExecutionRoleArn: !GetAtt SnapshotRole.Arn
+      PolicyDetails:
+        ResourceTypes: [INSTANCE]
+        TargetTags: [{Key: Backup, Value: carecircle}]
+        Schedules:
+          - Name: daily
+            CreateRule: {Interval: 24, IntervalUnit: HOURS, Times: ["21:30"]}
+            RetainRule: {Count: 7}
+            CopyTags: true
+
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${AWS::StackName}-alerts"
+
+  AlertEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasEmail
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  HealthCheck:
+    Type: AWS::Route53::HealthCheck
+    Properties:
+      HealthCheckConfig:
+        Type: HTTPS
+        FullyQualifiedDomainName: !Sub
+          - "${Dashed}.sslip.io"
+          - Dashed: !Join ["-", !Split [".", !Ref Address]]
+        Port: 443
+        ResourcePath: /healthz
+        RequestInterval: 30
+        FailureThreshold: 3
+        EnableSNI: true
+      HealthCheckTags: [{Key: Name, Value: !Sub "${AWS::StackName}-healthz"}]
+
+  SiteDownAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-site-down"
+      AlarmDescription: The site did not answer /healthz from outside AWS for two minutes
+      Namespace: AWS/Route53
+      MetricName: HealthCheckStatus
+      Dimensions: [{Name: HealthCheckId, Value: !Ref HealthCheck}]
+      Statistic: Minimum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
+
+  RebootAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-instance-reboot"
+      AlarmDescription: The operating system stopped answering; reboot the instance
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_Instance
+      Dimensions: [{Name: InstanceId, Value: !Ref Instance}]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions: [!Sub "arn:aws:automate:${AWS::Region}:ec2:reboot", !Ref AlertTopic]
+
+  RecoverAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${AWS::StackName}-system-recover"
+      AlarmDescription: The AWS host failed; recover the instance onto new hardware
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_System
+      Dimensions: [{Name: InstanceId, Value: !Ref Instance}]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions: [!Sub "arn:aws:automate:${AWS::Region}:ec2:recover", !Ref AlertTopic]
+
+Outputs:
+  Site:
+    Value: !Sub
+      - "https://${Dashed}.sslip.io"
+      - Dashed: !Join ["-", !Split [".", !Ref Address]]
+  InstanceId:
+    Value: !Ref Instance
+  BackupBucket:
+    Value: !If [CreateBucket, !Ref Bucket, !Ref BackupBucketName]
+  AlertTopicArn:
+    Value: !Ref AlertTopic
