@@ -75,13 +75,13 @@ export function HistoryScreen(): React.JSX.Element {
       && (!needle || `${e.text} ${e.who} ${e.quote}`.toLowerCase().includes(needle)));
   };
 
-  async function exportFhir(): Promise<void> {
-    const b = await app.api.fhir();
+  async function exportFhir(coded = false): Promise<void> {
+    const b = await app.api.fhir(coded);
     const url = URL.createObjectURL(new Blob([JSON.stringify(b, null, 2)], { type: 'application/fhir+json' }));
     const a = document.createElement('a');
     a.href = url; a.download = `${app.session.person}-medications-fhir.json`; a.click();
     URL.revokeObjectURL(url);
-    toast(`Exported ${b.entry.length - 1} medication statements (FHIR R4, free text)`);
+    toast(`Exported ${b.entry.length - 1} medication statements (FHIR R4, ${coded ? 'RxNorm codes where the name matches exactly' : 'free text'})`);
   }
 
   async function doErase(): Promise<void> {
@@ -124,6 +124,7 @@ export function HistoryScreen(): React.JSX.Element {
             <p className="muted">{tr('Take the regimen with you, or remove it. Removing leaves only a receipt: a hash of what was removed, who did it and when.')}</p>
             <div className="row row--wrap">
               <button type="button" className="btn btn--soft" onClick={() => void exportFhir()}><Download size={18} aria-hidden="true" /> {tr('Export as FHIR (JSON)')}</button>
+              <button type="button" className="btn btn--soft" onClick={() => void exportFhir(true)} data-testid="fhir-coded"><Download size={18} aria-hidden="true" /> {tr('Export as FHIR with medicine codes')}</button>
               <button type="button" className="btn btn--soft" onClick={() => window.print()}><Printer size={18} aria-hidden="true" /> {tr('Print a summary')}</button>
               {isOwner && <button type="button" className="btn btn--soft" style={{ color: 'var(--danger)' }} onClick={() => setErase(true)}><Trash2 size={18} aria-hidden="true" /> Remove everything about {title(app.session.person)}</button>}
             </div>

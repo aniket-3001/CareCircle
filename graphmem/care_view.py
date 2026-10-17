@@ -391,10 +391,12 @@ class CareViewMixin:
         return {"cleared": True}
 
     # ------------------------------------------------------------------ FHIR export
-    async def care_export_fhir(self, person: str) -> dict:
-        """The regimen as a FHIR R4 Bundle of MedicationStatement resources (free text only).
+    async def care_export_fhir(self, person: str, coded: bool = False) -> dict:
+        """The regimen as a FHIR R4 Bundle of MedicationStatement resources.
 
-        A collection of one Patient and the statements. This tool does not assign RxNorm or other medicine codes, so receiving systems must not treat the text as coded."""
+        A collection of one Patient and the statements. By default it is free text only and says so. With `coded=true` each medicine whose name matches an RxNorm
+        ingredient EXACTLY (looked up at NLM RxNav; only the medicine name is sent) also carries that RxNorm code; one that does not match stays text, and the
+        bundle says which are which. A brand or combination (Telma-AM) is never coded as a single ingredient."""
         p = norm(person)
         rows = await self._q(
             """MATCH (x:Dose {status:'confirmed', action:'set'})-[:FOR]->(:Person {id:$p})
@@ -402,16 +404,26 @@ class CareViewMixin:
                ORDER BY x.valid_from""", {"p": p}, scope="read")
         entries = [{"fullUrl": f"urn:uuid:patient-{p}", "resource": {"resourceType": "Patient", "id": p, "name": [{"text": _title(p)}],
                                                                        "meta": {"tag": [{"code": "synthetic-or-user-entered"}]}}}]
+        codes: dict[str, str] = {}
+        if coded:
+            from carecircle import external
+            for d in sorted({r[1] for r in rows}):
+                got = await asyncio.to_thread(external.rxnorm_ingredients, d)
+                hit = next((g for g in got if g["name"] == d and g.get("rxcui")), None)         # an exact ingredient match only: a guess is not a code
+                if hit:
+                    codes[d] = str(hit["rxcui"])
         for (did, drug, dt, ft, vf, vt, cur, src, quote, verified, by) in rows:
             period = {"start": datetime.fromtimestamp(vf / 1000, tz=timezone.utc).isoformat()}
             if vt:
                 period["end"] = datetime.fromtimestamp(vt / 1000, tz=timezone.utc).isoformat()
             res = {"resourceType": "MedicationStatement", "id": did, "status": "active" if cur else "stopped",
-                   "medicationCodeableConcept": {"text": _title(drug)}, "subject": {"reference": f"Patient/{p}", "display": _title(p)},
+                   "medicationCodeableConcept": ({"coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": codes[drug], "display": _title(drug)}], "text": _title(drug)}
+                                                 if drug in codes else {"text": _title(drug)}), "subject": {"reference": f"Patient/{p}", "display": _title(p)},
                    "effectivePeriod": period, "informationSource": {"display": who(by)},
                    "dosage": [{"text": " ".join(x for x in (dt, ft) if x) or "not recorded"}],
                    "note": [{"text": f"Source: {SOURCE_WORDS.get(src, src)}." + (f" Quoted line: \"{quote}\"." if quote else "")
                                      + (" Quote verified against the source text." if verified else "")}]}
             entries.append({"fullUrl": f"urn:uuid:{did}", "resource": res})
         return {"resourceType": "Bundle", "type": "collection", "timestamp": datetime.now(timezone.utc).isoformat(),
-                "meta": {"tag": [{"code": "free-text-only", "display": "No medicine codes are assigned by Care Circle"}]}, "entry": entries}
+                "meta": {"tag": [({"code": "coded-where-exact", "display": f"{len(codes)} of {len({r[1] for r in rows})} medicines carry an RxNorm code (exact ingredient match only); the others are free text"}
+                                  if coded else {"code": "free-text-only", "display": "No medicine codes are assigned by Care Circle"})]}, "entry": entries}

@@ -95,3 +95,20 @@ async def test_a_circle_outside_the_us_looks_up_no_recalls_and_sends_no_name(gm,
             await m.care_set_timezone(tz)
         out = await m.care_recalls("asha")
         assert seen == [] and out["available"] is False and out["region"] == "US only" and "no medicine name was sent" in out["note"]
+
+
+async def test_fhir_codes_only_exact_ingredient_matches_and_says_which(gm, monkeypatch):
+    monkeypatch.setattr(external, "rxnorm_ingredients", lambda d: {"metformin": [{"name": "metformin", "rxcui": "6809"}],
+                                                                   "becosules": [{"name": "thiamine", "rxcui": "10454"}]}.get(d, []))
+    t = tid(gm, "fh")
+    await gm.grant("ravi", t, ("read", "write"))
+    m = gm.open("ravi", t)
+    await m.care_record("asha", "metformin", dose_text="500 mg")
+    await m.care_record("asha", "becosules", dose_text="1")                    # RxNorm offers a different name: a guess, not a match
+    plain = await m.care_export_fhir("asha")
+    assert plain["meta"]["tag"][0]["code"] == "free-text-only" and not any("coding" in e["resource"].get("medicationCodeableConcept", {}) for e in plain["entry"])
+    got = await m.care_export_fhir("asha", coded=True)
+    by = {e["resource"]["medicationCodeableConcept"]["text"]: e["resource"]["medicationCodeableConcept"] for e in got["entry"] if e["resource"]["resourceType"] == "MedicationStatement"}
+    assert by["Metformin"]["coding"][0]["code"] == "6809" and "rxnorm" in by["Metformin"]["coding"][0]["system"]
+    assert "coding" not in by["Becosules"]
+    assert got["meta"]["tag"][0]["code"] == "coded-where-exact" and "1 of 2" in got["meta"]["tag"][0]["display"]

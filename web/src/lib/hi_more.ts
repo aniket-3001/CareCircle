@@ -169,4 +169,5 @@ export const HI_MORE: Record<string, string> = {
   "Could not load it.": "लोड नहीं हो सका।",
   "This is the text the server read, kept so the quoted line can be checked. The picture or recording itself is not stored.": "यह वह पाठ है जो सर्वर ने पढ़ा, ताकि उद्धृत पंक्ति जाँची जा सके। तस्वीर या रिकॉर्डिंग खुद नहीं रखी जाती।",
   "Typed in by hand, so there is no photo, voice note or document behind it.": "हाथ से लिखा गया, इसलिए इसके पीछे कोई फ़ोटो, वॉइस नोट या दस्तावेज़ नहीं है।",
+  "Export as FHIR with medicine codes": "दवा कोड के साथ FHIR में निर्यात करें",
 };

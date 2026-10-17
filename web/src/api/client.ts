@@ -96,7 +96,7 @@ export function apiFor(s: Session) {
     restoreEntry: (dose_id: string) => op<{ id: string }>('care_restore_entry', { dose_id }),
     me: () => get<{ tenants: Record<string, string[]> }>('/v1/me', token),
     receipts: () => op<Receipt[]>('care_receipts'),
-    fhir: () => op<FhirBundle>('care_export_fhir', { person: p }),
+    fhir: (coded = false) => op<FhirBundle>('care_export_fhir', { person: p, coded }),
     chat: () => op<ChatMessage[]>('care_chat_history', { limit: 60 }),
     ask: (question: string, lang = '') => op<ChatMessage>('care_chat_ask', { person: p, question, lang }),
     clearChat: () => op<{ cleared: boolean }>('care_chat_clear'),
