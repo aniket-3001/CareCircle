@@ -103,11 +103,15 @@ class CareScheduleMixin:
         chk = await self.care_check(person, t)
         div = await self.care_divergence(person, t)
         unseen = sum(len(c["unacknowledged"]) for c in div["carers"].values())
+        stopped = (await self._q("MATCH (v:Prevented {person:$p}) WHERE v.at >= $s RETURN count(v)", {"p": p, "s": since_ms}, scope="read"))[0][0]
+        late = (await self._q("MATCH (:Person)-[a:ACKED]->(x:Dose)-[:FOR]->(:Person {id:$p}) WHERE a.at >= $s AND a.at - x.at > $h RETURN count(a)",
+                              {"p": p, "s": since_ms, "h": 4 * 3_600_000}, scope="read"))[0][0]
         return {"days": days, "from": first.isoformat(), "to": today.isoformat(), "tz": tz,
                 "doses_due": due, "doses_marked_given": given, "doses_not_marked": due - given,
                 "entries_recorded": rec, "entries_marked_mistake": mist,
                 "flagged_now": len(chk["direct"]) + len(chk["enzyme_paths"]), "possible_duplicates_now": len(chk.get("duplicates", [])), "changes_not_yet_seen": unseen,
-                "note": "Counts of what people recorded in this circle. A dose that was taken but not marked counts as not marked. This says nothing about health and is not compared with anyone else."}
+                "double_doses_stopped": stopped, "changes_seen_late": late,
+                "note": "Counts of what people recorded in this circle. A dose that was taken but not marked counts as not marked. \"Double doses stopped\" is how often a carer tried to mark a slot someone else had already marked; \"seen late\" is changes a carer acknowledged more than 4 hours after they were made. This says nothing about health and is not compared with anyone else."}
 
     # ------------------------------------------------------------------ how many doses are left in the pack
     async def care_stock_set(self, dose_id: str, doses_left: int) -> dict:

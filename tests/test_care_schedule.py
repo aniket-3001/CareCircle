@@ -251,3 +251,22 @@ async def test_the_week_in_counts_matches_what_was_marked_and_what_was_due(gm):
     for bad in (0, 91, True):
         with pytest.raises(ValueError):
             await a.care_outcomes("asha", bad, now)
+
+
+async def test_a_refused_second_given_is_counted_once_per_carer_and_erased_with_the_person(gm):
+    t, a, b, ro = await circle(gm)
+    met = await entry(a, at_ms=at(date(2026, 10, 10), "00:00"))
+    await a.care_schedule_set(met, ["08:00"])
+    first = await a.care_give("asha", "metformin", "2026-10-16 08:00")
+    assert first["given"] is True
+    for _ in range(3):                                                              # the second carer tries three times
+        again = await b.care_give("asha", "metformin", "2026-10-16 08:00")
+        assert again["given"] is False and again["already_given_by"] == "sc-a"
+    out = await a.care_outcomes("asha", 7, at(date(2026, 10, 17), "12:00"))
+    assert out["double_doses_stopped"] == 1                                        # once for that carer and that slot, not three times
+    await a.care_give("asha", "metformin", "2026-10-15 08:00")
+    await b.care_give("asha", "metformin", "2026-10-15 08:00")                     # another slot, another refusal
+    assert (await a.care_outcomes("asha", 7, at(date(2026, 10, 17), "12:00")))["double_doses_stopped"] == 2
+    await a.care_forget_person("asha", confirm="asha")
+    left = (await a._q("MATCH (v:Prevented) RETURN count(v)", scope="read"))[0][0]
+    assert left == 0                                                               # nothing about the person is kept, including the refusals

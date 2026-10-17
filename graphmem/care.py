@@ -403,6 +403,8 @@ class CareMixin:
         if fresh:
             watched = (await self._q("MATCH (w:Watch {key:$k}) RETURN count(w)", {"k": f"{norm(person)}|{norm(drug)}"}, scope="read"))[0][0] > 0
             return {"given": True, "slot": slot, **({"needs_second_carer": True} if watched else {})}
+        await self._q("MERGE (v:Prevented {key:$k}) ON CREATE SET v.person=$p, v.drug=$d, v.slot=$s, v.by=$me, v.first_by=$by, v.at=$t",
+                      {"k": f"{key}|{norm(self.agent)}", "p": norm(person), "d": norm(drug), "s": norm(slot), "me": norm(self.agent), "by": by, "t": now_ms()}, checked=True)     # one record per carer and slot, however often they tap
         return {"given": False, "duplicate": True, "already_given_by": by, "at": at,
                 "note": "this slot was already recorded; check with them before giving another dose"}
 

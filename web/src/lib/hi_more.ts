@@ -229,4 +229,6 @@ export const HI_MORE: Record<string, string> = {
   "pairs are listed by the source without a severity": "जोड़ियाँ स्रोत में बिना गंभीरता के सूचीबद्ध हैं",
   "unrated is not the same as safe": "बिना रेटिंग का मतलब सुरक्षित नहीं",
   "More: how to read a flag, how the record adds up, readings, where the flags come from": "और: फ़्लैग कैसे पढ़ें, रिकॉर्ड का जोड़, रीडिंग, फ़्लैग कहाँ से आते हैं",
+  "double doses stopped (a second carer tried to mark a dose already marked)": "दोहरी खुराकें रुकीं (दूसरे देखभालकर्ता ने पहले से चिह्नित खुराक चिह्नित करनी चाही)",
+  "changes seen more than 4 hours after they were made": "बदलाव जो बनने के 4 घंटे से ज़्यादा बाद देखे गए",
 };

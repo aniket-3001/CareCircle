@@ -321,6 +321,7 @@ class CareViewMixin:
         gives = (await self._q("MATCH (g:Give {person:$p}) RETURN count(g)", {"p": p}))[0][0]
         digest = await self._receipt_mac([p, sorted(ids)])
         await self._q("MATCH (g:Give {person:$p}) DELETE g", {"p": p})
+        await self._q("MATCH (v:Prevented {person:$p}) DELETE v", {"p": p})
         await self._q("MATCH (h:Handover {person:$p}) DELETE h", {"p": p})
         await self._q("MATCH (w:Watch) WHERE w.key STARTS WITH $k DELETE w", {"k": p + "|"})
         await self._q("MATCH (f:Followup {person:$p}) DETACH DELETE f", {"p": p})

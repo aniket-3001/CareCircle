@@ -73,6 +73,8 @@ export interface Outcomes {
   flagged_now: number;
   possible_duplicates_now: number;
   changes_not_yet_seen: number;
+  double_doses_stopped: number;
+  changes_seen_late: number;
   note: string;
 }
 
