@@ -1,0 +1,763 @@
+{
+ "classes": {
+  "ace inhibitor": {
+   "atc": [
+    "C09A",
+    "C09B"
+   ],
+   "members": [
+    "benazepril",
+    "captopril",
+    "cilazapril",
+    "enalapril",
+    "fosinopril",
+    "imidapril",
+    "lisinopril",
+    "moexipril",
+    "perindopril",
+    "quinapril",
+    "ramipril",
+    "spirapril",
+    "trandolapril",
+    "zofenopril"
+   ]
+  },
+  "aminoglycoside": {
+   "atc": [
+    "J01G"
+   ],
+   "members": [
+    "amikacin",
+    "arbekacin",
+    "dibekacin",
+    "gentamicin",
+    "kanamycin",
+    "neomycin",
+    "netilmicin",
+    "plazomicin",
+    "sisomicin",
+    "streptomycin",
+    "tobramycin"
+   ]
+  },
+  "anticoagulant": {
+   "atc": [
+    "B01AA",
+    "B01AB",
+    "B01AE",
+    "B01AF"
+   ],
+   "members": [
+    "acenocoumarol",
+    "antithrombin iii",
+    "apixaban",
+    "argatroban",
+    "bemiparin",
+    "betrixaban",
+    "bivalirudin",
+    "dabigatran etexilate",
+    "dalteparin",
+    "danaparoid",
+    "desirudin",
+    "dicumarol",
+    "edoxaban",
+    "enoxaparin",
+    "fluindione",
+    "heparin",
+    "lepirudin",
+    "nadroparin",
+    "parnaparin",
+    "phenindione",
+    "phenprocoumon",
+    "reviparin",
+    "rivaroxaban",
+    "tinzaparin",
+    "tioclomarol",
+    "warfarin"
+   ]
+  },
+  "anticonvulsant": {
+   "atc": [
+    "N03A"
+   ],
+   "members": [
+    "barbexaclone",
+    "beclamide",
+    "brivaracetam",
+    "cannabidiol",
+    "carbamazepine",
+    "cenobamate",
+    "clonazepam",
+    "dipropylacetamide",
+    "eslicarbazepine",
+    "ethosuximide",
+    "ethotoin",
+    "ezogabine",
+    "felbamate",
+    "fenfluramine",
+    "fosphenytoin",
+    "ganaxolone",
+    "lacosamide",
+    "lamotrigine",
+    "levetiracetam",
+    "mephenytoin",
+    "mephobarbital",
+    "metharbital",
+    "methsuximide",
+    "oxcarbazepine",
+    "paramethadione",
+    "perampanel",
+    "phenacemide",
+    "phenobarbital",
+    "phensuximide",
+    "phenytoin",
+    "primidone",
+    "progabide",
+    "rufinamide",
+    "stiripentol",
+    "sulthiame",
+    "tiagabine",
+    "topiramate",
+    "trimethadione",
+    "vigabatrin",
+    "zonisamide"
+   ]
+  },
+  "antidepressant": {
+   "atc": [
+    "N06A"
+   ],
+   "members": [
+    "5-hydroxytryptophan",
+    "amineptin",
+    "amitriptyline",
+    "amoxapine",
+    "bifemelane",
+    "brexanolone",
+    "bupropion",
+    "butriptyline",
+    "citalopram",
+    "clomipramine",
+    "desipramine",
+    "desvenlafaxine",
+    "dibenzepin",
+    "dothiepin",
+    "doxepin",
+    "duloxetine",
+    "escitalopram",
+    "esketamine",
+    "fluoxetine",
+    "fluvoxamine",
+    "gepirone",
+    "imipramine",
+    "iprindole",
+    "iproniazid",
+    "isocarboxazid",
+    "levomilnacipran",
+    "lofepramine",
+    "maprotiline",
+    "medifoxamine",
+    "melitracen",
+    "mianserin",
+    "milnacipran",
+    "minaprine",
+    "mirtazapine",
+    "moclobemide",
+    "nefazodone",
+    "nialamide",
+    "nomifensine",
+    "nortriptyline",
+    "opipramol",
+    "paroxetine",
+    "phenelzine",
+    "protriptyline",
+    "quinupramine",
+    "reboxetine",
+    "sertraline",
+    "st. john's wort extract",
+    "tianeptine",
+    "toloxatone",
+    "tranylcypromine",
+    "trazodone",
+    "trimipramine",
+    "tryptophan",
+    "venlafaxine",
+    "vilazodone",
+    "viloxazine",
+    "vortioxetine",
+    "zuranolone"
+   ]
+  },
+  "antipsychotic": {
+   "atc": [
+    "N05A"
+   ],
+   "members": [
+    "acepromazine",
+    "acetophenazine",
+    "amisulpride",
+    "aripiprazole",
+    "asenapine",
+    "benperidol",
+    "brexpiprazole",
+    "bromperidol",
+    "cariprazine",
+    "chlorproethazine",
+    "chlorpromazine",
+    "chlorprothixene",
+    "clothiapine",
+    "clozapine",
+    "cyamemazine",
+    "droperidol",
+    "flupenthixol",
+    "fluphenazine",
+    "fluspirilene",
+    "haloperidol",
+    "iloperidone",
+    "lithium",
+    "loxapine",
+    "lumateperone",
+    "lurasidone",
+    "mesoridazine",
+    "methotrimeprazine",
+    "metylperon",
+    "molindone",
+    "olanzapine",
+    "oxypertine",
+    "paliperidone",
+    "penfluridol",
+    "perazine",
+    "periciazine",
+    "perphenazine",
+    "pimavanserin",
+    "pimozide",
+    "pipamperone",
+    "pipothiazine",
+    "prochlorperazine",
+    "promazine",
+    "prothipendyl",
+    "quetiapine",
+    "remoxipride",
+    "risperidone",
+    "sertindole",
+    "sulpiride",
+    "sultopride",
+    "thiopropazate",
+    "thioproperazine",
+    "thioridazine",
+    "thiothixene",
+    "tiapride",
+    "trifluoperazine",
+    "trifluperidol",
+    "triflupromazine",
+    "veralipride",
+    "ziprasidone",
+    "zotepine",
+    "zuclopenthixol"
+   ]
+  },
+  "arb": {
+   "atc": [
+    "C09C",
+    "C09D"
+   ],
+   "members": [
+    "candesartan",
+    "eprosartan",
+    "irbesartan",
+    "losartan",
+    "telmisartan",
+    "valsartan"
+   ]
+  },
+  "aspirin": {
+   "atc": [
+    "N02BA",
+    "B01AC06"
+   ],
+   "members": [
+    "aloxiprin",
+    "aspirin",
+    "benorilate",
+    "diflunisal",
+    "ethenzamide",
+    "imidazole-2-hydroxybenzoate",
+    "morpholine salicylate",
+    "salicylamide",
+    "salsalate"
+   ]
+  },
+  "benzodiazepine": {
+   "atc": [
+    "N05BA",
+    "N05CD",
+    "N03AE"
+   ],
+   "members": [
+    "alprazolam",
+    "bromazepam",
+    "brotizolam",
+    "chlordiazepoxide",
+    "clobazam",
+    "clonazepam",
+    "clotiazepam",
+    "cloxazolam",
+    "diazepam",
+    "estazolam",
+    "ethyl loflazepate",
+    "flunitrazepam",
+    "flurazepam",
+    "halazepam",
+    "ketazolam",
+    "lorazepam",
+    "lormetazepam",
+    "medazepam",
+    "midazolam",
+    "nitrazepam",
+    "nordazepam",
+    "oxazepam",
+    "prazepam",
+    "quazepam",
+    "remimazolam",
+    "temazepam",
+    "tofisopam",
+    "triazolam",
+    "triazulenone"
+   ]
+  },
+  "beta blocker": {
+   "atc": [
+    "C07A"
+   ],
+   "members": [
+    "acebutolol",
+    "alprenolol",
+    "atenolol",
+    "betaxolol",
+    "bisoprolol",
+    "bopindolol",
+    "bupranolol",
+    "carteolol",
+    "carvedilol",
+    "celiprolol",
+    "esmolol",
+    "labetalol",
+    "landiolol",
+    "mepindolol",
+    "metoprolol",
+    "nadolol",
+    "nebivolol",
+    "oxprenolol",
+    "penbutolol",
+    "pindolol",
+    "practolol",
+    "propranolol",
+    "sotalol",
+    "talinolol",
+    "tertatolol",
+    "timolol"
+   ]
+  },
+  "calcium channel blocker": {
+   "atc": [
+    "C08"
+   ],
+   "members": [
+    "amlodipine",
+    "bepridil",
+    "clevidipine",
+    "diltiazem",
+    "etripamil",
+    "felodipine",
+    "fendiline",
+    "gallopamil",
+    "isradipine",
+    "lacidipine",
+    "lercanidipine",
+    "levamlodipine",
+    "lidoflazine",
+    "manidipine",
+    "mepirodipine",
+    "mibefradil",
+    "nicardipine",
+    "nifedipine",
+    "nilvadipine",
+    "nimodipine",
+    "nisoldipine",
+    "nitrendipine",
+    "perhexiline",
+    "verapamil"
+   ]
+  },
+  "carbapenem": {
+   "atc": [
+    "J01DH"
+   ],
+   "members": [
+    "doripenem",
+    "ertapenem",
+    "meropenem",
+    "tebipenem pivoxil"
+   ]
+  },
+  "cephalosporin": {
+   "atc": [
+    "J01DB",
+    "J01DC",
+    "J01DD",
+    "J01DE"
+   ],
+   "members": [
+    "cefaclor",
+    "cefadroxil",
+    "cefamandole",
+    "cefatrizine",
+    "cefazolin",
+    "cefdinir",
+    "cefditoren",
+    "cefepime",
+    "cefetamet",
+    "cefixime",
+    "cefmetazole",
+    "cefodizime",
+    "cefonicid",
+    "cefoperazone",
+    "ceforanide",
+    "cefotaxime",
+    "cefotetan",
+    "cefotiam",
+    "cefoxitin",
+    "cefpirome",
+    "cefpodoxime",
+    "cefprozil",
+    "cefsulodin",
+    "ceftazidime",
+    "ceftibuten",
+    "ceftizoxime",
+    "ceftriaxone",
+    "cefuroxime",
+    "cephalexin",
+    "cephaloridine",
+    "cephalothin",
+    "cephapirin",
+    "cephradine",
+    "loracarbef",
+    "moxalactam"
+   ]
+  },
+  "fibrate": {
+   "atc": [
+    "C10AB"
+   ],
+   "members": [
+    "bezafibrate",
+    "choline fenofibrate",
+    "ciprofibrate",
+    "clofibrate",
+    "etofibrate",
+    "fenofibrate",
+    "gemfibrozil"
+   ]
+  },
+  "fluoroquinolone": {
+   "atc": [
+    "J01MA"
+   ],
+   "members": [
+    "ciprofloxacin",
+    "delafloxacin",
+    "enoxacin",
+    "fleroxacin",
+    "gatifloxacin",
+    "gemifloxacin",
+    "grepafloxacin",
+    "levofloxacin",
+    "lomefloxacin",
+    "moxifloxacin",
+    "norfloxacin",
+    "ofloxacin",
+    "pefloxacin",
+    "sparfloxacin",
+    "temafloxacin",
+    "trovafloxacin"
+   ]
+  },
+  "macrolide": {
+   "atc": [
+    "J01FA"
+   ],
+   "members": [
+    "azithromycin",
+    "clarithromycin",
+    "dirithromycin",
+    "erythromycin",
+    "josamycin",
+    "midecamycin",
+    "miocamycin",
+    "oleandomycin",
+    "roxithromycin",
+    "spiramycin",
+    "telithromycin",
+    "troleandomycin"
+   ]
+  },
+  "nitrofuran": {
+   "atc": [
+    "J01XE"
+   ],
+   "members": [
+    "nitrofurantoin"
+   ]
+  },
+  "nsaid": {
+   "atc": [
+    "M01A"
+   ],
+   "members": [
+    "aceclofenac",
+    "acemetacin",
+    "alminoprofen",
+    "apazone",
+    "benzydamine",
+    "bufexamac",
+    "bumadizone",
+    "celecoxib",
+    "chondroitin sulfates",
+    "clofezone",
+    "dexketoprofen",
+    "diacetylrhein",
+    "diclofenac",
+    "droxicam",
+    "etodolac",
+    "etoricoxib",
+    "fenbufen",
+    "fenoprofen",
+    "feprazone",
+    "flufenamic acid",
+    "flurbiprofen",
+    "glucosamine",
+    "ibuprofen",
+    "indomethacin",
+    "kebuzone",
+    "ketoprofen",
+    "ketorolac",
+    "lonazolac",
+    "lornoxicam",
+    "loxoprofen",
+    "meclofenamic acid",
+    "meloxicam",
+    "mofebutazone",
+    "morniflumate",
+    "nabumetone",
+    "naproxen",
+    "niflumic acid",
+    "nimesulide",
+    "orgotein",
+    "oxaceprol",
+    "oxaprozin",
+    "oxyphenbutazone",
+    "parecoxib",
+    "phenylbutazone",
+    "piroxicam",
+    "proglumetacin",
+    "proquazone",
+    "rofecoxib",
+    "sulindac",
+    "suprofen",
+    "tenoxicam",
+    "tolfenamic acid",
+    "tolmetin",
+    "valdecoxib",
+    "zomepirac"
+   ]
+  },
+  "opioid": {
+   "atc": [
+    "N02A"
+   ],
+   "members": [
+    "buprenorphine",
+    "butorphanol",
+    "dextromoramide",
+    "dezocine",
+    "dihydrocodeine",
+    "fentanyl",
+    "hydromorphone",
+    "meperidine",
+    "meptazinol",
+    "morphine",
+    "nalbuphine",
+    "oliceridine",
+    "opium",
+    "oxycodone",
+    "oxymorphone",
+    "papaveretum",
+    "pentazocine",
+    "phenazocine",
+    "pirinitramide",
+    "propoxyphene",
+    "tapentadol",
+    "tilidine",
+    "tramadol"
+   ]
+  },
+  "penicillin": {
+   "atc": [
+    "J01CA",
+    "J01CE",
+    "J01CF",
+    "J01CR"
+   ],
+   "members": [
+    "amdinocillin",
+    "amdinocillin pivoxil",
+    "amoxicillin",
+    "ampicillin",
+    "azidocillin",
+    "azlocillin",
+    "bacampicillin",
+    "carbenicillin",
+    "cloxacillin",
+    "dicloxacillin",
+    "floxacillin",
+    "hetacillin",
+    "methampicillin",
+    "methicillin",
+    "mezlocillin",
+    "nafcillin",
+    "oxacillin",
+    "penicillin g",
+    "penicillin v",
+    "phenethicillin",
+    "piperacillin",
+    "pivampicillin",
+    "propicillin",
+    "sulbenicillin",
+    "talampicillin",
+    "temocillin",
+    "ticarcillin"
+   ]
+  },
+  "ppi": {
+   "atc": [
+    "A02BC"
+   ],
+   "members": [
+    "dexlansoprazole",
+    "esomeprazole",
+    "lansoprazole",
+    "omeprazole",
+    "pantoprazole",
+    "rabeprazole",
+    "vonoprazan"
+   ]
+  },
+  "statin": {
+   "atc": [
+    "C10AA"
+   ],
+   "members": [
+    "atorvastatin",
+    "cerivastatin",
+    "fluvastatin",
+    "lovastatin",
+    "pitavastatin",
+    "pravastatin",
+    "rosuvastatin",
+    "simvastatin"
+   ]
+  },
+  "sulfa": {
+   "atc": [
+    "J01EB",
+    "J01EC",
+    "J01ED",
+    "J01EE"
+   ],
+   "members": [
+    "sulfadiazine",
+    "sulfadimethoxine",
+    "sulfalene",
+    "sulfamerazine",
+    "sulfamethazine",
+    "sulfamethizole",
+    "sulfamethoxazole",
+    "sulfamethoxypyridazine",
+    "sulfamoxole",
+    "sulfanilamide",
+    "sulfapyridine",
+    "sulfathiazole",
+    "sulfisomidine",
+    "sulfisoxazole"
+   ]
+  },
+  "sulfonylurea": {
+   "atc": [
+    "A10BB"
+   ],
+   "members": [
+    "acetohexamide",
+    "carbutamide",
+    "chlorpropamide",
+    "glibornuride",
+    "gliclazide",
+    "glimepiride",
+    "glipizide",
+    "gliquidone",
+    "glyburide",
+    "tolazamide",
+    "tolbutamide"
+   ]
+  },
+  "tetracycline": {
+   "atc": [
+    "J01AA"
+   ],
+   "members": [
+    "chlortetracycline",
+    "clomocycline",
+    "demeclocycline",
+    "doxycycline",
+    "eravacycline",
+    "lymecycline",
+    "methacycline",
+    "minocycline",
+    "omadacycline",
+    "oxytetracycline",
+    "rolitetracycline",
+    "sarecycline",
+    "tetracycline",
+    "tigecycline"
+   ]
+  },
+  "thiazide": {
+   "atc": [
+    "C03A",
+    "C03B"
+   ],
+   "members": [
+    "bendroflumethiazide",
+    "chlorothiazide",
+    "chlorthalidone",
+    "cicletanine",
+    "clopamide",
+    "cyclopenthiazide",
+    "cyclothiazide",
+    "hydrochlorothiazide",
+    "hydroflumethiazide",
+    "indapamide",
+    "mefruside",
+    "mersalyl",
+    "methyclothiazide",
+    "metolazone",
+    "polythiazide",
+    "quinethazone",
+    "theobromine",
+    "trichlormethiazide",
+    "xipamide"
+   ]
+  }
+ },
+ "fetched": "2026-10-17",
+ "source": "NLM RxClass, ATC relation, ingredient level"
+}

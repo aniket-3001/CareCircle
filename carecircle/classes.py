@@ -1,6 +1,6 @@
 """Medicine classes used by the allergy check: which medicines belong to a group a family might name ("penicillin", "NSAIDs", "sulfa").
 
-Two sources. data/ref/classes_atc.json lists the ingredients of each class from the WHO ATC table as served by NLM RxClass (scripts/fetch_atc_classes.py;
+Two sources. carecircle/snapshot/classes_atc.json lists the ingredients of each class from the WHO ATC table as served by NLM RxClass (scripts/fetch_atc_classes.py;
 the class words are mapped to ATC codes by hand, the members are not). The short hand-written list below is kept as a floor, and the two are merged. Neither is
 complete: a medicine can be missing from a group, and a group can be missing altogether. A hit means "ask the prescriber"; no hit means nothing. Members
 are generic names, matched to a regimen entry by name.
@@ -36,7 +36,7 @@ CLASSES: dict[str, dict] = {
 
 def _atc() -> dict[str, tuple[str, ...]]:
     try:
-        with open(os.path.join(os.path.dirname(__file__), "..", "data", "ref", "classes_atc.json"), encoding="utf-8") as f:
+        with open(os.path.join(os.path.dirname(__file__), "snapshot", "classes_atc.json"), encoding="utf-8") as f:
             return {k.replace(" ", "-"): tuple(v["members"]) for k, v in json.load(f)["classes"].items()}
     except (OSError, ValueError, KeyError):
         return {}

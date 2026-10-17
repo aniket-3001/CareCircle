@@ -1,4 +1,4 @@
-"""Fetch the members of each allergy class from NLM RxClass (WHO ATC codes, by ingredient) into data/ref/classes_atc.json.
+"""Fetch the members of each allergy class from NLM RxClass (WHO ATC codes, by ingredient) into carecircle/snapshot/classes_atc.json.
 
   python scripts/fetch_atc_classes.py
 
@@ -36,7 +36,7 @@ def main() -> None:
             time.sleep(0.3)
         out["classes"][name] = {"atc": codes, "members": sorted(got)}
         print(f"{name:24s} {len(got):4d} ingredients")
-    path = os.path.join(os.path.dirname(__file__), "..", "data", "ref", "classes_atc.json")
+    path = os.path.join(os.path.dirname(__file__), "..", "carecircle", "snapshot", "classes_atc.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=1, sort_keys=True)
 
