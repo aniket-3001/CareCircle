@@ -103,6 +103,7 @@ Content-Type: application/json
 | `care_graph` | read | `person`*, `include_history`, `now` | The circle as a graph: nodes and edges, each with plain-language metadata (read scope). |
 | `care_timeline` | read | `person`*, `limit`, `now` | Everything that happened for this person, newest first, as plain sentences. |
 | `care_history_digest` | read | `person`*, `upto` | A fingerprint of what was written about a person: each entry's fixed fields are chained (hash of the one before + this one), oldest first. |
+| `care_outcomes` | read | `person`*, `days`, `now` | Counts from the record over the last `days` local days: doses marked given against the times that were due, entries recorded or marked as mistakes, and |
 | `care_entry_source` | read | `dose_id`* | What an entry was read from: the full text the server read from the photo, voice note or document (not the image itself, which is never kept), |
 | `care_drug_search` | read | `text`*, `n` | Search the reference list by name (starts with, then contains). For a person who knows what the medicine is called. |
 | `care_stock_set` | write | `dose_id`*, `doses_left`* | Record how many doses are left in the pack of this entry (counted by a person, today). Doses marked given after this are taken off it. |
@@ -113,7 +114,7 @@ Content-Type: application/json
 | `care_mark_mistake` | write | `dose_id`*, `reason` | Take an entry off the record as entered by mistake, without erasing it: it stays in the history, marked, with who marked it and why, and the entry |
 | `care_restore_entry` | write | `dose_id`* | Put back an entry that was marked as entered by mistake. Only the owner or the carer who marked it. |
 | `care_receipts` | read | none | Receipts of everything that was removed for good (hash, who, when), newest first. |
-| `care_export_fhir` | read | `person`* | The regimen as a FHIR R4 Bundle of MedicationStatement resources (free text only). |
+| `care_export_fhir` | read | `person`*, `coded` | The regimen as a FHIR R4 Bundle of MedicationStatement resources. |
 | `care_followup_suggest` | read | `person`*, `now` | Suggested follow-ups from the record as it is now, minus any already on the list. Read-only: nothing is written until a person approves. |
 | `care_followup_add` | write | `person`*, `items`* | Write the follow-ups a person approved (each one: key, text, kind, basis = entry ids). A key already on the list is not added twice. |
 | `care_followups` | read | `person`* | The list, open first. `stale` means an entry it was written from has since been replaced or stopped: look again before doing it. |

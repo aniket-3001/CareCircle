@@ -234,3 +234,20 @@ async def test_doses_left_run_down_as_doses_are_marked_given_and_a_nearly_empty_
     assert again == []                                                               # said once per carer for this count
     await a.care_stock_set(met, 40)                                                  # a new pack was counted
     assert [n for n in await a.care_slot_nudges("asha", now=at(day, "10:00")) if n["kind"] == "stock"] == []
+
+
+async def test_the_week_in_counts_matches_what_was_marked_and_what_was_due(gm):
+    t, a, b, ro = await circle(gm)
+    day = date(2026, 10, 17)
+    met = await entry(a, at_ms=at(day - timedelta(days=10), "00:00"))
+    await a.care_schedule_set(met, ["08:00", "20:00"])
+    for d, hhmm in ((day - timedelta(days=1), "08:00"), (day - timedelta(days=1), "20:00"), (day - timedelta(days=2), "08:00")):
+        await a.care_give("asha", "metformin", f"{d.isoformat()} {hhmm}")
+    now = at(day, "12:00")                                                    # today's 08:00 is due and unmarked; 20:00 has not come
+    out = await a.care_outcomes("asha", 3, now)
+    # three days (15th, 16th, 17th). Due: two on the 15th, two on the 16th, and today's 08:00 = 5. Marked: the 15th 08:00 and both on the 16th = 3.
+    assert out["from"] == (day - timedelta(days=2)).isoformat() and out["doses_due"] == 5 and out["doses_marked_given"] == 3 and out["doses_not_marked"] == 2
+    assert "nothing about health" in out["note"] or "says nothing about health" in out["note"]
+    for bad in (0, 91, True):
+        with pytest.raises(ValueError):
+            await a.care_outcomes("asha", bad, now)

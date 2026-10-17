@@ -60,6 +60,22 @@ export interface EntrySource {
   note: string;
 }
 
+export interface Outcomes {
+  days: number;
+  from: string;
+  to: string;
+  tz: string;
+  doses_due: number;
+  doses_marked_given: number;
+  doses_not_marked: number;
+  entries_recorded: number;
+  entries_marked_mistake: number;
+  flagged_now: number;
+  possible_duplicates_now: number;
+  changes_not_yet_seen: number;
+  note: string;
+}
+
 export interface StockRow {
   dose_id: string;
   drug: string;

@@ -170,4 +170,13 @@ export const HI_MORE: Record<string, string> = {
   "This is the text the server read, kept so the quoted line can be checked. The picture or recording itself is not stored.": "यह वह पाठ है जो सर्वर ने पढ़ा, ताकि उद्धृत पंक्ति जाँची जा सके। तस्वीर या रिकॉर्डिंग खुद नहीं रखी जाती।",
   "Typed in by hand, so there is no photo, voice note or document behind it.": "हाथ से लिखा गया, इसलिए इसके पीछे कोई फ़ोटो, वॉइस नोट या दस्तावेज़ नहीं है।",
   "Export as FHIR with medicine codes": "दवा कोड के साथ FHIR में निर्यात करें",
+  "The last 7 days, in counts": "पिछले 7 दिन, गिनती में",
+  "doses due were marked as given": "देय खुराकें 'दी गई' चिह्नित हुईं",
+  "not marked": "चिह्नित नहीं",
+  "entries recorded": "प्रविष्टियाँ दर्ज हुईं",
+  "marked as entered by mistake": "गलती से दर्ज चिह्नित",
+  "interaction flags and": "इंटरैक्शन फ़्लैग और",
+  "possible duplicates on the record now": "संभावित दोहराव अभी रिकॉर्ड में",
+  "changes some carer has not yet seen": "बदलाव जो किसी देखभालकर्ता ने अभी नहीं देखे",
+  "Counts of what people recorded in this circle. A dose that was taken but not marked counts as not marked. This says nothing about health and is not compared with anyone else.": "इस सर्कल में लोगों ने जो दर्ज किया उसकी गिनती। जो खुराक ली गई पर चिह्नित नहीं हुई, वह 'चिह्नित नहीं' गिनी जाती है। यह सेहत के बारे में कुछ नहीं कहती और किसी और से तुलना नहीं की जाती।",
 };

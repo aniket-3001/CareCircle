@@ -67,6 +67,48 @@ class CareScheduleMixin:
                       {"id": dose_id, "s": slots, "a": bool(as_needed), "e": ends, "by": norm(self.agent), "t": now_ms()}, checked=True)
         return {"id": dose_id, "drug": rows[0][0], "times": slots, "as_needed": bool(as_needed), "ends_on": ends or None}
 
+    # ------------------------------------------------------------------ what the record shows for the last days (counts from the graph, no claims about health)
+    async def care_outcomes(self, person: str, days: int = 7, now: Optional[int] = None) -> dict:
+        """Counts from the record over the last `days` local days: doses marked given against the times that were due, entries recorded or marked as mistakes, and
+        what is flagged now. It counts what people recorded in this circle; it does not say anyone is better or worse, and it is not a comparison with other circles."""
+        if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 90:
+            raise ValueError("days is a whole number from 1 to 90")
+        import datetime as dt
+        t = now_ms() if now is None else now
+        tz = await self._tz()
+        today = sched.local_date(t, tz)
+        first = today - dt.timedelta(days=days - 1)
+        p = norm(person)
+        reg = await self.care_regimen(person, t)
+        gives = {r[0] for r in await self._q("MATCH (g:Give {person:$p}) WHERE g.slot >= $a RETURN g.key", {"p": p, "a": first.isoformat()}, scope="read")}
+        due = given = 0
+        for r in reg:
+            if r["as_needed"] or not r["slots"]:
+                continue
+            started = sched.local_date(r["since"], tz) if r.get("since") else first
+            for n in range(days):
+                day = first + dt.timedelta(days=n)
+                if day < started:
+                    continue
+                for hhmm in r["slots"]:
+                    if r.get("ends_on") and day.isoformat() > r["ends_on"]:
+                        continue
+                    if sched.slot_moment_ms(day, hhmm, tz) + 90 * 60_000 > t:        # a slot still inside its window is not a miss yet
+                        continue
+                    due += 1
+                    given += f"{p}|{norm(r['drug'])}|{day.isoformat()} {hhmm}" in gives
+        since_ms = sched.slot_moment_ms(first, "00:00", tz)
+        rec = (await self._q("MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p}) WHERE x.created_at >= $s RETURN count(x)", {"p": p, "s": since_ms}, scope="read"))[0][0]
+        mist = (await self._q("MATCH (x:Dose {status:'mistake'})-[:FOR]->(:Person {id:$p}) WHERE x.mistake_at >= $s RETURN count(x)", {"p": p, "s": since_ms}, scope="read"))[0][0]
+        chk = await self.care_check(person, t)
+        div = await self.care_divergence(person, t)
+        unseen = sum(len(c["unacknowledged"]) for c in div["carers"].values())
+        return {"days": days, "from": first.isoformat(), "to": today.isoformat(), "tz": tz,
+                "doses_due": due, "doses_marked_given": given, "doses_not_marked": due - given,
+                "entries_recorded": rec, "entries_marked_mistake": mist,
+                "flagged_now": len(chk["direct"]) + len(chk["enzyme_paths"]), "possible_duplicates_now": len(chk.get("duplicates", [])), "changes_not_yet_seen": unseen,
+                "note": "Counts of what people recorded in this circle. A dose that was taken but not marked counts as not marked. This says nothing about health and is not compared with anyone else."}
+
     # ------------------------------------------------------------------ how many doses are left in the pack
     async def care_stock_set(self, dose_id: str, doses_left: int) -> dict:
         """Record how many doses are left in the pack of this entry (counted by a person, today). Doses marked given after this are taken off it."""
