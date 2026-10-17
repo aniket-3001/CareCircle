@@ -270,3 +270,26 @@ async def test_a_refused_second_given_is_counted_once_per_carer_and_erased_with_
     await a.care_forget_person("asha", confirm="asha")
     left = (await a._q("MATCH (v:Prevented) RETURN count(v)", scope="read"))[0][0]
     assert left == 0                                                               # nothing about the person is kept, including the refusals
+
+
+async def test_a_dose_given_at_21_00_and_21_15_is_one_dose_whether_or_not_times_are_set(gm):
+    """The review's probe: two carers recording the same evening dose at 21:00 and 21:15 both got given: true, because the slot was free text."""
+    t, a, b, _ = await circle(gm)
+    day = (datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+    await entry(a, "amlodipine", "5 mg", "once daily")
+    # no confirmed times: a second give within the hour is the same dose
+    assert (await a.care_give("asha", "amlodipine", f"{day} 21:00"))["given"] is True
+    second = await b.care_give("asha", "amlodipine", f"{day} 21:15")
+    assert second["given"] is False and second["already_given_by"] == "sc-a"
+    far = await b.care_give("asha", "amlodipine", f"{day} 08:00")          # hours away: a different dose, allowed
+    assert far["given"] is True
+    # confirmed times: a typed time moves to the nearest of them, and a time far from all of them is refused
+    e = await entry(a, "metformin", "500 mg", "twice daily")
+    await a.care_schedule_set(e, ["08:00", "20:00"])
+    assert (await a.care_give("asha", "metformin", f"{day} 20:10"))["given"] is True
+    again = await b.care_give("asha", "metformin", f"{day} 19:50")
+    assert again["given"] is False and again["already_given_by"] == "sc-a"
+    with pytest.raises(ValueError):
+        await b.care_give("asha", "metformin", f"{day} 14:00")
+    out = await a.care_outcomes("asha")
+    assert out["double_doses_stopped"] >= 2

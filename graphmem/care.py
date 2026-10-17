@@ -49,6 +49,8 @@ def checker() -> Checker:
 
 
 SLOT_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$")
+SNAP_MIN = 90               # a typed time within this many minutes of one of the medicine's confirmed times is that time ("21:15" for a 21:00 dose)
+NEAR_MIN = 60               # with no confirmed times, a second give of the same medicine this close to an earlier one is the same dose
 
 
 def parse_slot(slot: str) -> tuple[str, int]:
@@ -385,6 +387,32 @@ class CareMixin:
         return out
 
     # ------------------------------------------------------------------ doses given: never twice for one slot
+    async def _canonical_slot(self, person: str, drug: str, slot: str) -> tuple[str, Optional[tuple]]:
+        """Bring a typed slot to the medicine's own times, so 21:00 and 21:15 are one dose and not two.
+
+        When the person has confirmed times for this medicine, a typed time is moved to the nearest of them (within SNAP_MIN minutes; farther is refused with the list).
+        When no times are set, the app cannot know what a "slot" is, so a give within NEAR_MIN minutes of an earlier one by anyone counts as that same dose:
+        returns (slot, (earlier slot, who, when)) for the caller to refuse."""
+        cur = await self._q("MATCH (x:Dose {drug:$d, cur:true, action:'set', status:'confirmed'})-[:FOR]->(:Person {id:$p}) RETURN x.slots LIMIT 1",
+                            {"d": norm(drug), "p": norm(person)}, scope="read")
+        times = list(cur[0][0] or []) if cur else []
+        mins = lambda hhmm: int(hhmm[:2]) * 60 + int(hhmm[3:5])  # noqa: E731
+        if times:
+            want = mins(slot[11:16])
+            best = min(times, key=lambda t: abs(mins(t) - want))
+            if abs(mins(best) - want) > SNAP_MIN:
+                raise ValueError(f"{slot[11:16]} is not one of this medicine's times ({', '.join(times)}); give it at one of those, or change the times first")
+            return f"{slot[:10]} {best}", None
+        mine = datetime.strptime(slot, "%Y-%m-%d %H:%M")
+        for s, by, at in await self._q("MATCH (g:Give {person:$p, drug:$d}) RETURN g.slot, g.by, g.at", {"p": norm(person), "d": norm(drug)}, scope="read"):
+            try:
+                gap = abs((datetime.strptime(s, "%Y-%m-%d %H:%M") - mine).total_seconds()) / 60
+            except (TypeError, ValueError):
+                continue
+            if s != slot and gap < NEAR_MIN:
+                return slot, (s, by, at)
+        return slot, None
+
     async def care_give(self, person: str, drug: str, slot: str) -> dict:
         """Record that the calling carer gave `drug` for dose slot `slot` (e.g. '2026-10-16 08:00'). A slot can be claimed once:
         the claim is a single MERGE, so two carers racing get exactly one winner and the other is told who already recorded it."""
@@ -395,6 +423,12 @@ class CareMixin:
             {"d": norm(drug), "p": norm(person), "ms": slot_ms, "slack": 14 * 3_600_000}, scope="read")      # slack: the slot is local time, the record is UTC
         if not on_record:
             raise KeyError(f"{norm(drug) or 'that medicine'} was not on the record at that time, so a dose of it cannot be recorded as given")
+        slot, near = await self._canonical_slot(person, drug, slot)
+        if near:                                                       # a different time typed for what is, in practice, the same dose
+            await self._q("MERGE (v:Prevented {key:$k}) ON CREATE SET v.person=$p, v.drug=$d, v.slot=$s, v.by=$me, v.first_by=$by, v.at=$t",
+                          {"k": f"{norm(person)}|{norm(drug)}|{near[0]}|{norm(self.agent)}", "p": norm(person), "d": norm(drug), "s": norm(slot), "me": norm(self.agent), "by": near[1], "t": now_ms()}, checked=True)
+            return {"given": False, "duplicate": True, "already_given_by": near[1], "at": near[2],
+                    "note": f"a dose of this was recorded for {near[0]}, within {NEAR_MIN} minutes of this one; check with them before giving another dose"}
         key = f"{norm(person)}|{norm(drug)}|{norm(slot)}"
         rows = await self._q(
             """MERGE (g:Give {key:$k}) ON CREATE SET g.by=$me, g.at=$t, g.person=$p, g.drug=$d, g.slot=$s, g.won=true
