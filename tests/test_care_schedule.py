@@ -364,3 +364,57 @@ async def test_times_confirmed_late_leave_earlier_slots_neutral_and_editing_them
     await a.care_schedule_set(e, ["08:00", "14:00"])                                                             # edited at 15:00: the starting point stays 13:00
     states = {i["time"]: i["state"] for i in (await a.care_today("asha", at(day, "16:00")))["items"]}
     assert states == {"08:00": "before", "14:00": "not_marked"}, states
+
+
+async def telma(a, at_ms):
+    """Telma-AM as the app saves it: one entry per ingredient, under one product, with the printed strength kept on them."""
+    ids = []
+    for ing in ("telmisartan", "amlodipine"):
+        r = await a.care_record("asha", ing, freq_text="once daily", source_type="typed", at=at_ms, product="Telma-AM", product_strength="40/5 mg")
+        ids.append(r["id"])
+    return ids
+
+
+async def test_a_combination_is_one_row_with_its_name_and_strength_and_one_tick(gm):
+    """N7: one Telma-AM tablet showed as two rows, 'Amlodipine' and 'Telmisartan', with blank doses; ticking one left the other 'not marked'."""
+    t, a, b, _ = await circle(gm)
+    day = date(2026, 9, 20)
+    ids = await telma(a, at(date(2026, 9, 1), "09:00"))
+    today = await a.care_today("asha", at(day, "07:30"))
+    assert [u["label"] for u in today["unscheduled"]] == ["telma-am"] and today["unscheduled"][0]["dose_text"] == "40/5 mg"      # one row to set times for
+    assert set(today["unscheduled"][0]["ingredients"]) == {"telmisartan", "amlodipine"}
+    await a.care_schedule_set(ids[0], ["08:00"])                                                    # setting the times on the row sets them on both entries
+    assert {r["id"]: r["slots"] for r in await a.care_regimen("asha", at(day, "07:30"))} == {ids[0]: ["08:00"], ids[1]: ["08:00"]}
+    items = (await a.care_today("asha", at(day, "07:30")))["items"]
+    assert len(items) == 1 and items[0]["label"] == "telma-am" and items[0]["dose_text"] == "40/5 mg" and items[0]["time"] == "08:00"
+    assert set(items[0]["ingredients"]) == {"telmisartan", "amlodipine"} and set(items[0]["dose_ids"]) == set(ids)
+    late = at(day, "10:30")
+    assert (await a.care_today("asha", late))["counts"]["not_marked"] == 1                             # one missed tablet, not two
+    assert len([x for x in await a.care_slot_nudges("asha", late) if x["notify"] == "sc-a"]) == 1       # one reminder
+    r = await a.care_give_slot("asha", ids[0], "08:00", late)                                          # one tick marks both
+    assert r["given"] is True and set(r["ingredients"]) == {"telmisartan", "amlodipine"}
+    done = await a.care_today("asha", late)
+    assert done["counts"]["given"] == 1 and done["counts"]["not_marked"] == 0 and done["items"][0]["given_by"] == "sc-a"
+    again = await b.care_give_slot("asha", ids[1], "08:00", late)                                      # the second carer is told who got there first
+    assert again["given"] is False and again["already_given_by"] == "sc-a"
+    assert [x for x in await a.care_slot_nudges("asha", late) if x["kind"] == "slot_not_marked"] == []
+
+
+async def test_a_combination_counts_once_in_the_outcomes(gm):
+    t, a, b, _ = await circle(gm)
+    day = date(2026, 9, 20)
+    ids = await telma(a, at(date(2026, 9, 10), "09:00"))
+    await a.care_schedule_set(ids[0], ["08:00"])
+    out = await a.care_outcomes("asha", 3, at(day, "12:00"))
+    assert out["doses_due"] == 3 and out["doses_not_marked"] == 3                                      # three days, one tablet a day, not six
+
+
+async def test_changing_a_dose_does_not_turn_the_morning_slot_into_a_neutral_one(gm):
+    """The start of a slot's tracking is when the medicine first went on record, not the latest edit of its dose."""
+    t, a, b, _ = await circle(gm)
+    day = date(2026, 9, 20)
+    e = await entry(a, "metformin", "500 mg", "daily", at_ms=at(date(2026, 9, 1), "09:00"))
+    await a.care_schedule_set(e, ["08:00"])
+    await a.care_record("asha", "metformin", dose_text="850 mg", freq_text="daily", source_type="typed", at=at(day, "14:00"))     # the dose changed at 14:00
+    states = {i["time"]: i["state"] for i in (await a.care_today("asha", at(day, "16:00")))["items"]}
+    assert states == {"08:00": "not_marked"}, states

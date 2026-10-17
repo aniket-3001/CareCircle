@@ -92,7 +92,7 @@ class CareMixin:
 
     async def care_record(self, person: str, drug: str, action: str = "set", dose_text: str = "", freq_text: str = "",
                           source_type: str = "typed", quote: str = "", source_text: str = "", confirm: bool = True,
-                          at: Optional[int] = None, edited: str = "", source_ref: str = "", product: str = "") -> dict:
+                          at: Optional[int] = None, edited: str = "", source_ref: str = "", product: str = "", product_strength: str = "") -> dict:
         """A change to what `person` takes. action 'set' (start/change) or 'stop'. The previous current entry is closed and linked
         by SUPERSEDES. If `quote` is given it must occur in the text it was read from, else the entry stays UNVERIFIED and PENDING until someone
         confirms it with care_confirm; pending entries never reach the regimen or the checks. For a photo, voice note or document the text is the one
@@ -113,6 +113,7 @@ class CareMixin:
             raise ValueError("a medicine name is 1 to 80 characters")
         dose_text, freq_text = fit(dose_text, 80, "the dose"), fit(freq_text, 80, "how often")
         person = await self._known_person(person)
+        product_strength = fit(product_strength, 80, "the product strength")
         product = norm(product)[:80]                       # the product the medicine came as ("telma-am"); empty when it was typed as the medicine itself
         cur = await self._q("MATCH (o:Dose {cur:true, drug:$d})-[:FOR]->(:Person {id:$p}) WHERE coalesce(o.product, '') = $pr "
                             "RETURN o.id, o.dose_text, o.freq_text, o.valid_from LIMIT 1", {"d": d, "p": norm(person), "pr": product}, scope="read")
@@ -133,19 +134,19 @@ class CareMixin:
             MERGE (p:Person {id:$p}) ON CREATE SET p.role='patient'
             MERGE (dr:Drug {name:$d})
             MERGE (au:Person {id:$by}) ON CREATE SET au.role='carer'
-            CREATE (x:Dose {id:$id, drug:$d, product:$pr, dose_text:$dt, freq_text:$ft, valid_from:$ts, cur:false, action:$a, status:$st,
+            CREATE (x:Dose {id:$id, drug:$d, product:$pr, pstrength:$ps, dose_text:$dt, freq_text:$ft, valid_from:$ts, cur:false, action:$a, status:$st,
                             source_type:$src, quote:$q, verified:$v, by:$by, at:$ts, created_at:$now, edited:$ed})
             CREATE (x)-[:FOR]->(p) CREATE (x)-[:OF]->(dr)
             WITH x OPTIONAL MATCH (s:Source {id:$sref}) FOREACH (_ IN CASE WHEN s IS NULL THEN [] ELSE [1] END | CREATE (x)-[:READ_FROM]->(s))
             RETURN x.id""",
             {"p": norm(person), "d": d, "id": did, "dt": dose_text, "ft": freq_text, "ts": ts, "now": now_ms(), "a": action, "st": status,
              "src": source_type, "q": quote[:200], "v": verified, "by": norm(self.agent), "ed": ",".join(sorted({x for x in edited.split(",") if x in ("drug", "dose", "freq")})),
-             "sref": stored["id"] if stored else "", "pr": product})
+             "sref": stored["id"] if stored else "", "pr": product, "ps": product_strength})
         if status == "confirmed":
             await self._care_activate(did)
             if action == "set" and cur and cur[0][2] and same(cur[0][2], freq_text):          # the same written frequency: keep the times a person already confirmed
                 await self._q("MATCH (o:Dose {id:$o}), (x:Dose {id:$n}) WHERE o.slots IS NOT NULL AND x.slots IS NULL "
-                              "SET x.slots=o.slots, x.as_needed=o.as_needed, x.sched_by=o.sched_by, x.sched_at=o.sched_at, x.ends_on=o.ends_on",
+                              "SET x.slots=o.slots, x.as_needed=o.as_needed, x.sched_by=o.sched_by, x.sched_at=o.sched_at, x.sched_first=o.sched_first, x.ends_on=o.ends_on",
                               {"o": cur[0][0], "n": did}, checked=True)
         await self._chain_entry(rows[0][0])                               # the append-only log: this entry, as written
         out = {"id": rows[0][0], "status": status, "verified": verified,
@@ -236,11 +237,11 @@ class CareMixin:
             """MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p})
                WHERE x.action='set' AND x.valid_from <= $t AND (x.valid_to IS NULL OR x.valid_to > $t)
                  AND (x.ends_on IS NULL OR x.ends_on = '' OR x.ends_on >= $today)
-               RETURN x.id, x.drug, x.dose_text, x.freq_text, x.valid_from, x.source_type, x.quote, x.by, x.slots, x.as_needed, x.ends_on, coalesce(x.product, '')
+               RETURN x.id, x.drug, x.dose_text, x.freq_text, x.valid_from, x.source_type, x.quote, x.by, x.slots, x.as_needed, x.ends_on, coalesce(x.product, ''), coalesce(x.pstrength, '')
                ORDER BY x.drug, x.product""",
             {"p": norm(person), "t": t, "today": today}, scope="read")
         return [dict(id=r[0], drug=r[1], dose_text=r[2], freq_text=r[3], since=r[4], source=r[5], quote=r[6], by=r[7],
-                     slots=list(r[8] or []), as_needed=bool(r[9]), ends_on=r[10] or None, product=r[11]) for r in rows]
+                     slots=list(r[8] or []), as_needed=bool(r[9]), ends_on=r[10] or None, product=r[11], product_strength=r[12]) for r in rows]
 
     async def care_duplicates(self, person: str, as_of: Optional[int] = None) -> list[dict]:
         """Ingredients recorded on more than one current entry (the same medicine reaching the person through two products: a combination brand and a plain

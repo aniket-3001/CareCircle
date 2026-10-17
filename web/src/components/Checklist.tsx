@@ -2,7 +2,7 @@ import { CalendarClock, Check, Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { StockRow, Suggestion, TodayItem, TodayView } from '../api/types';
 import { useT, tr } from '../lib/i18n';
-import { nameOf, title } from '../lib/format';
+import { nameOf, shown, title } from '../lib/format';
 import { useApp, useLoad } from '../state';
 import { Pill } from './Pill';
 import { Sheet } from './Sheet';
@@ -39,7 +39,7 @@ export function Checklist(): React.JSX.Element | null {
     setBusy(`${i.dose_id}|${i.time}`);
     try {
       const r = await app.api.giveSlot(i.dose_id, i.time);
-      toast(r.given ? `${title(i.drug)} at ${i.time} marked as given.` : `Already marked as given by ${nameOf(r.already_given_by ?? '')}. Check with them before giving another.`);
+      toast(r.given ? `${shown(i)} at ${i.time} marked as given.` : `Already marked as given by ${nameOf(r.already_given_by ?? '')}. Check with them before giving another.`);
       app.bump();
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Could not mark it');
@@ -83,7 +83,8 @@ function Checked({ today, error, onGive, busy, onSet, zone, setting, closeSet, t
         {today.items.map((i) => (
           <div key={`${i.dose_id}|${i.time}`} className="item" data-testid="slot" data-state={i.state}>
             <div>
-              <div className="item__title"><Clock size={16} aria-hidden="true" /> {i.time} · {title(i.drug)} <span className="muted">{i.dose_text}</span></div>
+              <div className="item__title"><Clock size={16} aria-hidden="true" /> {i.time} · {shown(i)} <span className="muted">{i.dose_text}</span></div>
+              {i.ingredients && <div className="item__sub muted" data-testid="slot-ingredients">{t('one tablet of')} {i.ingredients.map(title).join(' + ')}</div>}
               <div className="item__sub">
                 <Pill tone={STATE[i.state].tone}>{t(STATE[i.state].text)}</Pill>
                 {i.given_by && <> {t('by')} {nameOf(i.given_by)}</>}
@@ -104,7 +105,7 @@ function Checked({ today, error, onGive, busy, onSet, zone, setting, closeSet, t
           {today.unscheduled.map((u) => (
             <div key={u.dose_id} className="item">
               <div>
-                <div className="item__title">{title(u.drug)} <span className="muted">{u.dose_text} {u.freq_text}</span></div>
+                <div className="item__title">{shown(u)} <span className="muted">{u.dose_text} {u.freq_text}</span></div>
                 <div className="item__sub">{u.suggestion.understood ? t('The label says') + ` ${u.suggestion.label}.` : u.suggestion.why}</div>
               </div>
               <button type="button" className="btn btn--soft btn--sm" onClick={() => onSet(u)} data-testid="set-times">{t('Set times')}</button>
@@ -112,7 +113,7 @@ function Checked({ today, error, onGive, busy, onSet, zone, setting, closeSet, t
           ))}
         </div>
       )}
-      {today.as_needed.length > 0 && <p className="muted small">{t('Taken as needed, so no fixed times:')} {today.as_needed.map((a) => title(a.drug)).join(', ')}.</p>}
+      {today.as_needed.length > 0 && <p className="muted small">{t('Taken as needed, so no fixed times:')} {today.as_needed.map((a) => shown(a)).join(', ')}.</p>}
       <Packs today={today} />
       <p className="muted small">{today.tz} · {today.date}</p>
       <SetTimes u={setting} close={closeSet} />
@@ -192,7 +193,7 @@ function SetTimes({ u, close }: { u: TodayView['unscheduled'][number] | null; cl
     setBusy(true);
     try {
       await app.api.setSchedule(u.dose_id, asNeeded ? [] : times, asNeeded, ends);
-      toast(`${title(u.drug)}: times saved.`);
+      toast(`${shown(u)}: times saved.`);
       close();
       app.bump();
     } catch (e) {
@@ -204,7 +205,7 @@ function SetTimes({ u, close }: { u: TodayView['unscheduled'][number] | null; cl
 
   const setAt = (i: number, v: string): void => setTimes((cur) => cur.map((x, j) => (j === i ? v : x)));
   return (
-    <Sheet open={u !== null} title={u ? `${tr('Times for')} ${title(u.drug)}` : ''} onClose={close}>
+    <Sheet open={u !== null} title={u ? `${tr('Times for')} ${shown(u)}` : ''} onClose={close}>
       {u && (
         <>
           <p className="muted">{s?.understood && !s.as_needed ? `${tr('The label says')} ${s.label}. ${tr('These times are only a starting point: set the ones on the pack.')}` : s?.why}</p>

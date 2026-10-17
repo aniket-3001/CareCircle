@@ -212,7 +212,7 @@ class Bot:
                         "Each ingredient is saved on its own; confirm each one. From a hand-written list: check the pack.")
             elif p.get("possible_combination"):
                 note = f"\n{p['possible_combination']} may be a combination product. Only one ingredient was read from it; check the pack for any others."
-            await self._hold(cid, chat, {"drug": top, "dose_text": p.get("dose_text", ""), "freq_text": p.get("freq_text", ""), "product": combo,
+            await self._hold(cid, chat, {"drug": top, "dose_text": p.get("dose_text", ""), "freq_text": p.get("freq_text", ""), "product": combo, "product_strength": p.get("combination_strength", ""),
                                  "quote": p["quote"], "source_ref": sid, "source_type": kinds.get(src["kind"], "typed")})
             alt = ", ".join(c["name"] for c in p["drug_candidates"][1:])
             await self.api.send(chat, f"I read: {top} {p.get('dose_text', '')} {p.get('freq_text', '')}{note}\nFrom: \"{p['quote'][:120]}\""
@@ -230,7 +230,7 @@ class Bot:
         mem = self.gm.open(link["agent"], link["circle"])
         r = await mem.care_record(person or await self._patient(mem), p["drug"], dose_text=p["dose_text"], freq_text=p["freq_text"],
                                   source_type=p["source_type"], quote=p["quote"], source_ref=p.get("source_ref", ""),
-                                  source_text=p.get("source_text", ""), product=p.get("product", ""))
+                                  source_text=p.get("source_text", ""), product=p.get("product", ""), product_strength=p.get("product_strength", ""))
         if r["status"] == "pending":
             await mem.care_confirm(r["id"])                          # the person just confirmed by tapping
         who = person or await self._patient(mem)

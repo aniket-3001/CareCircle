@@ -36,6 +36,10 @@ export interface Suggestion {
 
 export interface TodayItem {
   dose_id: string;
+  /** Every entry this row stands for: a combination product is one row over several ingredient entries. */
+  dose_ids?: string[];
+  label?: string;
+  ingredients?: string[];
   drug: string;
   dose_text: string;
   freq_text: string;
@@ -113,8 +117,8 @@ export interface TodayView {
   date: string;
   items: TodayItem[];
   counts: { given: number; due: number; not_marked: number; upcoming: number; before: number };
-  unscheduled: { dose_id: string; drug: string; dose_text: string; freq_text: string; suggestion: Suggestion }[];
-  as_needed: { dose_id: string; drug: string; dose_text: string; freq_text: string }[];
+  unscheduled: { dose_id: string; dose_ids?: string[]; label?: string; ingredients?: string[]; drug: string; dose_text: string; freq_text: string; suggestion: Suggestion }[];
+  as_needed: { dose_id: string; label?: string; ingredients?: string[]; drug: string; dose_text: string; freq_text: string }[];
 }
 
 export interface DirectFlag {

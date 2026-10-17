@@ -29,3 +29,13 @@ export function whenLocal(ms: number): string {
 export const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 
 export const pct = (x: number): string => `${Math.round(x * 100)}%`;
+
+/** A combination product's name for display: stored lower-case ("telma-am"), shown as it is usually printed ("Telma-AM"): short parts after a hyphen in capitals. */
+export function productName(p: string): string {
+  return p.split(' ').map((w) => w.split('-').map((x, i) => (i > 0 && x.length <= 3 ? x.toUpperCase() : x.charAt(0).toUpperCase() + x.slice(1))).join('-')).join(' ');
+}
+
+/** What a checklist row is called: the product when it is a combination (one tablet), else the medicine. */
+export function shown(x: { drug: string; label?: string }): string {
+  return x.label ? productName(x.label) : title(x.drug);
+}

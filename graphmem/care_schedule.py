@@ -65,6 +65,10 @@ class CareScheduleMixin:
             ends = day.isoformat()
         await self._q("MATCH (x:Dose {id:$id}) SET x.slots=$s, x.as_needed=$a, x.ends_on=$e, x.sched_by=$by, x.sched_at=$t, x.sched_first=coalesce(x.sched_first, $t)",
                       {"id": dose_id, "s": slots, "a": bool(as_needed), "e": ends, "by": norm(self.agent), "t": now_ms()}, checked=True)
+        await self._q("MATCH (x:Dose {id:$id})-[:FOR]->(p:Person) WHERE coalesce(x.product, '') <> '' "
+                      "MATCH (y:Dose {status:'confirmed', cur:true, action:'set'})-[:FOR]->(p) WHERE coalesce(y.product, '') = x.product "
+                      "SET y.slots=$s, y.as_needed=$a, y.ends_on=$e, y.sched_by=$by, y.sched_at=$t, y.sched_first=coalesce(y.sched_first, $t)",
+                      {"id": dose_id, "s": slots, "a": bool(as_needed), "e": ends, "by": norm(self.agent), "t": now_ms()}, checked=True)       # the ingredients of one product share its times
         return {"id": dose_id, "drug": rows[0][0], "times": slots, "as_needed": bool(as_needed), "ends_on": ends or None}
 
     # ------------------------------------------------------------------ what the record shows for the last days (counts from the graph, no claims about health)
@@ -80,12 +84,20 @@ class CareScheduleMixin:
         first = today - dt.timedelta(days=days - 1)
         p = norm(person)
         reg = await self.care_regimen(person, t)
+        origins = await self._origins(person)
         gives = {r[0] for r in await self._q("MATCH (g:Give {person:$p}) WHERE g.slot >= $a RETURN g.key", {"p": p, "a": first.isoformat()}, scope="read")}
         due = given = 0
+        seen_products: set = set()
         for r in reg:
             if r["as_needed"] or not r["slots"]:
                 continue
-            started = sched.local_date(r["since"], tz) if r.get("since") else first
+            if r.get("product"):
+                key = (r["product"], tuple(r["slots"]), r.get("ends_on"))
+                if key in seen_products:
+                    continue                                        # another ingredient of the same tablet: counted once
+                seen_products.add(key)
+            origin = origins.get((r["drug"], r.get("product") or ""), r.get("since") or 0)
+            started = sched.local_date(origin, tz) if origin else first
             for n in range(days):
                 day = first + dt.timedelta(days=n)
                 if day < started:
@@ -93,7 +105,7 @@ class CareScheduleMixin:
                 for hhmm in r["slots"]:
                     if r.get("ends_on") and day.isoformat() > r["ends_on"]:
                         continue
-                    if r.get("since") and sched.slot_moment_ms(day, hhmm, tz) < r["since"]:
+                    if origin and sched.slot_moment_ms(day, hhmm, tz) < origin:
                         continue                                    # before the entry was recorded: it cannot have been missed
                     if sched.slot_moment_ms(day, hhmm, tz) + 90 * 60_000 > t:        # a slot still inside its window is not a miss yet
                         continue
@@ -150,11 +162,43 @@ class CareScheduleMixin:
 
     # ------------------------------------------------------------------ the checklist
     @staticmethod
-    def _tracked_since(r: dict, confirmed_at: dict, now: int) -> int:
+    def _groups(reg: list[dict]) -> list[dict]:
+        """The checklist's rows: a medicine that came as a combination product (Telma-AM saved as telmisartan and amlodipine) is ONE row, one tablet with one tick;
+        the entries stay one per ingredient underneath. {members, product, label, ingredients}."""
+        out, byp = [], {}
+        for r in reg:
+            if not r.get("product"):
+                out.append({"members": [r], "product": "", "label": "", "ingredients": []})
+            elif r["product"] in byp:
+                byp[r["product"]]["members"].append(r)
+            else:
+                byp[r["product"]] = {"members": [r], "product": r["product"], "label": r["product"], "ingredients": []}
+                out.append(byp[r["product"]])
+        for g in out:
+            if g["product"]:
+                g["ingredients"] = [m["drug"] for m in g["members"]]
+        return out
+
+    async def _origins(self, person: str) -> dict:
+        """When each (medicine, product) was first on record in its current run: the earliest confirmed entry since the last stop. A change of dose is a new
+        entry but not a new start, so a slot earlier today under the old dose is not 'before the entry existed'."""
+        rows = await self._q("MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p}) RETURN x.drug, coalesce(x.product, ''), x.action, x.valid_from", {"p": norm(person)}, scope="read")
+        stops: dict = {}
+        for d, pr, a, vf in rows:
+            if a == "stop":
+                stops[(d, pr)] = max(stops.get((d, pr), 0), vf)
+        out: dict = {}
+        for d, pr, a, vf in rows:
+            if a == "set" and vf >= stops.get((d, pr), 0):
+                out[(d, pr)] = min(out.get((d, pr), vf), vf)
+        return out
+
+    @staticmethod
+    def _tracked_since(r: dict, confirmed_at: dict, now: int, origin: Optional[int] = None) -> int:
         """From when the record can speak about this entry's slots: when it was recorded, and when its times were FIRST confirmed (later edits of the times do not move it; and once that moment has passed; a look at
         an earlier moment ignores it, so a look-back does not change)."""
         c = confirmed_at.get(r["id"])
-        return max(int(r.get("since") or 0), int(c) if c is not None and int(c) <= now else 0)
+        return max(int(origin if origin is not None else (r.get("since") or 0)), int(c) if c is not None and int(c) <= now else 0)
 
     async def care_today(self, person: str, now: Optional[int] = None) -> dict:
         """Today's confirmed dose slots in the circle's time zone, in clock order, each with its state: given (and by whom), due, not marked given yet, or
@@ -168,37 +212,60 @@ class CareScheduleMixin:
         watched = {r[0] for r in await self._q("MATCH (w:Watch) WHERE w.key STARTS WITH $k RETURN w.key", {"k": norm(person) + "|"}, scope="read")}
         confirmed_at = {r[0]: r[1] for r in await self._q("MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p}) WHERE x.sched_first IS NOT NULL RETURN x.id, x.sched_first",
                                                           {"p": norm(person)}, scope="read")}
+        origins = await self._origins(person)
         items, unscheduled, as_needed = [], [], []
-        for r in reg:
-            if r["as_needed"]:
-                as_needed.append({"dose_id": r["id"], "drug": r["drug"], "dose_text": r["dose_text"], "freq_text": r["freq_text"]})
+        for g in self._groups(reg):
+            ms, first = g["members"], g["members"][0]
+            base = {"dose_id": first["id"], "dose_ids": [m["id"] for m in ms], "drug": first["drug"], "freq_text": first["freq_text"],
+                    "dose_text": (first["dose_text"] or first.get("product_strength", "")) if not g["product"] else next((m.get("product_strength") for m in ms if m.get("product_strength")), "")}
+            if g["product"]:
+                base["label"], base["ingredients"] = g["label"], g["ingredients"]
+            if all(m["as_needed"] for m in ms):
+                as_needed.append(base)
                 continue
-            if not r["slots"]:
-                unscheduled.append({"dose_id": r["id"], "drug": r["drug"], "dose_text": r["dose_text"], "freq_text": r["freq_text"], "suggestion": sched.suggest(r["freq_text"])})
+            slots = sorted({h for m in ms for h in m["slots"]})
+            if not slots:
+                unscheduled.append({**base, "suggestion": sched.suggest(first["freq_text"])})
                 continue
-            for hhmm in r["slots"]:
+            tracked = max(self._tracked_since(m, confirmed_at, t, origins.get((m["drug"], m.get("product") or ""))) for m in ms)
+            for hhmm in slots:
                 slot = f"{today.isoformat()} {hhmm}"
                 moment = sched.slot_moment_ms(today, hhmm, tz)
-                got = gives.get(f"{norm(person)}|{norm(r['drug'])}|{slot}")
-                items.append({"dose_id": r["id"], "drug": r["drug"], "dose_text": r["dose_text"], "freq_text": r["freq_text"], "time": hhmm, "slot": slot, "at": moment,
-                              "state": sched.slot_state(t, moment, got is not None, self._tracked_since(r, confirmed_at, t)), "given_by": got[0] if got else None, "given_at": got[1] if got else None,
-                              "needs_second_carer": bool(got) and f"{norm(person)}|{norm(r['drug'])}" in watched and not got[2]})
-        items.sort(key=lambda i: (i["at"], i["drug"]))
+                gots = [gives.get(f"{norm(person)}|{norm(m['drug'])}|{slot}") for m in ms]
+                got = next((x for x in gots if x), None)
+                every = all(gots)                                    # a combination is given only when every ingredient has been marked
+                items.append({**base, "time": hhmm, "slot": slot, "at": moment,
+                              "state": sched.slot_state(t, moment, every, tracked), "given_by": got[0] if every and got else None, "given_at": got[1] if every and got else None,
+                              "needs_second_carer": every and f"{norm(person)}|{norm(first['drug'])}" in watched and not got[2]})
+        items.sort(key=lambda i: (i["at"], i.get("label") or i["drug"]))
         counts = {k: sum(1 for i in items if i["state"] == k) for k in ("given", "due", "not_marked", "upcoming", "before")}
         return {"person": norm(person), "tz": tz, "date": today.isoformat(), "items": items, "counts": counts, "unscheduled": unscheduled, "as_needed": as_needed}
 
     async def care_give_slot(self, person: str, dose_id: str, time: str, now: Optional[int] = None) -> dict:
         """Mark one of today's confirmed slots as given. Same once-per-slot claim as care_give: if someone already marked it, this says who."""
         t = now_ms() if now is None else now
-        rows = await self._q("MATCH (x:Dose {id:$id, status:'confirmed', cur:true, action:'set'})-[:FOR]->(:Person {id:$p}) RETURN x.drug, x.slots",
+        rows = await self._q("MATCH (x:Dose {id:$id, status:'confirmed', cur:true, action:'set'})-[:FOR]->(:Person {id:$p}) RETURN x.drug, x.slots, coalesce(x.product, '')",
                              {"id": dose_id, "p": norm(person)}, scope="read")
         if not rows:
             raise KeyError(dose_id)
-        drug, slots = rows[0]
-        if time not in (slots or []):
-            raise ValueError(f"{time} is not one of this medicine's times ({', '.join(slots or []) or 'none set'})")
+        drug, slots, product = rows[0]
+        members = [(drug, slots)]
+        if product:                                                  # one tablet of a combination: every ingredient entry of that product is marked together
+            members = [(r[0], r[1]) for r in await self._q(
+                "MATCH (x:Dose {status:'confirmed', cur:true, action:'set'})-[:FOR]->(:Person {id:$p}) WHERE coalesce(x.product, '') = $pr RETURN x.drug, x.slots ORDER BY x.drug",
+                {"p": norm(person), "pr": product}, scope="read")]
+        allowed = sorted({h for _d, sl in members for h in (sl or [])})
+        if time not in allowed:
+            raise ValueError(f"{time} is not one of this medicine's times ({', '.join(allowed) or 'none set'})")
         day = sched.local_date(t, await self._tz())
-        return await self.care_give(person, drug, f"{day.isoformat()} {time}")
+        results = [await self.care_give(person, d, f"{day.isoformat()} {time}") for d, _sl in members]
+        if len(results) == 1:
+            return results[0]
+        names = [d for d, _sl in members]
+        miss = next((r for r in results if not r["given"]), None)
+        if miss:
+            return {**miss, "ingredients": names}
+        return {"given": True, "slot": results[0]["slot"], "ingredients": names, **({"needs_second_carer": True} if any(r.get("needs_second_carer") for r in results) else {})}
 
     # ------------------------------------------------------------------ reminders about the checklist
     async def care_slot_edges(self, person: str, now: Optional[int] = None) -> list[int]:
@@ -249,7 +316,7 @@ class CareScheduleMixin:
                                   {"k": key, "t": t}, checked=True)
                 if not r[0][0]:
                     continue
-                what = f"{i['drug'].capitalize()} {i['dose_text']}".strip()
+                what = f"{(i.get('label') or i['drug']).capitalize()} {i['dose_text']}".strip()
                 text = (f"{what}, {i['time']}: due now." if i["state"] == "due" else f"{what}, {i['time']}: not marked as given yet. Please check with the others and mark it if it was given.")
                 out.append({"kind": "slot_" + i["state"], "notify": c, "drug": i["drug"], "slot": i["slot"], "claim": key, "message": {"text": text, "source": "template"}})
         return out

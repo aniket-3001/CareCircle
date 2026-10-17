@@ -84,6 +84,7 @@ export const HI_MORE: Record<string, string> = {
   'Time zone': 'समय क्षेत्र', 'Time zone saved': 'समय क्षेत्र सहेजा गया', 'Now': 'अभी', 'Not set yet: India time (Asia/Kolkata) is used.': 'अभी तय नहीं: भारतीय समय (Asia/Kolkata) इस्तेमाल हो रहा है।',
   'This device is in': 'यह डिवाइस है', 'Times are in': 'समय हैं', 'not set yet': 'अभी तय नहीं', 'Change it in Account.': 'इसे खाते (Account) में बदलें।',
   'but this circle uses': 'लेकिन यह सर्कल इस्तेमाल करता है', 'Which time zone is the person you look after in?': 'जिसकी देखभाल कर रहे हैं वह किस समय क्षेत्र में है?', 'Use': 'इस्तेमाल करें', 'Keep': 'रखें',
+  'one tablet of': 'एक गोली में',
   'This is a combination product.': 'यह एक संयुक्त (कॉम्बिनेशन) दवा है।', 'usually contains': 'में आम तौर पर होता है', 'printed strength': 'छपी हुई मात्रा',
   'Each ingredient is saved on its own, so confirm each one. From a hand-written list: check the pack.': 'हर घटक अलग से सहेजा जाता है, इसलिए हर एक की पुष्टि करें। यह हाथ से लिखी सूची से है: पैक देख लें।',
   'not checked': 'जाँचा नहीं गया', 'Another medicine: type its name': 'कोई और दवा: उसका नाम लिखें', 'Medicine name': 'दवा का नाम',

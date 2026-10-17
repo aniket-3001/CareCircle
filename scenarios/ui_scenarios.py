@@ -732,5 +732,37 @@ def u20(w, b, r):
     ctx.close()
 
 
+@scenario("U21", "One tablet of a combination is one row with its name and strength, one tick, one set of times")
+def u21(w, b, r):
+    errs = []
+    ctx, pg = new_page(b, errs=errs)
+    email = f"u21-{rid()}@scenario.test"
+    ui_signup(pg, "Combo", email)
+    ui_circle(pg, "Mum's medicines", "Mum")
+    u = api_user(w, email)
+    c = circle_of(u)
+    ids = [u.ok(c, "care_record", person="mum", drug=d, freq_text="once daily", product="Telma-AM", product_strength="40/5 mg")["id"] for d in ("telmisartan", "amlodipine")]
+    pg.goto(f"{BASE}/#/today")
+    pg.reload()
+    pg.get_by_test_id("unscheduled").wait_for(timeout=20000)
+    r.check(pg.get_by_test_id("unscheduled").locator(".item").count() == 1, "the combination is one row to set times for, not two")
+    txt = pg.get_by_test_id("unscheduled").inner_text()
+    r.check("Telma-AM" in txt and "40/5 mg" in txt, "the row carries the product's name and printed strength", txt)
+    pg.get_by_test_id("set-times").click()
+    r.check("Telma-AM" in pg.locator("dialog[open]").inner_text(), "the times sheet says 'Times for Telma-AM'", pg.locator("dialog[open]").inner_text()[:80])
+    pg.get_by_test_id("save-times").click()
+    pg.get_by_test_id("slot").first.wait_for(timeout=20000)
+    r.check(pg.get_by_test_id("slot").count() == 1, "one row for the tablet, with both ingredients under it", pg.get_by_test_id("slot").count())
+    r.check("telmisartan" in pg.get_by_test_id("slot-ingredients").first.inner_text().lower() and "amlodipine" in pg.get_by_test_id("slot-ingredients").first.inner_text().lower(),
+            "the ingredients are named under the tablet")
+    pg.get_by_test_id("give-slot").first.click()
+    pg.wait_for_timeout(1500)
+    r.check(pg.get_by_test_id("slot").first.get_attribute("data-state") == "given", "one tick marks the whole tablet as given")
+    got = [x for x in u.ok(c, "care_gives", person="mum")]
+    r.check(sorted(g["drug"] for g in got) == ["amlodipine", "telmisartan"], "both ingredients are recorded as given", got)
+    r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
+    ctx.close()
+
+
 if __name__ == "__main__":
     sys.exit(1 if main() else 0)
