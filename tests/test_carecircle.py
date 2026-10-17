@@ -548,3 +548,34 @@ def test_intake_model_has_its_own_off_switch(monkeypatch):
     monkeypatch.setenv("CC_INTAKE_LLM", "0")
     monkeypatch.setitem(__import__("sys").modules, "boto3", type("B", (), {"client": staticmethod(lambda *a, **k: called.append(1))}))
     assert intake.llm_proposals("metformin 500 mg") == [] and not called
+
+
+async def test_bot_saves_a_combination_as_its_own_product_and_never_over_a_plain_entry(gm, monkeypatch):
+    """N3: the bot dropped the combination field, so Telma-AM's amlodipine was saved as a plain entry and closed the plain 5 mg one, with no duplicate flag."""
+    monkeypatch.setenv("CC_LLM", "0")
+    t, c = await circle(gm, "ravi")
+    await c["ravi"].care_record("asha", "amlodipine", dose_text="5 mg", freq_text="once daily")
+    key = await gm.issue_key("ravi")
+    api = FakeApi(); bot = Bot(gm, api, Checker())
+    await bot.handle({"message": {"chat": {"id": 1}, "text": f"/link {key} {t}"}})
+    api.out.clear()
+    await bot.handle({"message": {"chat": {"id": 1}, "text": "Telma-AM 40 once daily"}})
+    cards = [o for o in api.out if o[2]]
+    assert len(cards) == 2 and all("Telma-AM" in o[1] and "combination" in o[1] for o in cards)           # the bot says what it read it as
+    for o in cards:
+        await bot.handle({"callback_query": {"message": {"chat": {"id": 1}}, "data": o[2][0][0]["callback_data"]}})
+    reg = {(r["drug"], r["product"], r["dose_text"]) for r in await c["ravi"].care_regimen("asha")}
+    assert ("amlodipine", "", "5 mg") in reg and ("amlodipine", "telma-am", "") in reg and ("telmisartan", "telma-am", "") in reg      # the plain entry is untouched
+    assert [d["ingredient"] for d in await c["ravi"].care_duplicates("asha")] == ["amlodipine"]
+    assert "may be the same medicine from two sources" in api.out[-1][1] and "from Telma-AM" in api.out[-1][1]
+
+
+async def test_bot_says_when_it_shows_fewer_cards_than_it_read(gm, monkeypatch):
+    monkeypatch.setenv("CC_LLM", "0")
+    t, c = await circle(gm, "ravi")
+    key = await gm.issue_key("ravi")
+    api = FakeApi(); bot = Bot(gm, api, Checker())
+    await bot.handle({"message": {"chat": {"id": 1}, "text": f"/link {key} {t}"}})
+    api.out.clear()
+    await bot.handle({"message": {"chat": {"id": 1}, "text": "\n".join(f"{d} 10 mg" for d in ("metformin", "warfarin", "amlodipine", "atorvastatin", "omeprazole", "sertraline", "lisinopril", "digoxin", "furosemide", "tramadol"))}})
+    assert sum(1 for o in api.out if o[2]) == 8 and any("will show the first 8" in o[1] for o in api.out)

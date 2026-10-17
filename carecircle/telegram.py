@@ -17,6 +17,7 @@ from typing import Optional
 from carecircle import intake
 from carecircle.safety import scan_advice
 
+MAX_CARDS = 8                                                  # cards shown for one message; more are announced, never dropped silently
 HELP = ("Care Circle records and cross-checks medicines for the person you look after. It never says what to take or stop.\n"
         "/link <key> <circle> - connect this chat\n/who - people in the circle\n/regimen <person> - what is on record now\n"
         "/check <person> - possible interactions (with sources)\n/history - what happened, newest first\n/ack - acknowledge pending changes\n"
@@ -198,13 +199,23 @@ class Bot:
         sid = ""
         if link and kinds.get(src["kind"]):                          # keep what was read, so the saved entry can be checked against it and points back at it
             sid = await self.gm.open(link["agent"], link["circle"]).care_store_source(src["kind"], src["text"], src.get("file_sha256", ""), src.get("file_bytes", 0))
-        for p in props[:4]:
+        if len(props) > MAX_CARDS:
+            await self.api.send(chat, f"I read {len(props)} medicines and will show the first {MAX_CARDS}. Send the rest again in a separate message.")
+        for p in props[:MAX_CARDS]:
             cid = os.urandom(4).hex()
             top = p["drug_candidates"][0]["name"]
-            await self._hold(cid, chat, {"drug": top, "dose_text": p.get("dose_text", ""), "freq_text": p.get("freq_text", ""),
+            combo = p.get("combination", "")
+            note = ""
+            if combo:                                                # one card per ingredient, each saved as that product's entry, never over a plain one
+                note = (f"\n{combo} is a combination that usually contains {' + '.join(p.get('combination_ingredients') or [top])}"
+                        f"{' (printed strength ' + p['combination_strength'] + ')' if p.get('combination_strength') else ''}. "
+                        "Each ingredient is saved on its own; confirm each one. From a hand-written list: check the pack.")
+            elif p.get("possible_combination"):
+                note = f"\n{p['possible_combination']} may be a combination product. Only one ingredient was read from it; check the pack for any others."
+            await self._hold(cid, chat, {"drug": top, "dose_text": p.get("dose_text", ""), "freq_text": p.get("freq_text", ""), "product": combo,
                                  "quote": p["quote"], "source_ref": sid, "source_type": kinds.get(src["kind"], "typed")})
             alt = ", ".join(c["name"] for c in p["drug_candidates"][1:])
-            await self.api.send(chat, f"I read: {top} {p.get('dose_text', '')} {p.get('freq_text', '')}\nFrom: \"{p['quote'][:120]}\""
+            await self.api.send(chat, f"I read: {top} {p.get('dose_text', '')} {p.get('freq_text', '')}{note}\nFrom: \"{p['quote'][:120]}\""
                                 f"{' (quote verified)' if p.get('verified') else ' (could not verify the quote)'}"
                                 f"{chr(10) + 'Other matches: ' + alt if alt else ''}\nIs this right? It is saved only when you confirm.",
                           [[{"text": f"Confirm for {who}", "callback_data": f"ok|{cid}|{who}"}, {"text": "Discard", "callback_data": f"no|{cid}|"}]])
@@ -219,10 +230,13 @@ class Bot:
         mem = self.gm.open(link["agent"], link["circle"])
         r = await mem.care_record(person or await self._patient(mem), p["drug"], dose_text=p["dose_text"], freq_text=p["freq_text"],
                                   source_type=p["source_type"], quote=p["quote"], source_ref=p.get("source_ref", ""),
-                                  source_text=p.get("source_text", ""))
+                                  source_text=p.get("source_text", ""), product=p.get("product", ""))
         if r["status"] == "pending":
             await mem.care_confirm(r["id"])                          # the person just confirmed by tapping
-        await self.api.send(chat, f"Saved {p['drug']} for {person or 'the person'}. Other carers will be asked to acknowledge it.")
+        who = person or await self._patient(mem)
+        again = [d["meaning"] for d in await mem.care_duplicates(who) if d["ingredient"] == p["drug"]]
+        await self.api.send(chat, f"Saved {p['drug']}{' (from ' + p['product'] + ')' if p.get('product') else ''} for {who}. Other carers will be asked to acknowledge it."
+                                  + (f"\n{again[0]}" if again else ""))
 
     async def _cmd_ack(self, chat, mem, person):
         div = await mem.care_divergence(person or await self._patient(mem))
