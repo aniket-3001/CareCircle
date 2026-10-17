@@ -88,6 +88,8 @@ export interface PatientView {
   consent: ConsentEntry | null;
 }
 
+export interface Digest { entries: number; of: number; head: string; checkpoints: { n: number; hash: string }[]; note: string }
+
 export interface StockRow {
   dose_id: string;
   drug: string;

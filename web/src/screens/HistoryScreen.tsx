@@ -6,6 +6,7 @@ import { PageHead } from '../components/PageHead';
 import { Pill } from '../components/Pill';
 import { Segmented } from '../components/Segmented';
 import { EntrySource } from '../components/EntrySource';
+import { Fingerprint } from '../components/Fingerprint';
 import { Sheet } from '../components/Sheet';
 import type { TimelineEvent } from '../api/types';
 import { useToast } from '../components/Toast';
@@ -154,6 +155,7 @@ export function HistoryScreen(): React.JSX.Element {
                     <Segmented<'all' | 'record' | 'ack' | 'give'> name="hkind" label={tr('Kind')} value={kind} onChange={setKind}
                       options={[{ value: 'all', label: tr('All') }, { value: 'record', label: tr('Changes') }, { value: 'ack', label: tr('Seen') }, { value: 'give', label: tr('Given') }]} />
                   </div>
+                  <Fingerprint />
                   {shown(events).length === 0 && <p className="muted" data-testid="history-none">{tr('Nothing matches.')}</p>}
                   <ol className="timeline">
                     {shown(events).map((e, i) => (

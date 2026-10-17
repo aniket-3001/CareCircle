@@ -213,4 +213,12 @@ export const HI_MORE: Record<string, string> = {
   "Close it": "बंद करें",
   "Notes written back": "वापस लिखे गए नोट",
   "name typed, not verified": "नाम लिखा गया, सत्यापित नहीं",
+  "History fingerprint": "इतिहास की फ़िंगरप्रिंट",
+  "Keep this line somewhere safe. Later, paste it below to check that these entries are exactly as they were. It shows an entry was changed or removed after the fact; it does not show an entry is right.": "यह पंक्ति कहीं सुरक्षित रखें। बाद में इसे नीचे चिपकाकर जाँचें कि ये प्रविष्टियाँ ठीक वैसी ही हैं। यह दिखाती है कि कोई प्रविष्टि बाद में बदली या हटाई गई; यह नहीं कि प्रविष्टि सही है।",
+  "A line you kept earlier": "जो पंक्ति आपने पहले रखी थी",
+  "Check": "जाँचें",
+  "Those entries are exactly as they were.": "वे प्रविष्टियाँ ठीक वैसी ही हैं।",
+  "Those entries are NOT the same as when the line was kept: one was changed or removed.": "वे प्रविष्टियाँ वैसी नहीं हैं जैसी पंक्ति रखते समय थीं: कोई बदली या हटाई गई।",
+  "That does not look like a kept line (a number, a colon and 64 letters or digits).": "यह रखी हुई पंक्ति जैसी नहीं दिखती (एक संख्या, कोलन और 64 अक्षर/अंक)।",
+  "No entries yet.": "अभी कोई प्रविष्टि नहीं।",
 };

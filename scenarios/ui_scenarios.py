@@ -616,5 +616,33 @@ def u17(w, b, r):
     ctx.close()
 
 
+@scenario("U18", "The history fingerprint: a kept line matches at once and still matches after a later entry is added")
+def u18(w, b, r):
+    errs = []
+    ctx, pg = new_page(b, errs=errs)
+    email = f"u18-{rid()}@scenario.test"
+    ui_signup(pg, "Finger", email)
+    ui_circle(pg, "Mum's medicines", "Mum")
+    expect(pg.get_by_text("Nothing on record yet")).to_be_visible()
+    u = api_user(w, email)
+    c = circle_of(u)
+    u.ok(c, "care_record", person="mum", drug="warfarin", dose_text="5 mg", freq_text="at bedtime")
+    u.ok(c, "care_record", person="mum", drug="metformin", dose_text="500 mg", freq_text="twice daily")
+    tab(pg, "History")
+    pg.get_by_test_id("fingerprint").locator("summary").click()
+    expect(pg.get_by_test_id("fingerprint-line")).to_contain_text("2:", timeout=15000)
+    kept = pg.get_by_test_id("fingerprint-line").inner_text().strip()
+    pg.get_by_test_id("fingerprint-input").fill(kept)
+    pg.get_by_test_id("fingerprint-check").click()
+    expect(pg.get_by_test_id("fingerprint-verdict")).to_contain_text("exactly as they were", timeout=15000)
+    r.check(True, "a kept fingerprint matches right away")
+    u.ok(c, "care_record", person="mum", drug="amlodipine", dose_text="5 mg", freq_text="once daily")      # a later entry does not disturb it
+    pg.get_by_test_id("fingerprint-check").click()
+    expect(pg.get_by_test_id("fingerprint-verdict")).to_contain_text("exactly as they were", timeout=15000)
+    r.check(True, "and still matches after a later entry is added")
+    r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
+    ctx.close()
+
+
 if __name__ == "__main__":
     sys.exit(1 if main() else 0)
