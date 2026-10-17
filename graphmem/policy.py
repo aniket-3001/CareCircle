@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
+import time
 from typing import Optional
 
 from .db import CTL_GRAPH, Db, now_ms, validate_tenant
@@ -77,16 +78,29 @@ class GraphMem:
         await g.query(
             "MERGE (a:Agent {id:$a}) MERGE (t:Tenant {id:$t}) MERGE (a)-[g:GRANTED]->(t) SET g.scopes=$s, g.at=$ts",
             {"a": agent, "t": tenant, "s": list(scopes), "ts": now_ms()})
+        self._forget_grants()
 
     async def revoke(self, agent: str, tenant: str) -> None:
         g = await self._ctl()
         await g.query("MATCH (:Agent {id:$a})-[g:GRANTED]->(:Tenant {id:$t}) DELETE g", {"a": agent, "t": tenant})
+        self._forget_grants()
+
+    GRANT_TTL = 1.0                     # seconds a looked-up grant is reused. Every change made through this process clears it at once; only a change made by ANOTHER process can lag, by at most this long
 
     async def scopes(self, agent: str, tenant: str) -> set[str]:
+        cache = self.__dict__.setdefault("_grant_cache", {})
+        hit = cache.get((agent, tenant))
+        if hit and time.monotonic() - hit[0] < self.GRANT_TTL:
+            return set(hit[1])
         g = await self._ctl()
         rows = (await g.query("MATCH (:Agent {id:$a})-[g:GRANTED]->(:Tenant {id:$t}) RETURN g.scopes",
                               {"a": agent, "t": tenant})).result_set
-        return set(rows[0][0]) if rows else set()
+        have = set(rows[0][0]) if rows else set()
+        cache[(agent, tenant)] = (time.monotonic(), frozenset(have))
+        return have
+
+    def _forget_grants(self) -> None:
+        self.__dict__.setdefault("_grant_cache", {}).clear()
 
     async def tenants_of(self, agent: str) -> dict[str, list[str]]:
         g = await self._ctl()
@@ -121,3 +135,4 @@ class GraphMem:
         await self.db.drop_tenant(tenant)
         g = await self._ctl()
         await g.query("MATCH (t:Tenant {id:$t}) DETACH DELETE t", {"t": tenant})
+        self._forget_grants()
