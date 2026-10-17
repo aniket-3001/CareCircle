@@ -102,3 +102,28 @@ async def test_the_medicine_list_can_be_searched_by_part_of_a_name(gm):
     starts = [x["name"] for x in await m.care_drug_search("metf")]
     assert starts and starts[0].startswith("metf")
     assert await m.care_drug_search("s") == [] and await m.care_drug_search("zzzzqqq") == []
+
+
+def test_only_text_is_ever_sent_to_a_model_never_the_picture_and_never_an_identity_line(monkeypatch):
+    """A prescription photo shows the patient's and the doctor's names. The OCR text is all a model needs, so what leaves the server is that text with identity lines removed."""
+    sent = []
+
+    class FakeClient:
+        def converse(self, **kw):
+            sent.append(kw)
+            return {"output": {"message": {"content": [{"text": '{"items": []}'}]}}}
+    import sys
+    import types
+    monkeypatch.setitem(sys.modules, "boto3", types.SimpleNamespace(client=lambda *a, **k: FakeClient()))
+    monkeypatch.setenv("CC_LLM", "1")
+    text = "Patient: Asha Rao\nAge 71 F\nPh 98765 43210\nDr. Mehta MBBS\nTab Telma-AM 40/5 once daily"
+    import inspect
+    assert "image" not in inspect.signature(intake.llm_proposals).parameters and "image" not in inspect.signature(intake.propose).parameters
+    intake.llm_proposals(text)
+    assert len(sent) == 1
+    blocks = [b for m in sent[0]["messages"] for b in m["content"]]
+    assert all(set(b) == {"text"} for b in blocks), "a block other than plain text was sent"
+    body = blocks[0]["text"]
+    assert "Telma-AM 40/5 once daily" in body
+    for gone in ("Asha", "Rao", "71", "98765", "Mehta"):
+        assert gone not in body.split("SOURCE TEXT:")[1], gone

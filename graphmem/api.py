@@ -349,9 +349,7 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
             src = ci._done("typed", text, "text")
         if src["status"] != "ok":
             return {"source": {k: src[k] for k in ("kind", "method", "status", "note")}, "text": "", "proposals": []}
-        img = data if file is not None and src["kind"] == "image" else None
-        fmt = (file.filename.rsplit(".", 1)[-1].lower() if img else "png").replace("jpg", "jpeg")
-        props = await asyncio.to_thread(ci.propose, src["text"], checker(), img, fmt if fmt in ("png", "jpeg", "webp") else "png")
+        props = await asyncio.to_thread(ci.propose, src["text"], checker())            # the text only: the picture is never sent to a model
         sid = await m.care_store_source(src["kind"], src["text"]) if src["kind"] in ("image", "voice", "document") else ""
         return {"source": {k: src[k] for k in ("kind", "method", "status", "note")}, "source_id": sid, "text": src["text"], "proposals": props}
 

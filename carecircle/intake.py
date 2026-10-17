@@ -3,7 +3,7 @@
 Pipeline per file:  source text (independent of any LLM)  ->  proposals  ->  every proposal's quote verified against the source text.
   image  : RapidOCR (local, no key)         audio : faster-whisper (local)         pdf : pypdf          docx : python-docx
 Proposal extractors, best first:
-  1. Bedrock (Nova by default; set CC_MODEL for another id) given the text and, for images, the picture. Output is strict JSON, schema
+  1. Bedrock (set CC_MODEL for the model id) given the text only: never the picture. Output is strict JSON, schema
      checked, and EACH quote must be found in the OCR/ASR text, so a model cannot invent a label line.
   2. Rules (regex + fuzzy drug match): always available offline.
 The model only structures what is there. It never decides interactions or doses; those come from the graph and the prescriber.
@@ -228,17 +228,15 @@ def redact_identifiers(text: str) -> str:
     return _EMAIL.sub("[removed]", _PHONE.sub("[removed]", t))
 
 
-def llm_proposals(text: str, image: Optional[bytes] = None, image_format: str = "png") -> list[dict]:
-    """Bedrock Converse. Returns [] on any failure so the caller falls back to rules. Output is untrusted: strict shape + caps."""
+def llm_proposals(text: str) -> list[dict]:
+    """Bedrock Converse on the text only. Returns [] on any failure so the caller falls back to rules. Output is untrusted: strict shape + caps.
+    The PICTURE is never sent: it shows the patient's and the doctor's names, and the text the OCR already read is all the model needs (B7: no model beat the rules on it)."""
     if os.getenv("CC_LLM", "1") == "0":
         return []
     try:
         import boto3
         client = boto3.client("bedrock-runtime", region_name=os.getenv("AWS_REGION", "us-east-1"))
-        content = []
-        if image:
-            content.append({"image": {"format": image_format, "source": {"bytes": image}}})
-        content.append({"text": _PROMPT + "\n\nSOURCE TEXT:\n" + redact_identifiers(text)[:6000]})
+        content = [{"text": _PROMPT + "\n\nSOURCE TEXT:\n" + redact_identifiers(text)[:6000]}]
         r = client.converse(modelId=os.getenv("CC_MODEL", "us.amazon.nova-pro-v1:0"), messages=[{"role": "user", "content": content}],
                             inferenceConfig={"maxTokens": 800, "temperature": 0})
         raw = r["output"]["message"]["content"][0]["text"]
@@ -256,11 +254,11 @@ def llm_proposals(text: str, image: Optional[bytes] = None, image_format: str = 
         return []
 
 
-def propose(text: str, checker, image: Optional[bytes] = None, image_format: str = "png") -> list[dict]:
+def propose(text: str, checker) -> list[dict]:
     """Merge LLM and rule proposals. Each carries `verified` = its quote occurs in the independent source text. Unverified LLM items
     are kept but flagged, never trusted. Drug names are always resolved to reference-graph candidates for a human to choose."""
     props = []
-    for p in llm_proposals(text, image, image_format):
+    for p in llm_proposals(text):
         named = p.pop("llm_drug")
         if not quote_in_source(named, p["quote"]):                # a quote that does not even contain the drug name proves nothing
             continue

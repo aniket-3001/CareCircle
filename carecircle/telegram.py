@@ -122,7 +122,7 @@ class Bot:
             if "photo" in m or "voice" in m or "audio" in m or "document" in m:
                 return await self._media(chat, m)
             if text and not text.startswith("/"):
-                return await self._propose(chat, intake._done("typed", text, "text"), None)
+                return await self._propose(chat, intake._done("typed", text, "text"))
         except KeyError:
             return await self.api.send(chat, "I could not find that.")
         await self.api.send(chat, HELP)
@@ -184,12 +184,12 @@ class Bot:
         data, path = await asyncio.to_thread(self.api.download, item["file_id"])
         name = (m.get("document") or {}).get("file_name") or path
         src = await asyncio.to_thread(intake.read_source, data, name, "")
-        await self._propose(chat, src, data if src["kind"] == "image" else None)
+        await self._propose(chat, src)
 
-    async def _propose(self, chat, src, image):
+    async def _propose(self, chat, src):
         if src["status"] != "ok":
             return await self.api.send(chat, src.get("note") or "I could not read that. Please type the medicine name.")
-        props = await asyncio.to_thread(intake.propose, src["text"], self.checker, image, "jpeg")
+        props = await asyncio.to_thread(intake.propose, src["text"], self.checker)
         if not props:
             return await self.api.send(chat, "I did not find a medicine name. Please type it.")
         kinds = {"image": "photo", "voice": "voice", "document": "document"}

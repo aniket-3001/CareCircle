@@ -506,7 +506,7 @@ def test_a_model_cannot_attach_a_dose_the_quoted_line_does_not_say(monkeypatch):
     """The quote was checked against the label, but the dose and frequency beside it were not checked against the quote: a model answer of
     '1000 mg, three times daily' on the line 'METFORMIN 500 MG TABLETS' was shown as verified."""
     text = "CITY PHARMACY\nMETFORMIN 500 MG TABLETS\nTake ONE tablet twice daily"
-    monkeypatch.setattr(intake, "llm_proposals", lambda t, image=None, image_format="png": [
+    monkeypatch.setattr(intake, "llm_proposals", lambda t: [
         {"llm_drug": "metformin", "dose_text": "1000 mg", "freq_text": "three times daily", "quote": "METFORMIN 500 MG TABLETS", "method": "bedrock"}])
     p = intake.propose(text, Checker())
     met = [x for x in p if x["drug_candidates"][0]["name"] == "metformin"]
