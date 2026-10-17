@@ -98,6 +98,17 @@ What Mem0 did here: it kept 170 of the 183 events as memories (in 10 of the 20 c
 
 **What this does not show.** It is one question on tiny circles, which is the easiest case for the systems that read text. Both baselines used a mid-sized model (Nova Pro) and a plain prompt that lets the model reason and then give an `ANSWER:` line; a stronger model, a tuned prompt or tuned Mem0 settings would very likely score higher, and I did not try them. Mem0 is a general personal-memory store that was never meant to answer this question, so the table says what it takes to ask it, not that Mem0 is poor at what it is for. A first version of this script parsed the models' answers badly and made the full-context baseline look like 1/20; that was my parser, found by reading the raw replies, and fixed before any number above was recorded. Mem0's own Bedrock adapter sent a malformed request for Nova in version 2.2.1, so Mem0 was run through its LiteLLM route to the same model. Cognee was not run: it needs its own LLM key setup and a graph store, and a result I could not check would not belong in a table of results.
 
+## B8: what a new circle costs the database
+
+`bench/circle_cost.py`, 150 circles per run, each made the way the app makes one (a grant, then one medicine recorded and confirmed), run twice per mode on the same code (`GRAPHMEM_EAGER_ENGINE=1` gives the old behaviour: every index the generic memory engine could want, created when the graph is made).
+
+| | indexes on one circle's graph | database memory per circle | time per circle |
+|---|---|---|---|
+| all 20 engine and care indexes up front (before) | 24 | 3.39 MB (3390, 3388 KiB) | 60 ms |
+| care indexes only; the engine's are created when it is first used (now) | 12 | 2.06 MB (2060, 2058 KiB) | 41 ms |
+
+That is 39% less memory and about a third less time per circle, because the care product never touches episodes, facts, tasks or plans. It is a development database on one machine: read the difference, not the absolute numbers. `tests/test_lazy_engine.py` checks both directions: a care circle has none of the engine's indexes, and using the engine on it creates them and the unique constraints.
+
 ## B7: does a model structure label text better than the rules alone?
 
 `bench/llm_compare.py` (17 Oct 2026, seed 7): 40 medicines from the reference graph, each drawn as a label at three levels of damage and read by the real OCR (120 labels), then turned into proposals by the real `intake.propose` once per model. Scored as in the intake benchmark. Every proposal from a model must still pass the quote check against the OCR text.

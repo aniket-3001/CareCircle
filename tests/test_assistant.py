@@ -205,6 +205,7 @@ async def test_a_side_effect_or_alcohol_question_about_a_medicine_on_the_record_
     for q in ("what are the side effects of metformin", "can she drink alcohol with metformin", "is metformin ok with food"):
         r = await say(c, q, now)
         assert r["source"] == "refusal" and "prescriber or pharmacist" in r["answer"] and "published label for Metformin" in r["answer"], q
-        assert "book icon" in r["answer"] and not scan_advice(r["answer"].replace("a prescriber or pharmacist who knows her has to answer that", ""))
+        assert "Metformin 500 mg twice daily" in r["answer"] and "only what was written" in r["answer"], q          # what the record does hold is stated
+        assert "book icon" in r["answer"] and not scan_advice(r["answer"].replace("is for a prescriber or pharmacist who knows her", ""))
     r = await say(c, "what are the side effects", now)                                  # no medicine named: the plain refusal
     assert r["source"] == "refusal" and "published label" not in r["answer"]

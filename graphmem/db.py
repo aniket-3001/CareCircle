@@ -28,13 +28,18 @@ TENANT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,47}$")
 CTL_GRAPH = "ctl"
 RO_USER = "gm_reader"
 
-# (label, property) pairs indexed in every tenant graph.
-TENANT_INDEXES = [
+# (label, property) pairs indexed in a tenant graph. A care circle's graph gets the CARE ones when it is made; the ENGINE ones belong to the generic memory engine
+# (episodes, facts, tasks, plans ...), which the care product never touches, so they are created the first time a query on that graph names one of those labels
+# (`Db.ensure_engine`, called from `TenantMemory._q`). Space and fork graphs hold engine data from the start and get everything at once.
+CARE_INDEXES = [("Person", "id"), ("Dose", "id"), ("Give", "key"), ("Nudge", "key"), ("Drug", "name"), ("ChatMsg", "by"), ("Receipt", "id")]
+ENGINE_INDEXES = [
     ("Session", "id"), ("Episode", "id"), ("Entity", "key"), ("Fact", "id"), ("Fact", "skey"),
     ("Skill", "key"), ("Run", "id"), ("Task", "id"), ("Plan", "id"), ("Decision", "id"), ("Agent", "id"),
-    ("Code", "id"), ("Commit", "sha"), ("Person", "id"),
-    ("Dose", "id"), ("Give", "key"), ("Nudge", "key"), ("Drug", "name"), ("ChatMsg", "by"), ("Receipt", "id"),
+    ("Code", "id"), ("Commit", "sha"),
 ]
+TENANT_INDEXES = ENGINE_INDEXES + CARE_INDEXES                 # all of them, for callers that want the full list
+ENGINE_LABELS = re.compile(r":(Session|Episode|Entity|Fact|Skill|Run|Task|Plan|Decision|Agent|Code|Commit)\b|db\.idx\.(fulltext|vector)")
+EAGER_ENGINE = os.getenv("GRAPHMEM_EAGER_ENGINE", "") in ("1", "true", "yes")     # create every index when a graph is made (the old behaviour)
 CTL_INDEXES = [("Tenant", "id"), ("Agent", "id"), ("ApiKey", "hash"), ("Fork", "id"), ("Account", "email"), ("Account", "agent"), ("Account", "sub"),
                ("Session", "hash"), ("Invite", "hash"), ("Throttle", "key"), ("TgChat", "chat")]
 # UNIQUE constraints enforced by FalkorDB itself (need the matching exact-match index above): even a buggy writer cannot
@@ -133,6 +138,8 @@ class Db:
         self._ro_password, self._conn = ro_password, dict(host=host, port=port, max_connections=max_connections)
         self._ro_ready = False
         self._ready: dict[str, asyncio.Future] = {}
+        self._engine: dict[str, asyncio.Future] = {}
+        self._engine_done: set[str] = set()
         self._lock = asyncio.Lock()
         self._limits_set = False
 
@@ -210,25 +217,16 @@ class Db:
 
     async def _setup(self, name: str) -> None:
         g = RetryingGraph(self.client.select_graph(name))
-        idx = CTL_INDEXES if name == CTL_GRAPH else TENANT_INDEXES
+        full = name != CTL_GRAPH and (EAGER_ENGINE or name.startswith(("shared__", "fork__")))
+        idx = CTL_INDEXES if name == CTL_GRAPH else (TENANT_INDEXES if full else CARE_INDEXES)
         for label, prop in idx:
             try:
                 await g.query(f"CREATE INDEX FOR (n:{label}) ON (n.{prop})")
             except Exception as e:  # idempotent: index may already exist from an earlier process
                 if "already indexed" not in str(e).lower() and "already exists" not in str(e).lower():
                     raise
-        for label, prop in (CTL_UNIQUE if name == CTL_GRAPH else TENANT_UNIQUE):
-            try:
-                await self.client.execute_command("GRAPH.CONSTRAINT", "CREATE", name, "UNIQUE", "NODE", label, "PROPERTIES", "1", prop)
-            except Exception as e:  # idempotent
-                if "already" not in str(e).lower():
-                    raise
-        if name != CTL_GRAPH and os.getenv("GRAPHMEM_EMBEDDINGS", "") in ("1", "true", "yes"):
-            try:
-                await g.query("CREATE VECTOR INDEX FOR (f:Fact) ON (f.embedding) OPTIONS {dimension:384, similarityFunction:'cosine'}")
-            except Exception as e:
-                if "already" not in str(e).lower():
-                    raise
+        if name == CTL_GRAPH or full:
+            await self._engine_extras(name, g)
         if name != CTL_GRAPH:
             from . import schema
 
@@ -239,12 +237,48 @@ class Db:
                     if "already" not in str(e).lower():
                         raise
             await schema.migrate(g, mk)           # versioned: each circle graph is brought up to the current shape when first opened
-        if name != CTL_GRAPH:   # full-text index for search_text (DDL form; the procedure form is rejected by FalkorDB 6.x)
+
+    async def _engine_extras(self, name: str, g) -> None:
+        """The unique constraints (and, for a tenant graph, the vector and full-text indexes) that go with the indexes above."""
+        for label, prop in (CTL_UNIQUE if name == CTL_GRAPH else TENANT_UNIQUE):
             try:
-                await g.query("CREATE FULLTEXT INDEX FOR (e:Episode) ON (e.content)")
+                await self.client.execute_command("GRAPH.CONSTRAINT", "CREATE", name, "UNIQUE", "NODE", label, "PROPERTIES", "1", prop)
+            except Exception as e:  # idempotent
+                if "already" not in str(e).lower():
+                    raise
+        if name == CTL_GRAPH:
+            return
+        if os.getenv("GRAPHMEM_EMBEDDINGS", "") in ("1", "true", "yes"):
+            try:
+                await g.query("CREATE VECTOR INDEX FOR (f:Fact) ON (f.embedding) OPTIONS {dimension:384, similarityFunction:'cosine'}")
             except Exception as e:
                 if "already" not in str(e).lower():
                     raise
+        try:   # full-text index for search_text (DDL form; the procedure form is rejected by FalkorDB 6.x)
+            await g.query("CREATE FULLTEXT INDEX FOR (e:Episode) ON (e.content)")
+        except Exception as e:
+            if "already" not in str(e).lower():
+                raise
+
+    async def ensure_engine(self, name: str) -> None:
+        """Create the generic memory engine's indexes and constraints on this graph, once per process (idempotent across processes)."""
+        if name == CTL_GRAPH or name in self._engine_done:
+            return
+        async with self._lock:
+            fut = self._engine.get(name)
+            if fut is None:
+                async def work() -> None:
+                    g = RetryingGraph(self.client.select_graph(name))
+                    for label, prop in ENGINE_INDEXES:
+                        try:
+                            await g.query(f"CREATE INDEX FOR (n:{label}) ON (n.{prop})")
+                        except Exception as e:
+                            if "already indexed" not in str(e).lower() and "already exists" not in str(e).lower():
+                                raise
+                    await self._engine_extras(name, g)
+                fut = self._engine[name] = asyncio.ensure_future(work())
+        await fut
+        self._engine_done.add(name)
 
     async def drop_tenant(self, tenant: str) -> None:
         name = self.graph_name(tenant)
@@ -253,6 +287,8 @@ class Db:
         except Exception:
             pass
         self._ready.pop(name, None)
+        self._engine.pop(name, None)
+        self._engine_done.discard(name)
 
     async def list_tenant_graphs(self) -> list[str]:
         return sorted(g[len("mem__"):] for g in await self.client.list_graphs() if g.startswith("mem__"))

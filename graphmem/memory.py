@@ -18,7 +18,7 @@ import math
 import re
 from typing import Awaitable, Callable, Iterable, Optional
 
-from .db import Db, new_id, norm, now_ms
+from .db import ENGINE_LABELS, Db, new_id, norm, now_ms
 from .care import CareMixin
 from .care_custody import CareCustodyMixin
 from .care_followups import CareFollowupsMixin
@@ -70,6 +70,9 @@ class TenantMemory(GraphAlgoMixin, CareConsentMixin, CareReviewMixin, CareSchedu
         if self._guard and not checked:
             await self._guard(scope)
         name = self._graph or self.db.graph_name(self.tenant)
+        if ENGINE_LABELS.search(cypher):          # the generic memory engine is used on this graph: it gets its indexes and constraints now, not when the circle was made
+            await self.db.graph(name)
+            await self.db.ensure_engine(name)
         if scope == "read":      # read scope never needs write access; with GRAPHMEM_RO_PASSWORD it runs as the RO database user
             g = await self.db.ro_graph(name)
             return (await g.ro_query(cypher, params or {})).result_set

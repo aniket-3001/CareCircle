@@ -46,10 +46,14 @@ ctl     (agents, grants, hashed API keys, Telegram chat links, and accounts)
   (:Account)-[:MEMBER {role: owner|carer}]->(:Tenant {id, name, person, owner})        a circle;  (:Agent)-[:GRANTED {scopes}]->(:Tenant) is the engine's access check
   (:Invite {hash, circle, exp})   (:Throttle {key, n, exp})
 mem__<circle> also has  (:ChatMsg {by, role, text, at})  the helper conversation, per carer
+  (:Source {id, kind, text, sha256})<-[:READ_FROM]-(Dose)    the text the server read an entry from (never the picture)    (:Receipt {id, kind, hash})  what was erased, as a keyed HMAC
+  (:Consent {status, who, note, at})-[:FOR]->(Person)    (:Review {name, note, share, at})-[:FOR]->(Person)    (:Setting {key, value})  time zone, receipt key
   (:Measurement {kind, value, unit, at, by})-[:FOR]->(Person)    (:Appointment {title, at, place, who, bring, status})-[:FOR]->(Person)
   (:Condition {name})-[:FOR]->(Person)   (:Allergy {text, drug})-[:FOR]->(Person)   (:Schema {v})  the graph's version
 cc_ref also has  (:Cached {url, at, body})  public lookups, by medicine name only
 ```
+
+**`SUPERSEDES` is derived, not authoritative.** The edge that links a medicine's entries in order is not the record of the order: the entries' own `valid_from` times are. After every change that could alter the order (a new entry, an entry marked as a mistake, an erase, an undo) the edges for that medicine and product are deleted and rebuilt from those times, so two entries recorded in the wrong order, or a late entry with an earlier date, still end up in the right chain, and a bug in building the edge can be repaired by rebuilding it. Queries that need "what stood then" use the times (`valid_from`, `valid_to`), and the edges are for walking the history in the graph view.
 
 ## Queries and algorithms
 | Behaviour | Cypher / algorithm | Where |
@@ -64,7 +68,7 @@ cc_ref also has  (:Cached {url, at, body})  public lookups, by medicine name onl
 | Hazard clusters | `CALL algo.WCC({nodeLabels:['Drug'], relationshipTypes:['HAZARD']})` | `algos.py clusters` |
 | Most hazard-connected in this regimen | degree and summed weight inside the induced `HAZARD` subgraph | `algos.py regimen_hubs` |
 | Change history / as-of | `valid_from <= $t AND (valid_to IS NULL OR valid_to > $t)` over `SUPERSEDES` chains | `graphmem/care.py care_regimen` |
-| Supersede on confirm | `OPTIONAL MATCH (old:Dose {cur:true, drug:x.drug}) ... FOREACH ... CREATE (x)-[:SUPERSEDES]->(old)` | `care.py _care_activate` |
+| Supersede on confirm (derived) | every confirmed entry of one medicine and product is ordered by `valid_from`, the edges are deleted and rebuilt, and `cur`/`valid_to` are set from that order | `care.py _care_rechain` |
 | Atomic dose-slot claim | `MERGE (g:Give {key:$k}) ON CREATE SET ... g.won=true` then `SET g.won=false` | `care.py care_give` |
 | Reminder once | `MERGE (n:Nudge {key:$k}) ON CREATE SET n.fresh=true` | `care.py care_nudges` |
 | Isolation and revocation | `(Agent)-[:GRANTED]->(Tenant)` checked on every query | `graphmem/policy.py` |
@@ -219,9 +223,15 @@ card with a big number and a face, white hairline cards, dashed add tiles, a flo
 
 Every push to `main` runs the tests, the web build and a headless-Chrome walk-through of the demo, and only then deploys to the instance (GitHub OIDC to AWS Systems Manager, no stored keys).
 FalkorDB itself has no query time or memory limit, so the app sets one on first connect (15 s default, 60 s ceiling, 1 GiB per query; tunable with `GRAPHMEM_QUERY_TIMEOUT_MS`, `GRAPHMEM_QUERY_TIMEOUT_MAX_MS`, `GRAPHMEM_QUERY_MEM_BYTES`, `0` = off). A query that hits a cap is stopped, a write inside it is rolled back, and the caller gets a 503 that says to ask for less. `GET /admin/db` (admin key) shows the caps in force, graph counts, memory and the slowest queries with every string value removed.
-One graph per circle costs memory: on the development database, 481 graphs use about 1.1 MB each on average (shared reference graph included, so a rough guide). Plan roughly 1 GB per thousand circles and watch `/admin/db`.
+One graph per circle costs memory. Measured with `bench/circle_cost.py` (150 circles, each with one confirmed medicine): **about 2.0 MB and 40 ms per circle, 12 indexes**; before the generic memory engine's indexes were made lazy it was 3.4 MB, 60 ms and 24 indexes (B8). Plan on the order of 2 GB per thousand circles on this engine and watch `/admin/db`.
 
 FalkorDB is **pinned by digest** (4.22.1) in `docker-compose.yml`, `deploy/docker-compose.prod.yml` and the CI workflow, and `tests/test_pinned_database.py` fails if those differ or if the database a test run talks to is another version. `latest` is a moving tag: it was 4.22.1 on the server and 6.0.2 on a laptop, and three bugs hid in that gap. 4.22.1 is the newest release of the 4.x line (15 Oct 2026); 6.x is a different engine (Rust) for which FalkorDB documents no supported upgrade from 4.x yet, so moving is a deliberate migration, not a version bump. A second workflow (`.github/workflows/compat.yml`) runs the whole test suite on 6.0.2 on every push; it passes on every push, so the code is ready, and the open question is moving the data. To upgrade, change the digest in all three files and `PINNED_VERSION` in that test together, after running the suite on the new image.
+
+## The product and the engine under it
+This repository holds two things that share a database, and it helps to keep them apart.
+- **The product, Care Circle.** `carecircle/` (reference data, checks, safety rules, intake, accounts, reminders, Telegram, the pharmacist link) and the care operations in `graphmem/care*.py` (the regimen, who has seen what, the dose-slot claim, the schedule), with the React app in `web/`. Every screen and every number in this README comes from this part.
+- **The engine, `graphmem`.** A general multi-tenant graph memory for agents on FalkorDB: a graph per tenant, access grants, an HTTP API and an MCP server over one table of operations (`graphmem/ops.py`), plus the generic memory operations in `graphmem/memory.py` (episodes, facts that supersede each other, tasks with atomic claims, plans, forks, shared spaces). It is what Track 02 (agent memory and coordination) asks for, and it is what lets another agent use a circle's memory.
+- **What depends on what.** The care code uses the engine's tenants, grants, operation table and query layer (`db.py`, `policy.py`, `ops.py`); it does **not** use the generic memory operations (episodes, facts, tasks, plans). Those are exercised by their own tests and by `docs/TRACK02.md`, and a care circle's graph only gets their indexes if something calls them (see Operations).
 
 ## Layout
 `carecircle/` product logic (reference graph, checks, risk math, safety, intake, Telegram, algorithms, demo) · `graphmem/` the multi-tenant graph

@@ -288,8 +288,11 @@ def ask(question: str, facts: Facts, checker, generate=None, lang: str = "") -> 
         return lookup
     if ADVICE_Q.search(q):
         about = next((r["drug"] for r in facts.regimen if r["drug"] in low), None)
-        if about and LABEL_TOPIC.search(q):                      # side effects, alcohol, food: not ours to answer, but the published label is one tap away
-            return {"answer": (f"I can't say what to expect from {_title(about)} or what is fine with it for her: a prescriber or pharmacist who knows her has to answer that. "
+        if about and LABEL_TOPIC.search(q):                      # side effects, alcohol, food: the record has only what was written; say that, decline the rest, point to the label
+            row = next(r for r in facts.regimen if r["drug"] == about)
+            written = " ".join(x for x in (_title(about), row["dose_text"], row["freq_text"]) if x).strip()
+            return {"answer": (f"What the record holds for {_title(about)} is only what was written for it: \"{written}\". It holds nothing about side effects, alcohol or food beyond those words, "
+                               f"and what applies to her is for a prescriber or pharmacist who knows her. "
                                f"The published label for {_title(about)} (what its maker or regulator wrote, not advice for her) is behind the book icon next to it on Today, with a link to the full label."),
                     "source": "refusal", "links": [{"tab": "today", "label": "Open Today"}]}
         return {"answer": REFUSAL, "source": "refusal", "links": []}
