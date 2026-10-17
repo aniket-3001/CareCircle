@@ -34,25 +34,49 @@ CLASSES: dict[str, dict] = {
 }
 
 
-def _atc() -> dict[str, tuple[str, ...]]:
+def _atc() -> dict[str, dict]:
     try:
         with open(os.path.join(os.path.dirname(__file__), "snapshot", "classes_atc.json"), encoding="utf-8") as f:
-            return {k.replace(" ", "-"): tuple(v["members"]) for k, v in json.load(f)["classes"].items()}
+            return json.load(f)["classes"]
     except (OSError, ValueError, KeyError):
         return {}
 
 
-ATC = _atc()
+ATC_SOURCE = "WHO ATC via NLM RxClass"
+HAND_SOURCE = "hand-written (unverified)"
+
+
+def all_classes() -> dict[str, dict]:
+    """Both sources merged, one entry per class: {also: [spellings], atc: [codes], members: {ingredient: source}}. Names have spaces, not hyphens."""
+    out: dict[str, dict] = {}
+    for name, c in CLASSES.items():
+        out[name.replace("-", " ")] = {"also": list(c["also"]), "atc": [], "members": {m: HAND_SOURCE for m in c["members"]}}
+    for name, v in _atc().items():
+        e = out.setdefault(name.replace("-", " "), {"also": [], "atc": [], "members": {}})
+        e["also"] = list(dict.fromkeys(e["also"] + list(v.get("also", []))))
+        e["atc"] = list(v.get("atc", []))
+        for m in v["members"]:
+            e["members"][m] = ATC_SOURCE                   # a member in both lists is credited to the table
+    return out
+
+
+CLASS_TABLE = all_classes()
+
+
+def words_for(name: str, also: list[str]) -> list[str]:
+    """The ways a person may write the class: its name (spaces or hyphens, with or without an s) and its other spellings."""
+    base = [name, name.replace(" ", "-"), name + "s", name.replace(" ", "-") + "s", *also, *[w + "s" for w in also]]
+    return list(dict.fromkeys(w.lower() for w in base))
+
+
+def classes_named_in(text: str, table: dict[str, dict] | None = None) -> list[str]:
+    """The classes a typed allergy names: the class word, or one of its other spellings, must occur as whole words."""
+    t = " " + re.sub(r"[^a-z0-9+\- ]+", " ", text.lower()) + " "
+    return [name for name, c in (table or CLASS_TABLE).items() if any(f" {w} " in t for w in words_for(name, c["also"]))]
 
 
 def group_of(text: str) -> tuple[str, tuple[str, ...]]:
-    """The class a typed allergy names (or ("", ()) when it names none): the class word, or one of its other spellings, must occur as whole words."""
-    t = " " + re.sub(r"[^a-z0-9+\- ]+", " ", text.lower()) + " "
-    for name, c in CLASSES.items():
-        for word in (name, *c["also"]):
-            if f" {word} " in t:
-                return name, tuple(dict.fromkeys(c["members"] + ATC.get(name.replace(" ", "-"), ())))
-    for name, members in ATC.items():
-        if f" {name.replace('-', ' ')} " in t or f" {name} " in t or f" {name}s " in t:
-            return name, members
+    """The first class a typed allergy names (or ("", ()) when it names none) and its members."""
+    for name in classes_named_in(text):
+        return name, tuple(CLASS_TABLE[name]["members"])
     return "", ()

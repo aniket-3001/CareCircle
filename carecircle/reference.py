@@ -17,7 +17,7 @@ from pathlib import Path
 from .curated import CURATED_SUBSTRATES
 
 REF_GRAPH = "cc_ref"
-REF_VERSION = 2          # bump when the shape of the reference graph changes: start-up reloads it when the stored version is older (2: laboratory and transporter tables)
+REF_VERSION = 3          # bump when the shape of the reference graph changes: start-up reloads it when the stored version is older (2: laboratory and transporter tables)
 DATA = Path(__file__).resolve().parent.parent / "data" / "ref"
 
 
@@ -149,8 +149,16 @@ def load(host: str = "localhost", port: int = 6379, data_dir: Path = DATA) -> di
     sub += [{"d": d, "e": e, "src": "curated (unverified)"} for d, e, *_ in CURATED_SUBSTRATES]
     g.query("UNWIND $r AS x MATCH (d:Drug {name:x.d}) MATCH (e:Enzyme {name:x.e}) "
             "CREATE (d)-[:SUBSTRATE_OF {source:x.src}]->(e)", {"r": sub})
+    from .classes import CLASS_TABLE, words_for
+    g.query("CREATE INDEX FOR (c:Class) ON (c.name)")
+    g.query("CREATE INDEX FOR (m:Member) ON (m.name)")
+    for name, c in CLASS_TABLE.items():                              # (:Member)-[:IN_CLASS {source}]->(:Class): which ingredient belongs to which class, and who says so
+        g.query("MERGE (c:Class {name:$n}) SET c.words = $w, c.atc = $a", {"n": name, "w": words_for(name, c["also"]), "a": c["atc"]})
+        mem = [{"m": m, "s": s} for m, s in c["members"].items()]
+        for i in range(0, len(mem), 500):
+            g.query("MATCH (c:Class {name:$n}) UNWIND $r AS x MERGE (m:Member {name:x.m}) CREATE (m)-[:IN_CLASS {source:x.s}]->(c)", {"n": name, "r": mem[i:i + 500]})
     g.query("MERGE (m:Meta {key:'ref'}) SET m.version = $v, m.loaded_at = timestamp()", {"v": REF_VERSION})
-    return {"drugs": len(names), "interacts": len(rows), "enzymes": len(enzymes), "transporters": len(transporters), "fda": {k: len(v) for k, v in fda.items()}}
+    return {"drugs": len(names), "interacts": len(rows), "enzymes": len(enzymes), "transporters": len(transporters), "classes": len(CLASS_TABLE), "fda": {k: len(v) for k, v in fda.items()}}
 
 
 if __name__ == "__main__":

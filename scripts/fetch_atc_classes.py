@@ -15,9 +15,17 @@ CODES = {
     "nsaid": ["M01A"], "aspirin": ["N02BA", "B01AC06"], "statin": ["C10AA"], "macrolide": ["J01FA"], "fluoroquinolone": ["J01MA"], "tetracycline": ["J01AA"],
     "ace inhibitor": ["C09A", "C09B"], "arb": ["C09C", "C09D"], "beta blocker": ["C07A"], "opioid": ["N02A"], "benzodiazepine": ["N05BA", "N05CD", "N03AE"],
     "ppi": ["A02BC"], "sulfonylurea": ["A10BB"], "anticonvulsant": ["N03A"],
+    "local anaesthetic": ["N01B"], "muscle relaxant": ["M03"], "antihistamine": ["R06A"], "corticosteroid": ["H02AB"], "azole antifungal": ["J02AC", "J02AB", "D01AC"],
+    "triptan": ["N02CC"], "nitrate": ["C01DA"], "loop diuretic": ["C03C"], "insulin": ["A10A"], "antiarrhythmic": ["C01B"], "antiemetic": ["A04A", "A03FA"],
+    "antiplatelet": ["B01AC"],
     "calcium channel blocker": ["C08"], "thiazide": ["C03A", "C03B"], "fibrate": ["C10AB"], "anticoagulant": ["B01AA", "B01AB", "B01AE", "B01AF"],
     "antidepressant": ["N06A"], "antipsychotic": ["N05A"], "aminoglycoside": ["J01G"], "carbapenem": ["J01DH"], "nitrofuran": ["J01XE"],
 }
+# other words a person may type for the same class (the class name itself is always matched, with an s)
+ALSO = {"local anaesthetic": ["local anesthetic", "lignocaine", "lidocaine allergy", "novocaine"], "muscle relaxant": ["muscle relaxants"], "antihistamine": ["antihistamines", "allergy tablets"],
+        "corticosteroid": ["steroid", "steroids", "corticosteroids"], "azole antifungal": ["azole", "azoles", "antifungal", "antifungals"], "triptan": ["triptans", "migraine tablets"],
+        "nitrate": ["nitrates"], "loop diuretic": ["water tablet", "diuretic", "diuretics"], "antiarrhythmic": ["antiarrhythmics"], "antiemetic": ["antiemetics", "anti-sickness"],
+        "antiplatelet": ["antiplatelets", "blood thinner"], "insulin": ["insulins"]}
 URL = "https://rxnav.nlm.nih.gov/REST/rxclass/classMembers.json?classId={}&relaSource=ATC&ttys=IN"
 
 
@@ -34,7 +42,7 @@ def main() -> None:
         for c in codes:
             got |= members(c)
             time.sleep(0.3)
-        out["classes"][name] = {"atc": codes, "members": sorted(got)}
+        out["classes"][name] = {"atc": codes, "also": ALSO.get(name, []), "members": sorted(got)}
         print(f"{name:24s} {len(got):4d} ingredients")
     path = os.path.join(os.path.dirname(__file__), "..", "carecircle", "snapshot", "classes_atc.json")
     with open(path, "w", encoding="utf-8") as f:

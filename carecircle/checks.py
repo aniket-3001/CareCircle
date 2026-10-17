@@ -26,6 +26,26 @@ class Checker:
     def __init__(self, host="localhost", port=6379):
         self.g = FalkorDB(host=host, port=port, password=os.getenv("GRAPHMEM_DB_PASSWORD") or None).select_graph(REF_GRAPH)
 
+    def class_hits(self, text: str, drugs: list[str]) -> dict:
+        """Which of these medicines belong to a class the typed allergy names, by walking (:Member)-[:IN_CLASS]->(:Class) in the reference graph.
+        {classes: [names found in the text], hits: [{class, drug, source}], from_graph: bool}. When the reference graph holds no classes (an older copy), the
+        same two sources are read from the files instead, so the answer does not depend on which copy is loaded."""
+        t = " " + re.sub(r"[^a-z0-9+\- ]+", " ", text.lower()) + " "
+        try:
+            rows = self.g.ro_query("MATCH (c:Class) RETURN c.name, c.words").result_set
+        except Exception:
+            rows = []
+        if not rows:
+            from .classes import CLASS_TABLE, classes_named_in
+            named = classes_named_in(text)
+            return {"classes": named, "from_graph": False, "hits": [{"class": n, "drug": d, "source": CLASS_TABLE[n]["members"][d]} for n in named for d in drugs if d in CLASS_TABLE[n]["members"]]}
+        named = [n for n, words in rows if any(f" {w} " in t for w in words)]
+        hits = []
+        for n in named:
+            hits += [{"class": n, "drug": r[0], "source": r[1]} for r in self.g.ro_query(
+                "MATCH (m:Member)-[r:IN_CLASS]->(c:Class {name:$c}) WHERE m.name IN $d RETURN m.name, r.source", {"c": n, "d": list(drugs)}).result_set]
+        return {"classes": named, "hits": hits, "from_graph": True}
+
     def check(self, drugs: list[str]) -> dict:
         d = sorted({norm(x) for x in drugs if x})
         known = {r[0] for r in self.g.ro_query(KNOWN, {"d": d}).result_set}

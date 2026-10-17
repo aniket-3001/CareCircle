@@ -267,7 +267,7 @@ export const HI_MORE: Record<string, string> = {
   "None of the medicines on record is on this short list. The list is a subset, so that does not mean the burden is zero.": "रिकॉर्ड की कोई भी दवा इस छोटी सूची में नहीं है। सूची पूरी नहीं है, इसलिए इसका मतलब यह नहीं कि बोझ शून्य है।",
   "Flags are for discussion with a prescriber or pharmacist. Different references may disagree. Absence of a flag is not a statement of safety.": "चिह्न डॉक्टर या फ़ार्मासिस्ट से चर्चा के लिए हैं। अलग-अलग संदर्भ असहमत हो सकते हैं। चिह्न का न होना सुरक्षा का कथन नहीं है।",
   "No entry has been read from a photo, voice note or document yet.": "अभी किसी फ़ोटो, आवाज़ के नोट या दस्तावेज़ से कोई प्रविष्टि नहीं पढ़ी गई।",
-  "A hit means ask the prescriber or pharmacist. No hit does not mean there is no problem: the list of groups is short.": "मेल मिलने का मतलब है डॉक्टर या फ़ार्मासिस्ट से पूछें। मेल न मिलने का मतलब यह नहीं कि कोई समस्या नहीं: समूहों की सूची छोटी है।",
+  "A hit means ask the prescriber or pharmacist. No hit does not mean there is no problem: the class tables are not complete.": "मेल मिलने का मतलब है डॉक्टर या फ़ार्मासिस्ट से पूछें। मेल न मिलने का मतलब यह नहीं कि कोई समस्या नहीं: समूहों की सूची छोटी है।",
   "A note kept by the family of what the person said. It is not legal consent.": "परिवार द्वारा रखा गया नोट कि व्यक्ति ने क्या कहा। यह कानूनी सहमति नहीं है।",
   "of a label or box": "लेबल या डिब्बे की",
   "Choose a photo of a label": "लेबल की फ़ोटो चुनें",

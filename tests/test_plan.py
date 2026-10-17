@@ -60,7 +60,7 @@ async def test_allergy_groups_are_matched_by_the_words_a_family_uses_and_only_as
     await m.care_allergy_add("asha", "ARBs")
     out = await m.care_allergy_check("asha")
     assert {h["drug"] for h in out["hits"]} == {"ciprofloxacin", "telmisartan"}
-    assert all("not verified" in h["why"] for h in out["hits"])
+    assert all(("unverified" in h["why"]) or ("WHO ATC" in h["why"]) for h in out["hits"])             # every class hit says which source put the medicine in the class
 
 
 async def test_what_to_bring_is_assembled_from_the_record(gm):
@@ -147,3 +147,18 @@ async def test_a_stored_source_keeps_the_files_fingerprint_but_not_the_file(gm):
     assert out["file_sha256"] == hashlib.sha256(data).hexdigest() and out["file_bytes"] == len(data) and out["text"] == src["text"]
     raw = await m._q("MATCH (s:Source) RETURN keys(s)", scope="admin")
     assert not any("image" in k or "data" in k or "blob" in k for ks in raw for k in ks[0])      # nothing of the file itself is stored
+
+
+def test_class_membership_is_walked_in_the_reference_graph_and_agrees_with_the_files():
+    """Allergy classes are edges in the reference graph, (:Member)-[:IN_CLASS {source}]->(:Class); every class and member in the files is there, with its source."""
+    from carecircle.checks import Checker
+    from carecircle.classes import CLASS_TABLE
+    ch = Checker()
+    assert len(CLASS_TABLE) >= 38
+    for name, c in CLASS_TABLE.items():
+        members = list(c["members"])
+        got = ch.class_hits(name, members)
+        assert got["from_graph"], "the loaded reference graph has no Class nodes: reload it (REF_VERSION 3)"
+        assert name in got["classes"], name
+        assert {h["drug"]: h["source"] for h in got["hits"] if h["class"] == name} == c["members"], name
+    assert ch.class_hits("peanuts", ["amoxicillin"]) == {"classes": [], "hits": [], "from_graph": True}

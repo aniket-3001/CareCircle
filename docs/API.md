@@ -90,7 +90,7 @@ Content-Type: application/json
 | `care_allergy_add` | write | `person`*, `text`* |  |
 | `care_profile` | read | `person`* |  |
 | `care_profile_remove` | write | `item_id`* |  |
-| `care_allergy_check` | read | `person`* | Recorded allergies against the medicines on record: an exact generic name, or a medicine in a common group (short hand-written list). |
+| `care_allergy_check` | read | `person`* | Recorded allergies against the medicines on record: an exact generic name, or a medicine in a class the allergy names (found by walking the class edges in the reference graph). |
 | `care_summary_counts` | read | `person`* | Plain counts over the record for a talk with a pharmacist: how complicated the regimen reads, a short anticholinergic list total (a subset), and |
 | `care_reading_stats` | read | `person`* | How often what was read from a photo, voice note or document was saved without a change by the carer who checked it. No text is kept, only |
 | `care_watch` | write | `person`*, `drug`*, `on` |  |

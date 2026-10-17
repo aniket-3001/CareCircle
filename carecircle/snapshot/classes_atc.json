@@ -1,6 +1,7 @@
 {
  "classes": {
   "ace inhibitor": {
+   "also": [],
    "atc": [
     "C09A",
     "C09B"
@@ -23,6 +24,7 @@
    ]
   },
   "aminoglycoside": {
+   "also": [],
    "atc": [
     "J01G"
    ],
@@ -40,7 +42,37 @@
     "tobramycin"
    ]
   },
+  "antiarrhythmic": {
+   "also": [
+    "antiarrhythmics"
+   ],
+   "atc": [
+    "C01B"
+   ],
+   "members": [
+    "ajmaline",
+    "amiodarone",
+    "aprindine",
+    "cifenline",
+    "disopyramide",
+    "dofetilide",
+    "dronedarone",
+    "encainide",
+    "flecainide",
+    "hydroquinidine",
+    "ibutilide",
+    "lidocaine",
+    "mexiletine",
+    "moricizine",
+    "prajmaline",
+    "procainamide",
+    "propafenone",
+    "quinidine",
+    "tocainide"
+   ]
+  },
   "anticoagulant": {
+   "also": [],
    "atc": [
     "B01AA",
     "B01AB",
@@ -77,6 +109,7 @@
    ]
   },
   "anticonvulsant": {
+   "also": [],
    "atc": [
     "N03A"
    ],
@@ -124,6 +157,7 @@
    ]
   },
   "antidepressant": {
+   "also": [],
    "atc": [
     "N06A"
    ],
@@ -188,7 +222,135 @@
     "zuranolone"
    ]
   },
+  "antiemetic": {
+   "also": [
+    "antiemetics",
+    "anti-sickness"
+   ],
+   "atc": [
+    "A04A",
+    "A03FA"
+   ],
+   "members": [
+    "alizapride",
+    "aprepitant",
+    "bromopride",
+    "cerium oxalate",
+    "chlorobutanol",
+    "cinitapride",
+    "cisapride",
+    "clebopride",
+    "dolasetron",
+    "domperidone",
+    "dronabinol",
+    "granisetron",
+    "metoclopramide",
+    "metopimazine",
+    "mosapride",
+    "nabilone",
+    "ondansetron",
+    "palonosetron",
+    "rolapitant",
+    "scopolamine",
+    "tropisetron"
+   ]
+  },
+  "antihistamine": {
+   "also": [
+    "antihistamines",
+    "allergy tablets"
+   ],
+   "atc": [
+    "R06A"
+   ],
+   "members": [
+    "acrivastine",
+    "antazoline",
+    "astemizole",
+    "azatadine",
+    "azelastine",
+    "bamipine",
+    "bromodiphenhydramine",
+    "brompheniramine",
+    "buclizine",
+    "carbinoxamine",
+    "cetirizine",
+    "chlorcyclizine",
+    "chloropyramine",
+    "chlorpheniramine",
+    "chlorphenoxamine",
+    "clemastine",
+    "cyclizine",
+    "cyproheptadine",
+    "desloratadine",
+    "dexbrompheniramine",
+    "dexchlorpheniramine",
+    "dimenhydrinate",
+    "dimethindene",
+    "diphenhydramine",
+    "diphenylpyraline",
+    "doxylamine",
+    "ebastine",
+    "epinastine",
+    "fexofenadine",
+    "isothipendyl",
+    "ketotifen",
+    "levocetirizine",
+    "loratadine",
+    "mebhydroline",
+    "meclizine",
+    "mequitazine",
+    "methapyrilene",
+    "methdilazine",
+    "mizolastine",
+    "oxatomide",
+    "phenindamine",
+    "pheniramine",
+    "pimethixene",
+    "promethazine",
+    "pyrilamine",
+    "terfenadine",
+    "thiethylperazine",
+    "thonzylamine",
+    "trimeprazine",
+    "trimethobenzamide",
+    "tripelennamine",
+    "triprolidine",
+    "tritoqualine"
+   ]
+  },
+  "antiplatelet": {
+   "also": [
+    "antiplatelets",
+    "blood thinner"
+   ],
+   "atc": [
+    "B01AC"
+   ],
+   "members": [
+    "abciximab",
+    "aloxiprin",
+    "aspirin",
+    "cangrelor",
+    "cilostazol",
+    "clopidogrel",
+    "dipyridamole",
+    "epoprostenol",
+    "eptifibatide",
+    "iloprost",
+    "indobufen",
+    "prasugrel",
+    "selexipag",
+    "ticagrelor",
+    "ticlopidine",
+    "tirofiban",
+    "treprostinil",
+    "triflusal",
+    "vorapaxar"
+   ]
+  },
   "antipsychotic": {
+   "also": [],
    "atc": [
     "N05A"
    ],
@@ -257,6 +419,7 @@
    ]
   },
   "arb": {
+   "also": [],
    "atc": [
     "C09C",
     "C09D"
@@ -271,6 +434,7 @@
    ]
   },
   "aspirin": {
+   "also": [],
    "atc": [
     "N02BA",
     "B01AC06"
@@ -287,7 +451,45 @@
     "salsalate"
    ]
   },
+  "azole antifungal": {
+   "also": [
+    "azole",
+    "azoles",
+    "antifungal",
+    "antifungals"
+   ],
+   "atc": [
+    "J02AC",
+    "J02AB",
+    "D01AC"
+   ],
+   "members": [
+    "bifonazole",
+    "clotrimazole",
+    "econazole",
+    "efinaconazole",
+    "fenticonazole",
+    "fluconazole",
+    "flutrimazole",
+    "isavuconazole",
+    "isoconazole",
+    "itraconazole",
+    "ketoconazole",
+    "luliconazole",
+    "miconazole",
+    "omoconazole",
+    "oteseconazole",
+    "oxiconazole",
+    "posaconazole",
+    "sertaconazole",
+    "sulconazole",
+    "thiabendazole",
+    "tioconazole",
+    "voriconazole"
+   ]
+  },
   "benzodiazepine": {
+   "also": [],
    "atc": [
     "N05BA",
     "N05CD",
@@ -326,6 +528,7 @@
    ]
   },
   "beta blocker": {
+   "also": [],
    "atc": [
     "C07A"
    ],
@@ -359,6 +562,7 @@
    ]
   },
   "calcium channel blocker": {
+   "also": [],
    "atc": [
     "C08"
    ],
@@ -390,6 +594,7 @@
    ]
   },
   "carbapenem": {
+   "also": [],
    "atc": [
     "J01DH"
    ],
@@ -401,6 +606,7 @@
    ]
   },
   "cephalosporin": {
+   "also": [],
    "atc": [
     "J01DB",
     "J01DC",
@@ -445,7 +651,37 @@
     "moxalactam"
    ]
   },
+  "corticosteroid": {
+   "also": [
+    "steroid",
+    "steroids",
+    "corticosteroids"
+   ],
+   "atc": [
+    "H02AB"
+   ],
+   "members": [
+    "betamethasone",
+    "cloprednol",
+    "cortisone",
+    "cortivazol",
+    "deflazacort",
+    "dexamethasone",
+    "fluocortolone",
+    "hydrocortisone",
+    "meprednisone",
+    "methylprednisolone",
+    "paramethasone",
+    "prednisolone",
+    "prednisone",
+    "prednylidene",
+    "rimexolone",
+    "triamcinolone",
+    "vamorolone"
+   ]
+  },
   "fibrate": {
+   "also": [],
    "atc": [
     "C10AB"
    ],
@@ -460,6 +696,7 @@
    ]
   },
   "fluoroquinolone": {
+   "also": [],
    "atc": [
     "J01MA"
    ],
@@ -482,7 +719,74 @@
     "trovafloxacin"
    ]
   },
+  "insulin": {
+   "also": [
+    "insulins"
+   ],
+   "atc": [
+    "A10A"
+   ],
+   "members": [
+    "insulin aspart, human",
+    "insulin degludec",
+    "insulin detemir",
+    "insulin glargine",
+    "insulin glulisine, human",
+    "insulin icodec",
+    "insulin lispro",
+    "insulin, regular, human",
+    "insulin, regular, pork"
+   ]
+  },
+  "local anaesthetic": {
+   "also": [
+    "local anesthetic",
+    "lignocaine",
+    "lidocaine allergy",
+    "novocaine"
+   ],
+   "atc": [
+    "N01B"
+   ],
+   "members": [
+    "articaine",
+    "benzocaine",
+    "bupivacaine",
+    "capsaicin",
+    "chloroprocaine",
+    "cocaine",
+    "dibucaine",
+    "dyclonine",
+    "ethyl chloride",
+    "etidocaine",
+    "levobupivacaine",
+    "lidocaine",
+    "mepivacaine",
+    "phenol",
+    "prilocaine",
+    "procaine",
+    "ropivacaine",
+    "tetracaine"
+   ]
+  },
+  "loop diuretic": {
+   "also": [
+    "water tablet",
+    "diuretic",
+    "diuretics"
+   ],
+   "atc": [
+    "C03C"
+   ],
+   "members": [
+    "bumetanide",
+    "furosemide",
+    "piretanide",
+    "torsemide"
+   ]
+  },
   "macrolide": {
+   "also": [],
    "atc": [
     "J01FA"
    ],
@@ -501,7 +805,55 @@
     "troleandomycin"
    ]
   },
+  "muscle relaxant": {
+   "also": [
+    "muscle relaxants"
+   ],
+   "atc": [
+    "M03"
+   ],
+   "members": [
+    "alcuronium",
+    "atracurium",
+    "baclofen",
+    "carisoprodol",
+    "chlormezanone",
+    "chlorzoxazone",
+    "cisatracurium",
+    "cyclobenzaprine",
+    "dantrolene",
+    "febarbamate",
+    "gallamine",
+    "hexafluorenium",
+    "mephenesin",
+    "methocarbamol",
+    "pancuronium",
+    "pridinol",
+    "styramate",
+    "succinylcholine",
+    "tetrazepam",
+    "thiocolchicoside",
+    "tizanidine",
+    "tolperisone",
+    "tubocurarine",
+    "vecuronium"
+   ]
+  },
+  "nitrate": {
+   "also": [
+    "nitrates"
+   ],
+   "atc": [
+    "C01DA"
+   ],
+   "members": [
+    "erythrityl tetranitrate",
+    "isosorbide dinitrate",
+    "nitroglycerin"
+   ]
+  },
   "nitrofuran": {
+   "also": [],
    "atc": [
     "J01XE"
    ],
@@ -510,6 +862,7 @@
    ]
   },
   "nsaid": {
+   "also": [],
    "atc": [
     "M01A"
    ],
@@ -572,6 +925,7 @@
    ]
   },
   "opioid": {
+   "also": [],
    "atc": [
     "N02A"
    ],
@@ -602,6 +956,7 @@
    ]
   },
   "penicillin": {
+   "also": [],
    "atc": [
     "J01CA",
     "J01CE",
@@ -639,6 +994,7 @@
    ]
   },
   "ppi": {
+   "also": [],
    "atc": [
     "A02BC"
    ],
@@ -653,6 +1009,7 @@
    ]
   },
   "statin": {
+   "also": [],
    "atc": [
     "C10AA"
    ],
@@ -668,6 +1025,7 @@
    ]
   },
   "sulfa": {
+   "also": [],
    "atc": [
     "J01EB",
     "J01EC",
@@ -692,6 +1050,7 @@
    ]
   },
   "sulfonylurea": {
+   "also": [],
    "atc": [
     "A10BB"
    ],
@@ -710,6 +1069,7 @@
    ]
   },
   "tetracycline": {
+   "also": [],
    "atc": [
     "J01AA"
    ],
@@ -731,6 +1091,7 @@
    ]
   },
   "thiazide": {
+   "also": [],
    "atc": [
     "C03A",
     "C03B"
@@ -755,6 +1116,25 @@
     "theobromine",
     "trichlormethiazide",
     "xipamide"
+   ]
+  },
+  "triptan": {
+   "also": [
+    "triptans",
+    "migraine tablets"
+   ],
+   "atc": [
+    "N02CC"
+   ],
+   "members": [
+    "almotriptan",
+    "eletriptan",
+    "frovatriptan",
+    "lasmiditan",
+    "naratriptan",
+    "rizatriptan",
+    "sumatriptan",
+    "zolmitriptan"
    ]
   }
  },

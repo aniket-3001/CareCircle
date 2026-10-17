@@ -14,7 +14,6 @@ from typing import Optional
 
 from .db import new_id, norm, now_ms
 from .textcheck import fit
-from carecircle.classes import group_of
 
 H = 3_600_000
 
@@ -144,16 +143,21 @@ class CarePlanMixin:
         return {"removed": item_id}
 
     async def care_allergy_check(self, person: str) -> dict:
-        """Recorded allergies against the medicines on record: an exact generic name, or a medicine in a common group (short hand-written list).
+        """Recorded allergies against the medicines on record: an exact generic name, or a medicine in a class the allergy names (found by walking the class edges in the reference graph).
         A hit is a prompt to ask the prescriber. No hit is NOT a statement that nothing is wrong."""
+        from .care import checker
         prof = await self.care_profile(person)
         reg = await self.care_regimen(person)
         hits = []
         for a in prof["allergies"]:
             text = norm(a["text"])
-            gname, group = group_of(a["text"])
+            ch = await asyncio.to_thread(checker().class_hits, a["text"], [r["drug"] for r in reg])
+            by_drug = {h["drug"]: h for h in ch["hits"]}
             for r in reg:
-                if r["drug"] == a["drug"] or r["drug"] in group or r["drug"] in text:
-                    hits.append({"allergy": a["text"], "drug": r["drug"], "entry": r["id"],
-                                 "why": "the exact medicine" if r["drug"] == a["drug"] or r["drug"] in text else f"a {gname} medicine (short hand-written list, not verified)"})
-        return {"hits": hits, "allergies": len(prof["allergies"]), "note": "A hit means ask the prescriber or pharmacist. No hit does not mean there is no problem: the list of groups is short."}
+                if r["drug"] == a["drug"] or r["drug"] in text:
+                    hits.append({"allergy": a["text"], "drug": r["drug"], "entry": r["id"], "why": "the exact medicine"})
+                elif r["drug"] in by_drug:
+                    h = by_drug[r["drug"]]
+                    hits.append({"allergy": a["text"], "drug": r["drug"], "entry": r["id"], "class": h["class"], "source": h["source"],
+                                 "why": f"a {h['class']} medicine ({h['source']}; walked from the class in the reference graph)" if ch["from_graph"] else f"a {h['class']} medicine ({h['source']})"})
+        return {"hits": hits, "allergies": len(prof["allergies"]), "note": "A hit means ask the prescriber or pharmacist. No hit does not mean there is no problem: the class tables are not complete."}
