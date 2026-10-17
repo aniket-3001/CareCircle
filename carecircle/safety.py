@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import re
 
+from graphmem.textcheck import plural
+
 # Imperative or advisory phrasing about medication. Matched on OUR output strings only (user-quoted text lives in 'quote' fields).
 ADVICE = re.compile(
     r"\b(you should|you must|you need to|do not|don't|never|please)\s+(take|stop|skip|double|halve|increase|decrease|reduce|change|"
@@ -63,7 +65,7 @@ def judgement(check: dict) -> dict:
     if check["not_in_reference"]:
         reasons.append(f"not in our reference data: {', '.join(check['not_in_reference'])}")
     if check["unrated"]:
-        reasons.append(f"{len(check['unrated'])} pair(s) listed by the source without a severity")
+        reasons.append(f"{plural(len(check['unrated']), 'pair')} listed by the source without a severity")
     if check["direct"] or check["enzyme_paths"]:
         return {"state": "flags", "reasons": reasons, "statement": "Possible interactions found: discuss with a prescriber or pharmacist."}
     if check.get("duplicates"):

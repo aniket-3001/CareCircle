@@ -22,7 +22,7 @@ from typing import Optional
 from carecircle.safety import scan_advice
 
 from .db import new_id, norm, now_ms
-from .textcheck import shown_name
+from .textcheck import plural, shown_name
 
 H = 3_600_000
 _secret_cache: dict = {}
@@ -133,7 +133,7 @@ class CareViewMixin:
             mine = [r for r in rows if norm(r[11]) == c]
             seen = [a for a in acks if a[0] == c]
             node(f"person:{c}", "carer", who(c),
-                 f"{who(c)} looks after {_title(p)}. " + (f"{len(unseen)} change(s) not yet acknowledged." if unseen else "Up to date with every change."),
+                 f"{who(c)} looks after {_title(p)}. " + (f"{plural(len(unseen), 'change')} not yet acknowledged." if unseen else "Up to date with every change."),
                  [["Role", "Carer"], ["Changes recorded", str(len(mine))], ["Changes acknowledged", str(len(seen))],
                   ["Changes not yet seen", ", ".join(f"{_title(u['drug'])} ({u['age_hours']} h)" for u in unseen) or "none"],
                   ["Out-of-date score", f"{d['divergence']:.2f} of 1 (older unseen changes count more; weights are assumptions)"]],
@@ -176,7 +176,7 @@ class CareViewMixin:
             hubrank = rank.get(d)
             on_now = d in drugs_now
             node(f"drug:{d}", "drug" if on_now else "drug_old", _title(d),
-                 f"{_title(d)} is {'on record now' if on_now else 'in the history only'}. The reference data lists {pr['total']} interaction pair(s) for it.",
+                 f"{_title(d)} is {'on record now' if on_now else 'in the history only'}. The reference data lists {plural(pr['total'], 'interaction pair')} for it.",
                  [["Medicine", _title(d)], ["On record now", "yes" if on_now else "no (history only)"],
                   ["Interaction pairs in the reference data", str(pr["total"])],
                   ["Of which major / moderate / minor / unrated",
@@ -425,7 +425,7 @@ class CareViewMixin:
         if used >= daily_limit:
             raise ValueError(f"You have used today's {daily_limit} questions for the assistant. It resets tomorrow.")
         facts = await assistant.gather(self, person, t)
-        recent = await self._q("MATCH (m:ChatMsg {by:$me}) RETURN m.role, m.text, m.ctx, m.at ORDER BY m.at DESC LIMIT 6", {"me": me}, scope="read")
+        recent = await self._q("MATCH (m:ChatMsg {by:$me}) RETURN m.role, m.text, m.ctx, m.at ORDER BY m.at DESC LIMIT 20", {"me": me}, scope="read")
         history = [{"role": r[0], "text": r[1], "ctx": json.loads(r[2]) if r[2] else {}, "at": r[3]} for r in reversed(recent)]
         out = await asyncio.to_thread(assistant.ask, question, facts, checker(), None, lang, history)
         qid, aid = new_id("msg"), new_id("msg")

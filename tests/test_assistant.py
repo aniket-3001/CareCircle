@@ -90,12 +90,12 @@ async def test_model_path_is_used_only_for_uncovered_questions_and_only_if_it_pa
         seen["user"] = user
         return "Metformin was recorded by [carer 1] earlier. Nothing else in FACTS answers that."
 
-    r = await say(c, "mumble about the pharmacy opening hours", now, generate=good)
+    r = await say(c, "mumble about the pharmacy and Meena", now, generate=good)
     assert r["source"] == "model" and r["answer"].startswith("Metformin was recorded by Meena")      # [carer 1] is Meena (carers are numbered alphabetically); the real name is put back
     assert "Asha" not in seen["user"] and "Ravi" not in seen["user"] and "Meena" not in seen["user"] and "[person]" in seen["user"]
     for bad in ("It is safe to continue.", "You should check with Ravi.", "See https://example.com for more.", "Take it twice daily.",
                 "The dose is 750 mg.", "x" * 800, ""):
-        r = await say(c, "mumble about the pharmacy opening hours", now, generate=lambda s, u, b=bad: b)
+        r = await say(c, "mumble about the pharmacy and Meena", now, generate=lambda s, u, b=bad: b)
         assert r["source"] == "rules" and "can't answer that from the record" in r["answer"], bad
 
     def boom(s, u):

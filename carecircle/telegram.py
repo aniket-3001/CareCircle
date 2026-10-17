@@ -16,6 +16,7 @@ from typing import Optional
 
 from carecircle import intake
 from carecircle.safety import scan_advice
+from graphmem.textcheck import plural
 
 MAX_CARDS = 8                                                  # cards shown for one message; more are announced, never dropped silently
 HELP = ("Care Circle records and cross-checks medicines for the person you look after. It never says what to take or stop.\n"
@@ -267,7 +268,7 @@ class Bot:
         todo = div["carers"].get(me, {}).get("unacknowledged", [])
         for u in todo:
             await mem.care_ack(u["dose"])
-        await self.api.send(chat, f"Acknowledged {len(todo)} change(s)." if todo else "Nothing waiting for you.")
+        await self.api.send(chat, f"Acknowledged {plural(len(todo), 'change')}." if todo else "Nothing waiting for you.")
 
     @staticmethod
     def _format_check(c: dict) -> str:

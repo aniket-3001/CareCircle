@@ -18,6 +18,7 @@ import re
 from typing import Optional
 
 from . import intake
+from graphmem.textcheck import plural, shown_name
 from .safety import NUM, scan_advice
 
 MAX_Q = 300
@@ -42,8 +43,9 @@ ADVICE_Q = re.compile(
 UNSEEN = re.compile(r"\b(not (yet )?seen|haven'?t seen|hasn'?t seen|unseen|unacknowledged|acknowledg\w*|out of date|behind|who (has|hasn'?t|have|knows)|kept in the loop|know about)\b", re.I)
 FLAGS = re.compile(r"\b(interact\w*|flag\w*|conflict\w*|clash\w*|major|moderate|enzyme|cyp\w*|why .*(flag|warn|red)|warning|combin\w*|together)\b", re.I)
 RECENT = re.compile(r"\b(what (changed|happened|is new|'?s new)|recent\w*|latest|history|last (change|week|day)|today|yesterday|who (added|recorded|changed)|timeline|activity)\b", re.I)
-DOSES = re.compile(r"\b(given|gave|dose[sd]? (given|today|recorded)|who gave|slot|already (given|had)|morning dose|evening dose)\b", re.I)
-REGIMEN = re.compile(r"\b(what (is|does|medicines?|meds?|drugs?)|which (medicines?|meds?|drugs?)|regimen|medicines?|medications?|meds|list|current|on record|takes?|taking)\b", re.I)
+DOSES = re.compile(r"\b(given|gave|gives?|giving|dose[sd]? (given|today|recorded)|who gave|slot|already (given|had)|morning dose|evening dose)\b", re.I)
+ASKED = re.compile(r"\b(what (did|have) i (ask|asked|say|said)|remind me what i (asked|said)|what was my (last|previous|first) (question|message)|my (last|previous) (question|message)|what (have )?we (talked|spoken|discussed))\b", re.I)
+REGIMEN = re.compile(r"\b(what (medicines?|meds?|drugs?)|which (medicines?|meds?|drugs?)|regimen|medicines?|medications?|meds|list|current|on record|takes?|taking)\b", re.I)
 HELPQ = re.compile(r"\b(help|what can you|how do (i|you)|who are you|what do you do|features?|how does (this|it) work)\b", re.I)
 ADD = re.compile(r"^\s*(please\s+)?(add|start|record|put|log|enter|include)\b\s*(a |an |the )?(medicine|medication|entry|drug)?\s*[:,-]?\s*", re.I)
 REASSURING = re.compile(r"\b(safe|safely|fine to|no risk|harmless|nothing to worry|no need to worry|healthy|recommend\w*|advis\w*|should)\b", re.I)
@@ -52,7 +54,6 @@ URL = re.compile(r"https?://|www\.|```|\]\(|<[a-z/][^>]*>", re.I)
 
 
 def _title(s: str) -> str:
-    from graphmem.textcheck import shown_name
     return shown_name(s)
 
 
@@ -165,7 +166,7 @@ def _a_flags(f: Facts, q: str) -> str:
         return "Nothing is on record yet, so there is nothing to check."
     shown = _flags_shown(f, q)
     if not shown:
-        extra = f" {len(c['unrated'])} pair(s) are listed by the source without a severity." if c["unrated"] else ""
+        extra = f" {plural(len(c['unrated']), 'pair')} {'is' if len(c['unrated']) == 1 else 'are'} listed by the source without a severity." if c["unrated"] else ""
         return f"{c['judgement']['statement']}{extra}"
     bits = []
     for x in shown:
@@ -173,7 +174,7 @@ def _a_flags(f: Facts, q: str) -> str:
             bits.append(f"{_title(x['drugs'][0])} + {_title(x['drugs'][1])}: {x['level'].lower()} ({x['source']})")
         else:
             bits.append(f"{_title(x['meaning'])} ({x['source'].split(';')[0]})")
-    return ("The record flags " + str(len(c["direct"]) + len(c["enzyme_paths"])) + " thing(s). Most relevant: " + "; ".join(bits)
+    return ("The record flags " + plural(len(c["direct"]) + len(c["enzyme_paths"]), "item") + ". Most relevant: " + "; ".join(bits)
             + ". These are for discussion with a prescriber or pharmacist; no flag does not mean safe. Open the Graph tab and click a line to see its source.")
 
 
@@ -281,6 +282,25 @@ def ask_model(question: str, facts: Facts, generate=None) -> Optional[str]:
 
 
 # ------------------------------------------------------------------ the entry point
+_TOPIC_WORDS = re.compile(r"\b(record|recorded|circle|medicine|medicines|medication|medications|tablet|tablets|entry|entries|dose|doses|flag|flags|carer|carers|changes?|history)\b", re.I)
+
+
+def _on_topic(q: str, f: Facts) -> bool:
+    """The model fallback answers only a question about this record: one that names a medicine or a carer on it, or says so. Anything else gets 'I can't answer that
+    from the record', not a confident answer to a different question."""
+    low = q.lower()
+    carers = {c.split("-")[0].lower() for c in f.div["carers"]}
+    return bool(_TOPIC_WORDS.search(q) or any(r["drug"] in low for r in f.regimen) or any(c and re.search(rf"\b{re.escape(c)}\b", low) for c in carers))
+
+
+def _a_asked(history, now: int) -> str:
+    """What this carer asked before, from the conversation stored in the circle's graph (this carer's, on any device or channel)."""
+    qs = [h for h in (history or []) if h.get("role") == "user" and (h.get("text") or "").strip()]
+    if not qs:
+        return "You have not asked me anything yet in this chat."
+    return "You asked: " + "; ".join(f"\"{h['text'][:90]}\" ({_ago(int(h.get('at') or 0), now)})" for h in qs[-5:]) + "."
+
+
 def _ask_plain(question: str, facts: Facts, checker, generate=None, lang: str = "", allow_model: bool = True) -> dict:
     """One question on its own, as if it were the first. {answer, source: rules|model|refusal|proposal, proposals?, links?}. Pure: no writes."""
     q = " ".join((question or "").split())[:MAX_Q]
@@ -333,7 +353,7 @@ def _ask_plain(question: str, facts: Facts, checker, generate=None, lang: str = 
         return {"answer": HELP, "source": "rules", "links": []}
     if REGIMEN.search(q):
         return {"answer": _a_regimen(facts), "source": "rules", "links": [{"tab": "today", "label": "Open Today"}]}
-    said = ask_model(q, facts, generate) if allow_model else None
+    said = ask_model(q, facts, generate) if allow_model and _on_topic(q, facts) else None
     if said:
         return {"answer": said, "source": "model", "links": []}
     return {"answer": "I can't answer that from the record. " + HELP, "source": "rules", "links": []}
@@ -451,6 +471,8 @@ def ask(question: str, facts: Facts, checker, generate=None, lang: str = "", his
     q = " ".join((question or "").split())[:MAX_Q]
     if not q or lang == "hi" or re.search("[ऀ-ॿ]", q) or EMERGENCY.search(q) or ADD.match(q):
         return _ask_plain(question, facts, checker, generate, lang)
+    if ASKED.search(q) and not ADVICE_Q.search(q):
+        return {"answer": _a_asked(history, facts.now), "source": "rules", "links": [], "ctx": {}}
     last = _last_ctx(history, facts.now)
     ref = _followup(q, facts, last)
     advice = bool(ADVICE_Q.search(q))

@@ -104,3 +104,32 @@ async def test_two_brands_of_one_molecule_are_told_apart_in_the_helpers_answers(
     assert "Atorvastatin (Storvas)" in seen and "Atorvastatin (Atorva)" in seen, seen
     listed = (await ask(ravi, "What medicines are on record?"))["text"]
     assert "Atorvastatin (Storvas) 10 mg" in listed and "Atorvastatin (Atorva) 20 mg" in listed, listed
+
+
+async def test_did_anyone_give_it_today_is_a_question_about_doses_not_the_history(gm):
+    """Round 3: the word 'today' sent 'Did anyone give it today?' to the history answer ('Most recent: Ravi recorded ...')."""
+    ravi, meena = await circle(gm, flagged=False)
+    out = await ask(ravi, "Did anyone give metformin today?")
+    assert out["source"] == "rules" and "Most recent" not in out["text"] and ("recorded as given" in out["text"].lower() or "no doses" in out["text"].lower()), out
+    sloppy = await ask(ravi, "Did anyone give it today?")                                      # 'it' with nothing to refer to: a question back, not the history
+    assert "Most recent" not in sloppy["text"] and "Which medicine" in sloppy["text"], sloppy
+
+
+async def test_what_did_i_ask_is_answered_from_the_stored_conversation(gm):
+    ravi, meena = await circle(gm, flagged=False)
+    await ask(ravi, "Who has not seen the latest changes?")
+    await ask(ravi, "What medicines are on record?")
+    out = await ask(ravi, "Remind me what I asked you yesterday")
+    assert out["source"] == "rules" and "Who has not seen the latest changes?" in out["text"] and "What medicines are on record?" in out["text"], out
+    other = await ask(meena, "What did I ask you?")                                             # Meena asked nothing: Ravi's questions are not hers
+    assert "have not asked me anything" in other["text"]
+
+
+async def test_a_question_that_is_not_about_the_record_gets_no_confident_model_answer(gm, monkeypatch):
+    ravi, meena = await circle(gm, flagged=False)
+    called = []
+    monkeypatch.setattr(assistant, "ask_model", lambda *a, **k: called.append(1) or "Paris is the capital of France.")
+    out = await ask(ravi, "What is the capital of France?")
+    assert out["source"] == "rules" and "can't answer that from the record" in out["text"] and called == []
+    on = await ask(ravi, "Tell me about Meena's part in this")                                   # names a carer: the model may be asked
+    assert called == [1] and on["source"] == "model"

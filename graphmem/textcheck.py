@@ -53,6 +53,11 @@ def shown_name(s: str) -> str:
     return (s[:1].upper() + s[1:]) if not s else re.sub(r"(?<=\bvitamin )[a-z]\d*\b", lambda m: m.group(0).upper(), s[:1].upper() + s[1:], flags=re.I)
 
 
+def plural(n: int, one: str, many: str = "") -> str:
+    """'1 pair', '2 pairs': the noun agrees with the number."""
+    return f"{n} {one if n == 1 else (many or one + 's')}"
+
+
 def product_name(p: str) -> str:
     """A combination product's name as it is usually printed: 'telma-am' -> 'Telma-AM' (short parts after a hyphen in capitals). The same rule as `productName` in the web app."""
     return " ".join("-".join((x.upper() if i > 0 and len(x) <= 3 else x[:1].upper() + x[1:]) for i, x in enumerate(w.split("-"))) for w in p.split(" "))
