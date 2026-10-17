@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import time
 import urllib.request
 from typing import Optional
@@ -22,7 +23,10 @@ MAX_CARDS = 8                                                  # cards shown for
 HELP = ("Care Circle records and cross-checks medicines for the person you look after. It never says what to take or stop.\n"
         "/link <key> <circle> - connect this chat\n/who - people in the circle\n/regimen <person> - what is on record now\n"
         "/check <person> - possible interactions (with sources)\n/history - what happened, newest first\n/ack - acknowledge pending changes\n"
-        "/gave <person> <medicine> <slot> - record a dose given\nSend a photo, voice note or text about a medicine to add it.")
+        "/gave <person> <medicine> <slot> - record a dose given\nSend a photo, voice note or text about a medicine to add it.\n"
+        "Or just ask a question (\"who has not seen the latest changes?\"): it is the same helper, and the same conversation, as on the web.")
+
+QUESTION = re.compile(r"^\s*(who|what|why|how|when|which|did|does|do|has|have|is|are|was|were|can|could|should|remind)\b", re.I)
 
 
 class TgApi:
@@ -124,7 +128,9 @@ class Bot:
             if "photo" in m or "voice" in m or "audio" in m or "document" in m:
                 return await self._media(chat, m)
             if text and not text.startswith("/"):
-                return await self._propose(chat, intake._done("typed", text, "text"))
+                if text.endswith("?") or QUESTION.match(text):
+                    return await self._ask(chat, mem, text)          # a question goes to the helper, which keeps this carer's conversation (web and Telegram share it)
+                return await self._propose(chat, intake._done("typed", text, "text"), ask=(mem, text))
         except KeyError:
             return await self.api.send(chat, "I could not find that.")
         await self.api.send(chat, HELP)
@@ -188,11 +194,24 @@ class Bot:
         src = await asyncio.to_thread(intake.read_source, data, name, "")
         await self._propose(chat, src)
 
-    async def _propose(self, chat, src):
+    async def _ask(self, chat, mem, text: str) -> None:
+        """The same helper as the web (`care_chat_ask`), for this carer: the question and the answer are stored in the circle's graph, so what was asked on the web is
+        remembered here and the other way round."""
+        try:
+            out = await mem.care_chat_ask(await self._patient(mem), text)
+        except ValueError as e:                                      # today's allowance of questions used up
+            return await self.api.send(chat, str(e))
+        if out.get("proposals"):                                     # "add warfarin 5 mg": the helper prepared an entry; Telegram shows it as a card to confirm
+            return await self._propose(chat, intake._done("typed", out.get("proposal_text") or text, "text"))
+        await self.api.send(chat, out["text"])
+
+    async def _propose(self, chat, src, ask=None):
         if src["status"] != "ok":
             return await self.api.send(chat, src.get("note") or "I could not read that. Please type the medicine name.")
         props = await asyncio.to_thread(intake.propose, src["text"], self.checker)
         if not props:
+            if ask:                                                  # no medicine in it: it may be a question after all
+                return await self._ask(chat, *ask)
             return await self.api.send(chat, "I did not find a medicine name. Please type it.")
         kinds = {"image": "photo", "voice": "voice", "document": "document"}
         link = await self._link(chat)

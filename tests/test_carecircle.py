@@ -621,3 +621,46 @@ async def test_a_combination_in_the_bot_is_one_card_so_it_cannot_be_half_confirm
     assert {(r["drug"], r["product"]) for r in await c["ravi"].care_regimen("asha")} == {("warfarin", ""), ("telmisartan", "telma-am"), ("amlodipine", "telma-am")}   # one tap saved both
     assert "telmisartan + amlodipine" in api.out[-1][1] or "amlodipine + telmisartan" in api.out[-1][1]
     await (await gm._ctl()).query("MATCH (c:TgChat {chat:7771}) DELETE c")                                    # leave no chat link behind for other tests
+
+
+async def test_the_bot_and_the_web_helper_share_one_conversation_per_carer(gm, monkeypatch):
+    """Round 3: the bot had no helper, so a carer asking on the web and then on Telegram talked to two agents that knew nothing of each other."""
+    monkeypatch.setenv("CC_LLM", "0")
+    t, c = await circle(gm, "ravi", "meena")
+    await c["ravi"].care_record("asha", "warfarin", dose_text="5 mg", freq_text="at bedtime")
+    await c["meena"].care_ack((await c["ravi"].care_regimen("asha"))[0]["id"])                                       # Meena has done something, so she is a carer in the record
+    key = await gm.issue_key("ravi")
+    api = FakeApi(); bot = Bot(gm, api, Checker())
+    await bot.handle({"message": {"chat": {"id": 7772}, "text": f"/link {key} {t}"}})
+    api.out.clear()
+    await bot.handle({"message": {"chat": {"id": 7772}, "text": "Who has not seen the latest changes?"}})            # asked on Telegram
+    assert ("not yet seen" in api.out[-1][1] or "seen every change" in api.out[-1][1]) and not api.out[-1][2]
+    web = await c["ravi"].care_chat_ask("asha", "And what about Meena?")                                           # the follow-up arrives on the web
+    assert web["source"] == "rules" and web["text"].startswith("Meena ")
+    asked = await c["ravi"].care_chat_ask("asha", "What did I ask you?")
+    assert "Who has not seen the latest changes?" in asked["text"]                                                   # the web helper remembers the question asked on Telegram
+    await bot.handle({"message": {"chat": {"id": 7772}, "text": "Who has not seen the latest changes?"}})
+    await bot.handle({"message": {"chat": {"id": 7772}, "text": "And what about Ravi?"}})                          # and back on Telegram, the thread continues
+    assert api.out[-1][1].startswith("Ravi ")
+    hist = await c["ravi"].care_chat_history(10)
+    assert [h["text"] for h in hist if h["role"] == "user"][:2] == ["Who has not seen the latest changes?", "And what about Meena?"]
+    await (await gm._ctl()).query("MATCH (c:TgChat {chat:7772}) DELETE c")
+
+
+async def test_a_question_on_telegram_is_refused_when_it_asks_for_advice_and_a_medicine_line_still_makes_a_card(gm, monkeypatch):
+    monkeypatch.setenv("CC_LLM", "0")
+    t, c = await circle(gm, "ravi")
+    await c["ravi"].care_record("asha", "warfarin", dose_text="5 mg", freq_text="at bedtime")
+    key = await gm.issue_key("ravi")
+    api = FakeApi(); bot = Bot(gm, api, Checker())
+    await bot.handle({"message": {"chat": {"id": 7773}, "text": f"/link {key} {t}"}})
+    api.out.clear()
+    await bot.handle({"message": {"chat": {"id": 7773}, "text": "Should she skip tonight's warfarin?"}})
+    assert "prescriber or pharmacist" in api.out[-1][1] and not api.out[-1][2]
+    api.out.clear()
+    await bot.handle({"message": {"chat": {"id": 7773}, "text": "Metformin 500 mg twice daily"}})                  # a medicine line is still a card to confirm
+    assert api.out[-1][2] and "metformin" in api.out[-1][1].lower()
+    api.out.clear()
+    await bot.handle({"message": {"chat": {"id": 7773}, "text": "hello there"}})                                    # no medicine in it: the helper answers instead of "I did not find a medicine"
+    assert "I did not find a medicine name" not in api.out[-1][1] and api.out[-1][1]
+    await (await gm._ctl()).query("MATCH (c:TgChat {chat:7773}) DELETE c")
