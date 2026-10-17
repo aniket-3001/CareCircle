@@ -49,7 +49,7 @@ class CareCustodyMixin:
             raise KeyError(dose_id)
         cur, status, drug = head[0]
         notes = [dict(id=r[0], kind="agent_note", text=r[1], by=r[2], at=r[3], label=f"noted by {r[2]}, unverified")
-                 for r in await self._q("MATCH (e:Episode)-[:ABOUT]->(:Dose {id:$id}) WHERE e.redacted = false RETURN e.id, e.content, e.agent, e.ts", {"id": dose_id}, scope="read")]
+                 for r in await self._q("MATCH (e)-[:ABOUT]->(:Dose {id:$id}) WHERE e.content IS NOT NULL AND e.redacted = false RETURN e.id, e.content, e.agent, e.ts", {"id": dose_id}, scope="read")]
         notes += [dict(id=r[0], kind="handover", text=r[1], by=r[2], at=r[3], label=f"handover note from {r[2]}")
                   for r in await self._q("MATCH (h:Handover)-[:ABOUT]->(:Dose {id:$id}) RETURN h.id, h.text, h.by, h.at", {"id": dose_id}, scope="read")]
         notes.sort(key=lambda n: n["at"])
