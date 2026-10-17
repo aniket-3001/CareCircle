@@ -109,3 +109,12 @@ async def test_edit_an_appointment_and_reword_conditions_and_allergies(gm):
     assert prof["conditions"][0]["name"] == "high blood pressure" and prof["allergies"][0]["text"] == "penicillin"
     with pytest.raises(ValueError):
         await m.care_profile_edit(c, "  ")
+
+
+def test_allergy_classes_come_from_the_atc_table_as_well_as_the_starter_list():
+    from carecircle.classes import group_of
+    n, m = group_of("allergic to statins")
+    assert n == "statin" and "atorvastatin" in m
+    n, m = group_of("penicillin")
+    assert "amoxicillin" in m and len(m) > 20           # the starter list had 9
+    assert group_of("peanut") == ("", ())

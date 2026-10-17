@@ -31,7 +31,8 @@ RO_USER = "gm_reader"
 # (label, property) pairs indexed in a tenant graph. A care circle's graph gets the CARE ones when it is made; the ENGINE ones belong to the generic memory engine
 # (episodes, facts, tasks, plans ...), which the care product never touches, so they are created the first time a query on that graph names one of those labels
 # (`Db.ensure_engine`, called from `TenantMemory._q`). Space and fork graphs hold engine data from the start and get everything at once.
-CARE_INDEXES = [("Person", "id"), ("Dose", "id"), ("Give", "key"), ("Nudge", "key"), ("Drug", "name"), ("ChatMsg", "by"), ("Receipt", "id")]
+CARE_INDEXES = [("Person", "id"), ("Dose", "id"), ("Give", "key"), ("Nudge", "key"), ("Drug", "name"), ("ChatMsg", "by"), ("Receipt", "id"), ("Chain", "k")]
+CARE_UNIQUE = [("Chain", "k")]     # one head to the stored log: two writers racing to make it cannot both succeed
 ENGINE_INDEXES = [
     ("Session", "id"), ("Episode", "id"), ("Entity", "key"), ("Fact", "id"), ("Fact", "skey"),
     ("Skill", "key"), ("Run", "id"), ("Task", "id"), ("Plan", "id"), ("Decision", "id"), ("Agent", "id"),
@@ -227,6 +228,13 @@ class Db:
                     raise
         if name == CTL_GRAPH or full:
             await self._engine_extras(name, g)
+        if name != CTL_GRAPH:
+            for label, prop in CARE_UNIQUE:
+                try:
+                    await self.client.execute_command("GRAPH.CONSTRAINT", "CREATE", name, "UNIQUE", "NODE", label, "PROPERTIES", "1", prop)
+                except Exception as e:  # idempotent
+                    if "already" not in str(e).lower():
+                        raise
         if name != CTL_GRAPH:
             from . import schema
 

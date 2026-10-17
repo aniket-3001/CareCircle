@@ -45,7 +45,12 @@ class CareChainMixin:
         """Add one event to the end of the log. Returns its sequence number. Retries when another writer got there first."""
         by = norm(self.agent)
         for _ in range(MAX_TRIES):
-            head = await self._q("MERGE (h:Chain {k:'head'}) ON CREATE SET h.seq = 0, h.hash = $g RETURN h.seq, h.hash", {"g": GENESIS}, checked=True)
+            try:
+                head = await self._q("MERGE (h:Chain {k:'head'}) ON CREATE SET h.seq = 0, h.hash = $g RETURN h.seq, h.hash", {"g": GENESIS}, checked=True)
+            except Exception as e:   # two writers made the head at once; the constraint let one win, so read it on the next pass
+                if "constraint" not in str(e).lower():
+                    raise
+                continue
             seq0, prev = int(head[0][0]), head[0][1]
             seq, at = seq0 + 1, now_ms()
             h = link(prev, seq, kind, ref, by, at, body)

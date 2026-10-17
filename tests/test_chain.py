@@ -58,7 +58,7 @@ async def test_many_writers_at_once_extend_one_chain_without_forking_it(gm):
     o, c = await make(gm, "ch3")
     await asyncio.gather(*[(o if i % 2 else c).care_record("asha", f"drug{i}", dose_text="5 mg", source_type="typed") for i in range(12)])
     v = await o.care_chain_verify()
-    assert v["ok"] and v["events"] == 12 and v["entries_logged"] == 12
+    assert v["ok"] and v["events"] == 12 and v["entries_logged"] == 12, v
 
 
 async def test_erasing_the_person_empties_the_log_and_everything_else_about_them(gm):
