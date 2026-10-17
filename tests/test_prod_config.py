@@ -40,3 +40,27 @@ def test_the_env_file_is_rendered_from_parameter_store_and_never_replaced_by_som
     assert "get-parameters-by-path" in sh and "--with-decryption" in sh and "keeping" in sh            # a store outage keeps the file on disk
     assert re.search(r"REQUIRED=.*GRAPHMEM_ADMIN_KEY.*GRAPHMEM_RO_PASSWORD", sh) and "install -m 600" in sh
     assert "\r" not in sh                                                                               # a shell script with Windows line endings does not run on the server
+
+
+def _template():
+    import yaml
+
+    class Loader(yaml.SafeLoader):
+        pass
+    Loader.add_multi_constructor("!", lambda loader, suffix, node: loader.construct_scalar(node) if isinstance(node, yaml.ScalarNode) else
+                                 (loader.construct_sequence(node, deep=True) if isinstance(node, yaml.SequenceNode) else loader.construct_mapping(node, deep=True)))
+    return yaml.load((ROOT / "deploy/infra/carecircle.yaml").read_text(encoding="utf-8"), Loader=Loader)
+
+
+def test_the_cloudformation_template_still_holds_every_piece_of_the_stack_and_no_secret():
+    t = _template()
+    kinds = {r["Type"] for r in t["Resources"].values()}
+    for need in ("AWS::EC2::Instance", "AWS::EC2::SecurityGroup", "AWS::EC2::EIP", "AWS::IAM::Role", "AWS::S3::Bucket", "AWS::DLM::LifecyclePolicy",
+                 "AWS::Route53::HealthCheck", "AWS::CloudWatch::Alarm", "AWS::SNS::Topic"):
+        assert need in kinds, need
+    inst = t["Resources"]["Instance"]["Properties"]
+    assert inst["MetadataOptions"]["HttpTokens"] == "required" and inst["BlockDeviceMappings"][0]["Ebs"]["Encrypted"] is True
+    ports = {(p["FromPort"], p["ToPort"]) for p in t["Resources"]["SecurityGroup"]["Properties"]["SecurityGroupIngress"]}
+    assert ports == {(80, 80), (443, 443)}                                                          # nothing else is open, there is no SSH
+    text = (ROOT / "deploy/infra/carecircle.yaml").read_text(encoding="utf-8")
+    assert "render_env.sh" in text and not re.search(r"(?i)password\s*[:=]\s*['\"]?[0-9a-f]{16,}", text)
