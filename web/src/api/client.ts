@@ -1,4 +1,4 @@
-import type { ConsentView, PatientView, Outcomes, EntrySource, Candidate, StockRow, Counts, Followup, FollowupSuggestion, Handover, AllergyCheck, Appointment, CareProfile, Visit, DrugInfo, Reading, Trend, Recalls, SoleKnowers,
+import type { Review, ShareLink, ShareRow, ConsentView, PatientView, Outcomes, EntrySource, Candidate, StockRow, Counts, Followup, FollowupSuggestion, Handover, AllergyCheck, Appointment, CareProfile, Visit, DrugInfo, Reading, Trend, Recalls, SoleKnowers,
   Account, AuthConfig, CareGraph, ChatMessage, CheckResult, Divergence, FhirBundle, GiveRecord, GiveResult, Hubs, GInfluence, GCommunities, GPath, IntakeResult, Invite, Member, Reminder, People,
   Profile, Receipt, RegimenEntry, Session, TimelineEvent, CircleInfo, TodayView,
 } from './types';
@@ -90,6 +90,7 @@ export function apiFor(s: Session) {
     consent: () => op<ConsentView>('care_consent', { person: p }),
     setConsent: (status: string, who: string, note: string) => op<{ id: string }>('care_consent_set', { person: p, status, who, note }),
     patientView: () => op<PatientView>('care_patient_view', { person: p }),
+    reviews: () => op<Review[]>('care_pharmacist_reviews', { person: p }),
     stock: (now: number) => op<StockRow[]>('care_stock', { person: p, now }),
     setStock: (dose_id: string, doses_left: number) => op<{ id: string; doses_left: number }>('care_stock_set', { dose_id, doses_left }),
     timezone: () => op<{ tz: string; set: boolean }>('care_timezone'),
@@ -136,6 +137,9 @@ export function accountApi(token: string) {
     createCircle: (name: string, person: string) => send<CircleInfo>('POST', '/v1/account/circles', token, { name, person }),
     join: (code: string) => send<CircleInfo>('POST', '/v1/join', token, { code }),
     renameCircle: (id: string, name: string) => send<{ ok: boolean }>('PATCH', `/v1/circles/${encodeURIComponent(id)}`, token, { name }),
+    shareNew: (id: string, person: string, hours: number, note: string) => send<ShareLink>('POST', `/v1/circles/${encodeURIComponent(id)}/shares`, token, { person, hours, note }),
+    shares: (id: string) => get<ShareRow[]>(`/v1/circles/${encodeURIComponent(id)}/shares`, token),
+    shareRevoke: (id: string, share: string) => send<{ revoked: string }>('DELETE', `/v1/circles/${encodeURIComponent(id)}/shares/${encodeURIComponent(share)}`, token),
     invite: (id: string) => send<Invite>('POST', `/v1/circles/${encodeURIComponent(id)}/invites`, token),
     members: (id: string) => get<Member[]>(`/v1/circles/${encodeURIComponent(id)}/members`, token),
     leave: (id: string) => send<{ deleted_circle: boolean }>('POST', `/v1/circles/${encodeURIComponent(id)}/leave`, token),

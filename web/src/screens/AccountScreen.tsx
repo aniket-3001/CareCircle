@@ -8,6 +8,7 @@ import { Async } from '../components/Async';
 import { CircleForms } from '../components/CircleForms';
 import { PageHead } from '../components/PageHead';
 import { Pill } from '../components/Pill';
+import { PharmacistLink } from '../components/PharmacistLink';
 import { Sheet } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { when } from '../lib/format';
@@ -188,6 +189,7 @@ function CircleRow({ c }: { c: CircleInfo }): React.JSX.Element {
       {open && (
         <div className="stack">
           <MemberList id={c.id} owner={owner} />
+          {owner && <PharmacistLink circle={c.id} person={c.person} />}
           {owner && (
             <>
               <div className="row row--wrap">

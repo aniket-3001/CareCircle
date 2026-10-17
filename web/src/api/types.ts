@@ -353,6 +353,10 @@ export interface Account {
   created_at: number;
 }
 
+export interface ShareLink { id: string; token: string; path: string; expires_at: number; hours: number; note: string }
+export interface ShareRow { id: string; created: number; expires_at: number; views: number; revoked: boolean; active: boolean; note: string }
+export interface Review { id: string; name: string; note: string; at: number; verified: boolean }
+
 export interface CircleInfo {
   id: string;
   name: string;

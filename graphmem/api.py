@@ -25,13 +25,24 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request
 from pathlib import Path
 
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from . import accounts_api, branch, mcp_http, ops, spaces
 from .db import Db, Overloaded, QueryLimit
 from .dbstats import db_stats
 from .textcheck import Clean
 from .policy import GraphMem, PermissionDenied
+
+
+class ShareNew(Clean):
+    person: str = Field(max_length=60)
+    hours: int = 48
+    note: str = Field("", max_length=120)
+
+
+class ShareReview(Clean):
+    name: str = Field(max_length=60)
+    note: str = Field("", max_length=300)
 
 
 class AgentBody(Clean):
@@ -205,6 +216,41 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
     demo_per_caller = HourlyCap(int(os.getenv("CC_DEMO_PER_HOUR", "12")))
     demo_everyone = HourlyCap(int(os.getenv("CC_DEMO_ALL_PER_HOUR", "600")))
     app.state.accounts = accounts_api.mount(app, gm, agent_id, demo_on)            # sign-in, profiles, circles, invitations
+
+    # A read-only link for a pharmacist (carecircle/share.py): the owner makes, lists and revokes; anyone holding the secret may read it until it expires.
+    from carecircle.share import Shares, render as render_share
+    shares = Shares(gm, app.state.accounts)
+    NO_STORE = {"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow", "Referrer-Policy": "no-referrer"}
+
+    @app.post("/v1/circles/{circle}/shares")
+    async def share_new(circle: str, b: ShareNew, agent: str = Depends(agent_id)):
+        return await shares.create(agent, circle, b.person, b.hours, b.note)
+
+    @app.get("/v1/circles/{circle}/shares")
+    async def share_list(circle: str, agent: str = Depends(agent_id)):
+        return await shares.list(agent, circle)
+
+    @app.delete("/v1/circles/{circle}/shares/{share_id}")
+    async def share_revoke(circle: str, share_id: str, agent: str = Depends(agent_id)):
+        return await shares.revoke(agent, circle, share_id)
+
+    @app.get("/v1/share/{token}")
+    async def share_json(token: str, request: Request):
+        v = await shares.view(token, client_ip(request))
+        if v is None:
+            raise HTTPException(404, "This link is not open any more.")
+        return JSONResponse(v, headers=NO_STORE)
+
+    @app.post("/v1/share/{token}/review")
+    async def share_review(token: str, b: ShareReview):
+        return JSONResponse(await shares.review(token, b.name, b.note), headers=NO_STORE)
+
+    @app.get("/share/{token}")
+    async def share_page(token: str, request: Request):
+        v = await shares.view(token, client_ip(request))
+        if v is None:
+            return HTMLResponse("<!doctype html><meta charset=utf-8><meta name=robots content=noindex><title>Link closed</title><p>This link is not open any more.</p>", status_code=404, headers=NO_STORE)
+        return HTMLResponse(render_share(v), headers=NO_STORE)
 
     @app.post("/demo/start")
     async def demo_start(request: Request):

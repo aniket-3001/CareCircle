@@ -52,3 +52,22 @@ class CareConsentMixin:
                 "what_is_not": ["it is not a medical record kept by a doctor or pharmacy", "it does not give advice and does not say any medicine is safe"],
                 "your_rights": "The owner of the circle can remove any entry, or everything about you, for good; a receipt remains that something was removed, but not what it said.",
                 "consent": consent["current"]}
+
+
+class CareReviewMixin:
+    """What a pharmacist (or anyone) who opened a share link wrote back: a name they typed and a short note, kept in the circle. The name is not verified."""
+
+    async def care_add_review(self, person: str, name: str, note: str, share: str) -> dict:
+        """Written by the share service on behalf of a link's owner, never reachable as an operation."""
+        name, note = fit(name, 60, "the name"), fit(note, 300, "the note")
+        if not name:
+            raise ValueError("please type your name")
+        rid = new_id("rev")
+        await self._q("MATCH (p:Person {id:$p}) CREATE (:Review {id:$id, name:$n, note:$t, share:$s, at:$a})-[:FOR]->(p)",
+                      {"p": norm(person), "id": rid, "n": name, "t": note, "s": share, "a": now_ms()})
+        return {"id": rid}
+
+    async def care_pharmacist_reviews(self, person: str) -> list[dict]:
+        """Notes written back from a share link, newest first. The name is whatever was typed: it is not checked."""
+        rows = await self._q("MATCH (r:Review)-[:FOR]->(:Person {id:$p}) RETURN r.id, r.name, r.note, r.at ORDER BY r.at DESC LIMIT 50", {"p": norm(person)}, scope="read")
+        return [{"id": r[0], "name": r[1], "note": r[2], "at": r[3], "verified": False} for r in rows]

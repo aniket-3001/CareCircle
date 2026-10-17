@@ -568,5 +568,53 @@ def u16(w, b, r):
     ctx.close()
 
 
+@scenario("U17", "A pharmacist link: the owner makes it, someone with no account reads it and leaves a note, the owner closes it and it stops working")
+def u17(w, b, r):
+    errs = []
+    ctx, pg = new_page(b, errs=errs)
+    email = f"u17-{rid()}@scenario.test"
+    ui_signup(pg, "Sharer", email)
+    ui_circle(pg, "Mum's medicines", "Mum")
+    expect(pg.get_by_text("Nothing on record yet")).to_be_visible()
+    u = api_user(w, email)
+    c = circle_of(u)
+    u.ok(c, "care_record", person="mum", drug="clarithromycin", dose_text="500 mg", freq_text="twice daily")
+    u.ok(c, "care_record", person="mum", drug="atorvastatin", dose_text="20 mg", freq_text="at bedtime")
+    pg.get_by_test_id("open-account").click()
+    pg.get_by_role("button", name="Show details of Mum's medicines").click()
+    pg.get_by_test_id("pharmacist-link").locator("summary").click()
+    pg.get_by_test_id("share-make").click()
+    expect(pg.get_by_test_id("share-url")).to_be_visible(timeout=15000)
+    url = pg.get_by_test_id("share-url").locator("input").input_value()
+    r.check("/share/ps_" in url, "a link is made and shown", url[:40])
+    ctx2, other = new_page(b, errs=[])                                             # a different browser with no sign-in at all
+    other.goto(url)
+    expect(other.locator("h1")).to_contain_text("Medicines on record", timeout=15000)
+    body = other.locator("body").inner_text()
+    r.check("Clarithromycin" in body and "Atorvastatin" in body and "major" in body.lower(), "someone with no account sees the medicines and the flag", body[:160])
+    r.check("not a statement that anything is safe" in body, "and is told it is not a statement of safety")
+    other.locator("#n").fill("Dr. Rao")
+    other.locator("#t").fill("Please ask about the pair")
+    other.get_by_role("button", name="Send").click()
+    expect(other.locator("#m")).to_contain_text("Thank you", timeout=10000)
+    ctx2.close()
+    pg.reload()                                                                    # the owner comes back to the Account page
+    expect(pg.get_by_test_id("open-account")).to_be_visible(timeout=15000)
+    pg.get_by_test_id("open-account").click()
+    expect(pg.get_by_role("button", name="Show details of Mum's medicines")).to_be_visible(timeout=15000)
+    pg.get_by_role("button", name="Show details of Mum's medicines").click()
+    pg.get_by_test_id("pharmacist-link").locator("summary").click()
+    expect(pg.get_by_test_id("share-rows")).to_contain_text("1 views", timeout=15000)
+    expect(pg.get_by_test_id("share-reviews")).to_contain_text("Dr. Rao", timeout=15000)
+    r.check("not verified" in pg.get_by_test_id("share-reviews").inner_text(), "the note comes back labelled as unverified")
+    pg.get_by_role("button", name="Close it").click()
+    ctx3, again = new_page(b, errs=[])
+    resp = again.goto(url)
+    r.check(resp.status == 404, "a closed link stops working", resp.status)
+    ctx3.close()
+    r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
+    ctx.close()
+
+
 if __name__ == "__main__":
     sys.exit(1 if main() else 0)
