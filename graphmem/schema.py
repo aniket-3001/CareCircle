@@ -11,6 +11,27 @@ MIGRATIONS: list[tuple[int, str, list[tuple]]] = [
     (2, "readings over time", [("index", "Measurement", "id"), ("index", "Measurement", "kind")]),
     (3, "appointments, conditions and allergies", [("index", "Appointment", "id"), ("index", "Condition", "id"), ("index", "Allergy", "id")]),
     (4, "follow-up checklist", [("index", "Followup", "id"), ("index", "Followup", "person")]),
+    (5, "products: a tablet is a node, its entries point at it, and the schedule lives on it", [
+        ("index", "Product", "key"),
+        # one (:Product) per person and tablet: a combination brand (kind 'combination', named for the brand) or the medicine itself (kind 'medicine')
+        ("cypher", """MATCH (x:Dose)-[:FOR]->(p:Person) WHERE NOT (x)-[:VIA]->(:Product)
+                      WITH x, p, CASE WHEN coalesce(x.product, '') <> '' THEN 'combination' ELSE 'medicine' END AS kind,
+                           CASE WHEN coalesce(x.product, '') <> '' THEN x.product ELSE x.drug END AS nm
+                      MERGE (pr:Product {key: p.id + '|' + kind + '|' + nm})
+                        ON CREATE SET pr.name = nm, pr.kind = kind, pr.person = p.id, pr.combo = CASE WHEN kind = 'combination' THEN nm ELSE '' END
+                      MERGE (x)-[:VIA]->(pr)"""),
+        # the times, the course end and who confirmed them: from the latest CURRENT entry (an older entry's times were replaced)
+        ("cypher", """MATCH (x:Dose {cur: true})-[:VIA]->(pr:Product) WHERE x.slots IS NOT NULL AND pr.slots IS NULL
+                      WITH pr, x ORDER BY x.valid_from DESC
+                      WITH pr, collect(x)[0] AS l
+                      SET pr.slots = l.slots, pr.as_needed = coalesce(l.as_needed, false), pr.ends_on = coalesce(l.ends_on, ''), pr.sched_by = l.sched_by, pr.sched_at = l.sched_at"""),
+        # when times were FIRST confirmed (the earliest of its entries), and the printed strength of a combination
+        ("cypher", """MATCH (x:Dose)-[:VIA]->(pr:Product) WHERE x.sched_first IS NOT NULL AND pr.sched_first IS NULL
+                      WITH pr, min(x.sched_first) AS f SET pr.sched_first = f"""),
+        ("cypher", """MATCH (x:Dose)-[:VIA]->(pr:Product) WHERE coalesce(x.pstrength, '') <> '' AND pr.strength IS NULL
+                      WITH pr, x ORDER BY x.valid_from DESC
+                      WITH pr, collect(x)[0] AS l SET pr.strength = l.pstrength"""),
+    ]),
 ]
 CURRENT = MIGRATIONS[-1][0]
 

@@ -37,7 +37,7 @@ def link(prev: str, seq: int, kind: str, ref: str, by: str, at: int, body: str) 
     return hashlib.sha256("|".join([prev, str(seq), kind, ref, by, str(at), body]).encode("utf-8")).hexdigest()
 
 
-ENTRY_FIELDS = "x.drug, coalesce(x.product, ''), x.dose_text, x.freq_text, x.action, x.valid_from, x.by, x.quote"
+ENTRY_FIELDS = "x.drug, coalesce(pr.combo, x.product, ''), x.dose_text, x.freq_text, x.action, x.valid_from, x.by, x.quote"
 
 
 class CareChainMixin:
@@ -65,7 +65,7 @@ class CareChainMixin:
 
     async def _chain_entry(self, dose_id: str, kind: str = "entry") -> None:
         """Log an entry as it now stands."""
-        rows = await self._q(f"MATCH (x:Dose {{id:$id}}) RETURN {ENTRY_FIELDS}", {"id": dose_id}, checked=True)
+        rows = await self._q(f"MATCH (x:Dose {{id:$id}}) OPTIONAL MATCH (x)-[:VIA]->(pr:Product) RETURN {ENTRY_FIELDS}", {"id": dose_id}, checked=True)
         if rows:
             kdf = await self._receipt_kdf()
             await self._chain_append(kind, dose_id, entry_body(await self._receipt_key(kdf), *rows[0]), kdf)
@@ -92,7 +92,7 @@ class CareChainMixin:
             if kind in ("entry", "adopted"):
                 entries += 1
                 adopted += kind == "adopted"
-                now = await self._q(f"MATCH (x:Dose {{id:$id}}) RETURN {ENTRY_FIELDS}", {"id": ref}, scope="read")
+                now = await self._q(f"MATCH (x:Dose {{id:$id}}) OPTIONAL MATCH (x)-[:VIA]->(pr:Product) RETURN {ENTRY_FIELDS}", {"id": ref}, scope="read")
                 if kdf not in keys:
                     keys[kdf] = await self._receipt_key(kdf)
                 if now and entry_body(keys[kdf], *now[0]) != body:
@@ -111,7 +111,7 @@ class CareChainMixin:
         """Put entries that were written before the log began into it, as they read now, marked 'adopted'. From then on a change to them is caught; what they said
         before is not knowable (there was nothing to compare with), and the event records who adopted them and when, so it cannot pass for an original write."""
         done = {e[0] for e in await self._q("MATCH (e:Event) WHERE e.kind IN ['entry','adopted'] RETURN e.ref", scope="read")}
-        rows = await self._q(f"MATCH (x:Dose) RETURN x.id, {ENTRY_FIELDS} ORDER BY x.created_at, x.id", scope="read")
+        rows = await self._q(f"MATCH (x:Dose) OPTIONAL MATCH (x)-[:VIA]->(pr:Product) RETURN x.id, {ENTRY_FIELDS} ORDER BY x.created_at, x.id", scope="read")
         kdf = await self._receipt_kdf()
         key, n = await self._receipt_key(kdf), 0
         for r in rows:

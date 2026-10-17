@@ -81,6 +81,11 @@ def _ingredient_of(name: str) -> str:
 
 
 class CareMixin:
+    @staticmethod
+    def _pkey(person: str, product: str, drug: str) -> str:
+        """The key of the (:Product) a tablet is: a combination brand (kind 'combination', named for the brand) or the medicine itself (kind 'medicine'). One node per
+        person and tablet; every entry of it points at it with VIA, and the times it is taken at live on it."""
+        return f"{person}|combination|{product}" if product else f"{person}|medicine|{drug}"
     # ------------------------------------------------------------------ record / confirm
     async def _known_person(self, person: str) -> str:
         """The person's id, refused if it is a near miss of someone already in the circle ("ashaa" for "asha"): a slip of the keyboard would otherwise start a second
@@ -127,8 +132,9 @@ class CareMixin:
         person = await self._known_person(person)
         product_strength = fit(product_strength, 80, "the product strength")
         product = norm(product)[:80]                       # the product the medicine came as ("telma-am"); empty when it was typed as the medicine itself
-        cur = await self._q("MATCH (o:Dose {cur:true, drug:$d})-[:FOR]->(:Person {id:$p}) WHERE coalesce(o.product, '') = $pr "
-                            "RETURN o.id, o.dose_text, o.freq_text, o.valid_from LIMIT 1", {"d": d, "p": norm(person), "pr": product}, scope="read")
+        pk = self._pkey(norm(person), product, d)
+        cur = await self._q("MATCH (o:Dose {cur:true, drug:$d})-[:FOR]->(:Person {id:$p}), (o)-[:VIA]->(:Product {key:$pk}) "
+                            "RETURN o.id, o.dose_text, o.freq_text, o.valid_from LIMIT 1", {"d": d, "p": norm(person), "pk": pk}, scope="read")
         if action == "stop" and not cur:
             raise KeyError(f"{d} is not on the record, so there is nothing to stop")
         same = lambda x, y: " ".join((x or "").lower().split()) == " ".join((y or "").lower().split())      # noqa: E731
@@ -138,25 +144,30 @@ class CareMixin:
         warning = None
         if action == "set" and dose_text:
             from carecircle import dose as dosemod
-            prev = await self._q("MATCH (o:Dose {cur:true, drug:$d})-[:FOR]->(:Person {id:$p}) WHERE coalesce(o.product, '') = $pr RETURN o.dose_text LIMIT 1",
-                                 {"d": d, "p": norm(person), "pr": product}, scope="read")
+            prev = await self._q("MATCH (o:Dose {cur:true, drug:$d})-[:FOR]->(:Person {id:$p}), (o)-[:VIA]->(:Product {key:$pk}) RETURN o.dose_text LIMIT 1",
+                                 {"d": d, "p": norm(person), "pk": pk}, scope="read")
             warning = dosemod.slip(prev[0][0], dose_text) if prev and prev[0][0] else None
         rows = await self._q(
             """
             MERGE (p:Person {id:$p}) ON CREATE SET p.role='patient'
             MERGE (dr:Drug {name:$d})
             MERGE (au:Person {id:$by}) ON CREATE SET au.role='carer'
+            MERGE (pr:Product {key:$pk}) ON CREATE SET pr.name=$pn, pr.kind=$pkind, pr.person=$p, pr.combo=$pcombo
+            SET pr.strength = CASE WHEN $ps <> '' THEN $ps ELSE pr.strength END
             CREATE (x:Dose {id:$id, drug:$d, product:$pr, pstrength:$ps, dose_text:$dt, freq_text:$ft, valid_from:$ts, cur:false, action:$a, status:$st,
                             source_type:$src, quote:$q, verified:$v, by:$by, at:$ts, created_at:$now, edited:$ed})
-            CREATE (x)-[:FOR]->(p) CREATE (x)-[:OF]->(dr)
+            CREATE (x)-[:FOR]->(p) CREATE (x)-[:OF]->(dr) CREATE (x)-[:VIA]->(pr)
             WITH x OPTIONAL MATCH (s:Source {id:$sref}) FOREACH (_ IN CASE WHEN s IS NULL THEN [] ELSE [1] END | CREATE (x)-[:READ_FROM]->(s))
             RETURN x.id""",
             {"p": norm(person), "d": d, "id": did, "dt": dose_text, "ft": freq_text, "ts": ts, "now": now_ms(), "a": action, "st": status,
              "src": source_type, "q": quote[:200], "v": verified, "by": norm(self.agent), "ed": ",".join(sorted({x for x in edited.split(",") if x in ("drug", "dose", "freq")})),
-             "sref": stored["id"] if stored else "", "pr": product, "ps": product_strength})
+             "sref": stored["id"] if stored else "", "pr": product, "ps": product_strength,
+             "pk": pk, "pn": product or d, "pkind": "combination" if product else "medicine", "pcombo": product})
         if status == "confirmed":
             await self._care_activate(did)
-            if action == "set" and cur and cur[0][2] and same(cur[0][2], freq_text):          # the same written frequency: keep the times a person already confirmed
+            if action == "set" and cur and ts >= cur[0][3] and not (cur[0][2] and same(cur[0][2], freq_text)):
+                await self._q("MATCH (pr:Product {key:$pk}) REMOVE pr.slots, pr.as_needed, pr.ends_on, pr.sched_by, pr.sched_at, pr.sched_first", {"pk": pk}, checked=True)          # a new written frequency: the times a person confirmed no longer apply to it
+            if action == "set" and cur and cur[0][2] and same(cur[0][2], freq_text):          # the same written frequency: the product keeps its times (and the entry carries a copy, for one release, so a rolled-back server still reads them)
                 await self._q("MATCH (o:Dose {id:$o}), (x:Dose {id:$n}) WHERE o.slots IS NOT NULL AND x.slots IS NULL "
                               "SET x.slots=o.slots, x.as_needed=o.as_needed, x.sched_by=o.sched_by, x.sched_at=o.sched_at, x.sched_first=o.sched_first, x.ends_on=o.ends_on",
                               {"o": cur[0][0], "n": did}, checked=True)
@@ -200,7 +211,7 @@ class CareMixin:
 
     async def _care_activate(self, did: str) -> None:
         """A confirmed entry has joined the record: lay out that medicine's whole timeline again."""
-        rows = await self._q("MATCH (x:Dose {id:$id})-[:FOR]->(p:Person) RETURN p.id, x.drug, coalesce(x.product, '')", {"id": did}, checked=True)
+        rows = await self._q("MATCH (x:Dose {id:$id})-[:FOR]->(p:Person) OPTIONAL MATCH (x)-[:VIA]->(pr:Product) RETURN p.id, x.drug, coalesce(pr.combo, x.product, '')", {"id": did}, checked=True)
         if rows:
             await self._care_rechain(rows[0][0], rows[0][1], rows[0][2])
 
@@ -210,25 +221,29 @@ class CareMixin:
         entries' own dates, an older prescription typed in late slots into the history instead of overriding the current one, and forgetting an entry
         simply closes the gap, so the entry before it is current again. Each statement recomputes from what is stored, so racing writers converge."""
         order = "ORDER BY x.valid_from, coalesce(x.created_at, x.valid_from), x.id"
+        pk = self._pkey(person, product, drug)
         await self._q(
-            f"""MATCH (x:Dose {{drug:$d, status:'confirmed'}})-[:FOR]->(:Person {{id:$p}}) WHERE coalesce(x.product, '') = $pr
+            f"""MATCH (x:Dose {{drug:$d, status:'confirmed'}})-[:FOR]->(:Person {{id:$p}}), (x)-[:VIA]->(:Product {{key:$pk}})
                 WITH x {order}
                 WITH collect(x) AS es
                 UNWIND range(0, size(es) - 1) AS i
                 WITH es[i] AS x, CASE WHEN i + 1 < size(es) THEN es[i + 1] ELSE null END AS nxt
                 SET x.cur = (nxt IS NULL AND x.action = 'set'),
                     x.valid_to = CASE WHEN x.action = 'stop' THEN x.valid_from WHEN nxt IS NULL THEN null ELSE nxt.valid_from END""",
-            {"p": person, "d": drug, "pr": product}, checked=True)
-        await self._q("MATCH (x:Dose {drug:$d})-[:FOR]->(:Person {id:$p}) WHERE coalesce(x.product, '') = $pr MATCH (x)-[r:SUPERSEDES]->(:Dose) DELETE r",
-                      {"p": person, "d": drug, "pr": product}, checked=True)
+            {"p": person, "d": drug, "pk": pk}, checked=True)
+        await self._q("MATCH (x:Dose {drug:$d})-[:FOR]->(:Person {id:$p}), (x)-[:VIA]->(:Product {key:$pk}) MATCH (x)-[r:SUPERSEDES]->(:Dose) DELETE r",
+                      {"p": person, "d": drug, "pk": pk}, checked=True)
         await self._q(
-            f"""MATCH (x:Dose {{drug:$d, status:'confirmed'}})-[:FOR]->(:Person {{id:$p}}) WHERE coalesce(x.product, '') = $pr
+            f"""MATCH (x:Dose {{drug:$d, status:'confirmed'}})-[:FOR]->(:Person {{id:$p}}), (x)-[:VIA]->(:Product {{key:$pk}})
                 WITH x {order}
                 WITH collect(x) AS es
                 UNWIND range(1, size(es) - 1) AS i
                 WITH es[i] AS n, es[i - 1] AS o
                 CREATE (n)-[:SUPERSEDES]->(o)""",
-            {"p": person, "d": drug, "pr": product}, checked=True)
+            {"p": person, "d": drug, "pk": pk}, checked=True)
+        # a tablet with no current entry left (stopped, or every entry erased) has no times, and one with no entries at all is not kept
+        await self._q("MATCH (pr:Product {key:$pk}) WHERE NOT (pr)<-[:VIA]-(:Dose {cur:true}) REMOVE pr.slots, pr.as_needed, pr.ends_on, pr.sched_by, pr.sched_at, pr.sched_first", {"pk": pk}, checked=True)
+        await self._q("MATCH (pr:Product {key:$pk}) WHERE NOT (pr)<-[:VIA]-(:Dose) DETACH DELETE pr", {"pk": pk}, checked=True)
 
     async def care_confirm(self, dose_id: str) -> dict:
         """A person confirms a pending entry (after looking at the quote beside the source). Makes it current."""
@@ -248,12 +263,15 @@ class CareMixin:
         rows = await self._q(
             """MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p})
                WHERE x.action='set' AND x.valid_from <= $t AND (x.valid_to IS NULL OR x.valid_to > $t)
-                 AND (x.ends_on IS NULL OR x.ends_on = '' OR x.ends_on >= $today)
-               RETURN x.id, x.drug, x.dose_text, x.freq_text, x.valid_from, x.source_type, x.quote, x.by, x.slots, x.as_needed, x.ends_on, coalesce(x.product, ''), coalesce(x.pstrength, '')
-               ORDER BY x.drug, x.product""",
+               OPTIONAL MATCH (x)-[:VIA]->(pr:Product)
+               WITH x, pr, coalesce(pr.ends_on, x.ends_on) AS ends
+               WHERE (ends IS NULL OR ends = '' OR ends >= $today)
+               RETURN x.id, x.drug, x.dose_text, x.freq_text, x.valid_from, x.source_type, x.quote, x.by, coalesce(pr.slots, x.slots), coalesce(pr.as_needed, x.as_needed), ends,
+                      coalesce(pr.combo, x.product, ''), coalesce(pr.strength, x.pstrength, ''), coalesce(pr.key, '')
+               ORDER BY x.drug, coalesce(pr.combo, x.product, '')""",
             {"p": norm(person), "t": t, "today": today}, scope="read")
         return [dict(id=r[0], drug=r[1], dose_text=r[2], freq_text=r[3], since=r[4], source=r[5], quote=r[6], by=r[7],
-                     slots=list(r[8] or []), as_needed=bool(r[9]), ends_on=r[10] or None, product=r[11], product_strength=r[12]) for r in rows]
+                     slots=list(r[8] or []), as_needed=bool(r[9]), ends_on=r[10] or None, product=r[11], product_strength=r[12], product_key=r[13]) for r in rows]
 
     async def care_duplicates(self, person: str, as_of: Optional[int] = None) -> list[dict]:
         """Ingredients recorded on more than one current entry (the same medicine reaching the person through two products: a combination brand and a plain
@@ -264,9 +282,12 @@ class CareMixin:
         today = sched.local_date(t, await self._tz()).isoformat()
         rows = await self._q(
             """MATCH (x:Dose {status:'confirmed', action:'set'})-[:FOR]->(:Person {id:$p}), (x)-[:OF]->(d:Drug)
-               WHERE x.valid_from <= $t AND (x.valid_to IS NULL OR x.valid_to > $t) AND (x.ends_on IS NULL OR x.ends_on = '' OR x.ends_on >= $today)
-               WITH d.name AS drug, x, coalesce(x.product, '') AS pr ORDER BY pr, x.id
-               WITH drug, collect({id: x.id, product: pr, dose_text: x.dose_text, freq_text: x.freq_text, by: x.by}) AS es
+               WHERE x.valid_from <= $t AND (x.valid_to IS NULL OR x.valid_to > $t)
+               OPTIONAL MATCH (x)-[:VIA]->(pr:Product)
+               WITH d.name AS drug, x, coalesce(pr.combo, x.product, '') AS cb, coalesce(pr.ends_on, x.ends_on) AS ends
+               WHERE (ends IS NULL OR ends = '' OR ends >= $today)
+               WITH drug, x, cb ORDER BY cb, x.id
+               WITH drug, collect({id: x.id, product: cb, dose_text: x.dose_text, freq_text: x.freq_text, by: x.by}) AS es
                WHERE size(es) > 1 RETURN drug, es ORDER BY drug""",
             {"p": norm(person), "t": t, "today": today}, scope="read")
         out = []
@@ -316,8 +337,8 @@ class CareMixin:
         more; a change touching a current interaction flag carries that flag's weight, otherwise a base 0.3 (an assumption)."""
         t = now_ms() if now is None else now
         carers = [r[0] for r in await self._q("MATCH (c:Person {role:'carer'}) RETURN c.id ORDER BY c.id", scope="read")]
-        changes = await self._q("MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p}) "
-                                "RETURN x.id, x.drug, x.action, x.at, x.by, coalesce(x.product, '') ORDER BY x.valid_from, coalesce(x.created_at, x.valid_from), x.id", {"p": norm(person)}, scope="read", checked=True)
+        changes = await self._q("MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p}) OPTIONAL MATCH (x)-[:VIA]->(pr:Product) "
+                                "RETURN x.id, x.drug, x.action, x.at, x.by, coalesce(pr.combo, x.product, '') ORDER BY x.valid_from, coalesce(x.created_at, x.valid_from), x.id", {"p": norm(person)}, scope="read", checked=True)
         flags = await self.care_check(person)
         heavy: dict[str, float] = {}
         for f in flags["direct"]:
@@ -413,7 +434,8 @@ class CareMixin:
         """(ingredient, every name this person's confirmed entries use for it, the union of those entries' current times). Two products of one ingredient
         (plain and a combination) are two entries with their own times; the guard looks at all of them."""
         ing = await asyncio.to_thread(self._ingredient, drug)
-        rows = await self._q("MATCH (x:Dose {action:'set', status:'confirmed'})-[:FOR]->(:Person {id:$p}) RETURN x.drug, x.cur, x.slots", {"p": norm(person)}, scope="read")
+        rows = await self._q("MATCH (x:Dose {action:'set', status:'confirmed'})-[:FOR]->(:Person {id:$p}) OPTIONAL MATCH (x)-[:VIA]->(pr:Product) RETURN x.drug, x.cur, coalesce(pr.slots, x.slots)",
+                             {"p": norm(person)}, scope="read")
         names, times = {norm(drug)}, set()
         for name, cur, slots in rows:
             if await asyncio.to_thread(self._ingredient, name) == ing:

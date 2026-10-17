@@ -64,12 +64,13 @@ class CareScheduleMixin:
             if day < sched.local_date(now_ms(), tz) - __import__("datetime").timedelta(days=1) or day.year > 2100:
                 raise ValueError("the last day of a course cannot be in the past")
             ends = day.isoformat()
-        await self._q("MATCH (x:Dose {id:$id}) SET x.slots=$s, x.as_needed=$a, x.ends_on=$e, x.sched_by=$by, x.sched_at=$t, x.sched_first=coalesce(x.sched_first, $t)",
-                      {"id": dose_id, "s": slots, "a": bool(as_needed), "e": ends, "by": norm(self.agent), "t": now_ms()}, checked=True)
-        await self._q("MATCH (x:Dose {id:$id})-[:FOR]->(p:Person) WHERE coalesce(x.product, '') <> '' "
-                      "MATCH (y:Dose {status:'confirmed', cur:true, action:'set'})-[:FOR]->(p) WHERE coalesce(y.product, '') = x.product "
-                      "SET y.slots=$s, y.as_needed=$a, y.ends_on=$e, y.sched_by=$by, y.sched_at=$t, y.sched_first=coalesce(y.sched_first, $t)",
-                      {"id": dose_id, "s": slots, "a": bool(as_needed), "e": ends, "by": norm(self.agent), "t": now_ms()}, checked=True)       # the ingredients of one product share its times
+        args = {"id": dose_id, "s": slots, "a": bool(as_needed), "e": ends, "by": norm(self.agent), "t": now_ms()}
+        # the times belong to the tablet (the product), so every ingredient of a combination shares them by construction
+        await self._q("MATCH (:Dose {id:$id})-[:VIA]->(pr:Product) SET pr.slots=$s, pr.as_needed=$a, pr.ends_on=$e, pr.sched_by=$by, pr.sched_at=$t, pr.sched_first=coalesce(pr.sched_first, $t)",
+                      args, checked=True)
+        # a copy on its current entries, for one release, so a server rolled back to the previous version still reads the times
+        await self._q("MATCH (:Dose {id:$id})-[:VIA]->(pr:Product)<-[:VIA]-(y:Dose {status:'confirmed', cur:true, action:'set'}) "
+                      "SET y.slots=$s, y.as_needed=$a, y.ends_on=$e, y.sched_by=$by, y.sched_at=$t, y.sched_first=coalesce(y.sched_first, $t)", args, checked=True)
         return {"id": dose_id, "drug": rows[0][0], "times": slots, "as_needed": bool(as_needed), "ends_on": ends or None}
 
     # ------------------------------------------------------------------ what the record shows for the last days (counts from the graph, no claims about health)
@@ -170,11 +171,11 @@ class CareScheduleMixin:
         for r in reg:
             if not r.get("product"):
                 out.append({"members": [r], "product": "", "label": "", "ingredients": []})
-            elif r["product"] in byp:
-                byp[r["product"]]["members"].append(r)
+            elif (r.get("product_key") or r["product"]) in byp:                     # the tablet is a node: its entries are the ones that point at the same one
+                byp[r.get("product_key") or r["product"]]["members"].append(r)
             else:
-                byp[r["product"]] = {"members": [r], "product": r["product"], "label": r["product"], "ingredients": []}
-                out.append(byp[r["product"]])
+                byp[r.get("product_key") or r["product"]] = {"members": [r], "product": r["product"], "label": r["product"], "ingredients": []}
+                out.append(byp[r.get("product_key") or r["product"]])
         for g in out:
             if g["product"]:
                 g["ingredients"] = [m["drug"] for m in g["members"]]
@@ -183,7 +184,8 @@ class CareScheduleMixin:
     async def _origins(self, person: str) -> dict:
         """When each (medicine, product) was first on record in its current run: the earliest confirmed entry since the last stop. A change of dose is a new
         entry but not a new start, so a slot earlier today under the old dose is not 'before the entry existed'."""
-        rows = await self._q("MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p}) RETURN x.drug, coalesce(x.product, ''), x.action, x.valid_from", {"p": norm(person)}, scope="read")
+        rows = await self._q("MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p}) OPTIONAL MATCH (x)-[:VIA]->(pr:Product) RETURN x.drug, coalesce(pr.combo, x.product, ''), x.action, x.valid_from",
+                             {"p": norm(person)}, scope="read")
         stops: dict = {}
         for d, pr, a, vf in rows:
             if a == "stop":
@@ -211,7 +213,8 @@ class CareScheduleMixin:
         gives = {r[0]: (r[1], r[2], r[3]) for r in await self._q(
             "MATCH (g:Give {person:$p}) WHERE g.slot STARTS WITH $d RETURN g.key, g.by, g.at, g.witness", {"p": norm(person), "d": today.isoformat()}, scope="read")}
         watched = {r[0] for r in await self._q("MATCH (w:Watch) WHERE w.key STARTS WITH $k RETURN w.key", {"k": norm(person) + "|"}, scope="read")}
-        confirmed_at = {r[0]: r[1] for r in await self._q("MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p}) WHERE x.sched_first IS NOT NULL RETURN x.id, x.sched_first",
+        confirmed_at = {r[0]: r[1] for r in await self._q("MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p}) OPTIONAL MATCH (x)-[:VIA]->(pr:Product) "
+                                                          "WITH x, coalesce(pr.sched_first, x.sched_first) AS f WHERE f IS NOT NULL RETURN x.id, f",
                                                           {"p": norm(person)}, scope="read")}
         origins = await self._origins(person)
         items, unscheduled, as_needed = [], [], []
@@ -245,16 +248,16 @@ class CareScheduleMixin:
     async def care_give_slot(self, person: str, dose_id: str, time: str, now: Optional[int] = None) -> dict:
         """Mark one of today's confirmed slots as given. Same once-per-slot claim as care_give: if someone already marked it, this says who."""
         t = now_ms() if now is None else now
-        rows = await self._q("MATCH (x:Dose {id:$id, status:'confirmed', cur:true, action:'set'})-[:FOR]->(:Person {id:$p}) RETURN x.drug, x.slots, coalesce(x.product, '')",
-                             {"id": dose_id, "p": norm(person)}, scope="read")
+        rows = await self._q("MATCH (x:Dose {id:$id, status:'confirmed', cur:true, action:'set'})-[:FOR]->(:Person {id:$p}) OPTIONAL MATCH (x)-[:VIA]->(pr:Product) "
+                             "RETURN x.drug, coalesce(pr.slots, x.slots), coalesce(pr.combo, x.product, ''), coalesce(pr.key, '')", {"id": dose_id, "p": norm(person)}, scope="read")
         if not rows:
             raise KeyError(dose_id)
-        drug, slots, product = rows[0]
+        drug, slots, product, pkey = rows[0]
         members = [(drug, slots)]
-        if product:                                                  # one tablet of a combination: every ingredient entry of that product is marked together
+        if product:                                                  # one tablet of a combination: every ingredient entry that points at the same product node is marked together
             members = [(r[0], r[1]) for r in await self._q(
-                "MATCH (x:Dose {status:'confirmed', cur:true, action:'set'})-[:FOR]->(:Person {id:$p}) WHERE coalesce(x.product, '') = $pr RETURN x.drug, x.slots ORDER BY x.drug",
-                {"p": norm(person), "pr": product}, scope="read")]
+                "MATCH (pr:Product {key:$pk})<-[:VIA]-(x:Dose {status:'confirmed', cur:true, action:'set'}) RETURN x.drug, coalesce(pr.slots, x.slots) ORDER BY x.drug",
+                {"pk": pkey}, scope="read")]
         allowed = sorted({h for _d, sl in members for h in (sl or [])})
         if time not in allowed:
             raise ValueError(f"{time} is not one of this medicine's times ({', '.join(allowed) or 'none set'})")

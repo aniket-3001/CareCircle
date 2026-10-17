@@ -234,8 +234,8 @@ class CareViewMixin:
         earlier entry was changed or removed after the fact. It does not say an entry is true, only that it is unchanged. Marking an entry as a mistake,
         stopping a medicine and a later entry do not change the earlier chain (status and end dates are not part of it)."""
         rows = await self._q(
-            """MATCH (x:Dose)-[:FOR]->(:Person {id:$p})
-               RETURN x.id, x.drug, coalesce(x.product, ''), x.dose_text, x.freq_text, x.action, x.valid_from, x.by, x.quote, coalesce(x.created_at, x.valid_from)
+            """MATCH (x:Dose)-[:FOR]->(:Person {id:$p}) OPTIONAL MATCH (x)-[:VIA]->(pr:Product)
+               RETURN x.id, x.drug, coalesce(pr.combo, x.product, ''), x.dose_text, x.freq_text, x.action, x.valid_from, x.by, x.quote, coalesce(x.created_at, x.valid_from)
                ORDER BY coalesce(x.created_at, x.valid_from), x.id""", {"p": norm(person)}, scope="read")
         if upto < 0:
             raise ValueError("upto must be zero or more")
@@ -290,7 +290,7 @@ class CareViewMixin:
         The dose, frequency, quote, links and acknowledgements are deleted. What stays is a receipt with a keyed hash (HMAC-SHA-256, the key stays on the
         server) of what was removed, who did it, and when. A plain hash of a short line like "warfarin 5 mg" could be found by trying likely lines; a keyed one cannot. Only the owner of the circle may do this: it cannot
         be undone and it removes what other carers may rely on. Any carer can instead mark an entry as entered by mistake (care_mark_mistake), which keeps it in the history."""
-        rows = await self._q("MATCH (x:Dose {id:$id}) RETURN x.drug, x.dose_text, x.freq_text, x.quote, x.by, x.at, x.status, coalesce(x.product, '')",
+        rows = await self._q("MATCH (x:Dose {id:$id}) OPTIONAL MATCH (x)-[:VIA]->(pr:Product) RETURN x.drug, x.dose_text, x.freq_text, x.quote, x.by, x.at, x.status, coalesce(pr.combo, x.product, '')",
                              {"id": dose_id}, scope="admin")
         if not rows:
             raise KeyError(dose_id)
@@ -312,7 +312,7 @@ class CareViewMixin:
     async def care_mark_mistake(self, dose_id: str, reason: str = "") -> dict:
         """Take an entry off the record as entered by mistake, without erasing it: it stays in the history, marked, with who marked it and why, and the entry
         before it becomes current again. Any carer can do this; the owner (or whoever marked it) can put it back with care_restore_entry."""
-        rows = await self._q("MATCH (x:Dose {id:$id})-[:FOR]->(p:Person) WHERE x.status IN ['confirmed', 'pending'] RETURN x.drug, p.id, x.status, coalesce(x.product, '')", {"id": dose_id}, scope="write")
+        rows = await self._q("MATCH (x:Dose {id:$id})-[:FOR]->(p:Person) WHERE x.status IN ['confirmed', 'pending'] OPTIONAL MATCH (x)-[:VIA]->(pr:Product) RETURN x.drug, p.id, x.status, coalesce(pr.combo, x.product, '')", {"id": dose_id}, scope="write")
         if not rows:
             raise KeyError(dose_id)
         drug, person, was, product = rows[0]
@@ -324,7 +324,7 @@ class CareViewMixin:
 
     async def care_restore_entry(self, dose_id: str) -> dict:
         """Put back an entry that was marked as entered by mistake. Only the owner or the carer who marked it."""
-        rows = await self._q("MATCH (x:Dose {id:$id, status:'mistake'})-[:FOR]->(p:Person) RETURN x.drug, p.id, x.status_before, x.mistake_by, coalesce(x.product, '')", {"id": dose_id}, scope="write")
+        rows = await self._q("MATCH (x:Dose {id:$id, status:'mistake'})-[:FOR]->(p:Person) OPTIONAL MATCH (x)-[:VIA]->(pr:Product) RETURN x.drug, p.id, x.status_before, x.mistake_by, coalesce(pr.combo, x.product, '')", {"id": dose_id}, scope="write")
         if not rows:
             raise KeyError(dose_id)
         drug, person, before, marker, product = rows[0]
@@ -356,6 +356,7 @@ class CareViewMixin:
         if ids:
             await self._q("UNWIND $ids AS i MATCH (n:Nudge) WHERE n.key CONTAINS i DELETE n", {"ids": ids})
             await self._q("MATCH (x:Dose)-[:FOR]->(:Person {id:$p}) DETACH DELETE x", {"p": p})
+        await self._q("MATCH (pr:Product {person:$p}) DETACH DELETE pr", {"p": p})                       # the tablets go with the person
         await self._q("MATCH (q:Person {id:$p, role:'patient'}) DETACH DELETE q", {"p": p})
         await self._q("MATCH (s:Source) DETACH DELETE s")                         # the text read from photos, voice notes and documents (names and all)
         await self._q("MATCH (m:ChatMsg) DELETE m")                                # the helper's conversation: it is about this person
