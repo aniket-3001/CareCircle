@@ -118,3 +118,13 @@ def test_allergy_classes_come_from_the_atc_table_as_well_as_the_starter_list():
     n, m = group_of("penicillin")
     assert "amoxicillin" in m and len(m) > 20           # the starter list had 9
     assert group_of("peanut") == ("", ())
+
+
+async def test_an_api_only_process_starts_no_background_loops(monkeypatch):
+    from graphmem import api as apimod
+    monkeypatch.setenv("CC_ROLE", "api")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "x:y")
+    app = apimod.create_app(admin_key="k")
+    for h in app.router.on_startup:
+        await h()
+    assert not hasattr(app.state, "tg") and not hasattr(app.state, "rem")

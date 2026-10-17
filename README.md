@@ -68,21 +68,6 @@ Click anything and it explains itself in plain words, with the line it was read 
 
 ![History screen: the look-back slider with the flags as they were then, and a timeline of changes with the quoted line and a link to the text it was read from](docs/img/ui-history.png)
 
-## What it does
-
-| Screen | |
-|---|---|
-| **Today** | One verdict tile (never "safe"), the regimen, and every flag with its source Cypher or enzyme path. |
-| **Add** | A photo, voice note, PDF, Word file or typed text becomes proposals with the exact quoted line; a person confirms each one. |
-| **Circle** | Who has seen each change, reminders and escalation, and a once-per-slot dose log that refuses a second "given". |
-| **Graph** | The circle as a living graph (people, entries, medicines, enzymes); click anything for a plain-words explanation; cards for what the record hangs on, bridges, groups and a path finder. |
-| **History** | A look-back slider (what the flags were), a written timeline, FHIR R4 export, and *forget with a receipt*. |
-| **Helper** | Answers from the circle's own record, in English or Hindi; declines to advise and points to a prescriber or pharmacist. |
-| **Account** | Sign-in (Amazon Cognito on the live site), invitations, quiet hours, browser notifications, a time-limited read-only link for a pharmacist who can leave a note, and a note of whether the person knows about the record. |
-| **Telegram** | The same without the app: photo, voice, text, `/regimen`, `/check`, `/history`, `/ack`, `/gave`. |
-
-Every number and flag says where it came from, and when the sources disagree or are missing the app says so rather than guessing. Details of each part are in [`docs/DETAILS.md`](docs/DETAILS.md).
-
 ## Connect an agent
 
 The same memory is open to any agent: `POST /mcp` on the live address (Streamable HTTP, `Authorization: Bearer <key>`), or the stdio server `python -m graphmem.mcp_server`, or the LangChain and LlamaIndex tools in `integrations/`. Keys carry scopes (`read`, `write`, `admin`) that are enforced before every operation. Setup, tool list and examples: [Connect your agent stack](docs/DETAILS.md#connect-your-agent-stack).
@@ -98,16 +83,12 @@ On the question this memory exists to answer ("which carer has not seen which ch
 - **Unknown stays unknown.** 26% of DDInter pairs have severity "Unknown": shown as *unrated*.
 
 ## Limits, stated plainly
-- Interaction severity weights (minor .1, moderate .3, major .7; enzyme strong .7, moderate .3; staleness half-life 72 h) are **assumptions**, not clinical values.
-- The FDA CYP table is an index list, not exhaustive. Sources may disagree. Flags are for discussion with a prescriber or pharmacist.
-- **The enzyme layer is small.** The enzyme-path check rests on the FDA's table of index CYP inhibitors, inducers and substrates: 7 enzymes, 13 inhibitors, 7 inducers and 12 substrates, plus 9 substrates from a short hand-made list that is marked `curated (unverified)` wherever it appears. Together they touch **32 of the 1,833 medicines** in the reference graph. The FDA page also lists *laboratory (in vitro)* inhibitors, inducers and transporter findings (P-gp, OATP, OAT, OCT2, MATE, BCRP); those add 31 more medicines (63 in all) as the weakest kind of flag: labelled "a laboratory finding, not shown in people", given the lowest weight, shown as minor, and never shown instead of a clinical path for the same pair. When the FDA site refuses the scripted download (it did in CI), the loader uses the copy of that page bundled in `carecircle/snapshot/`. A medicine outside those gets no enzyme-path flag; its interactions come only from the DDInter pairs. **No flag is never a statement that nothing interacts.**
-- The Telegram bot is tested against a fake Telegram API and, by hand, live (`/link`, `/regimen`, a typed medicine, Confirm, `/check`, a photo of a label, a reminder arriving after a back-dated unseen change, `/ack`); a spoken note, where Whisper heard "Arferin" and the matcher still offered warfarin first, with the heard text shown for a person to confirm. Voice uses a local Whisper `base` model; accuracy varies with accent and noise.
-- **Which model, and why Nova is still the default.** The optional structuring model is set by `CC_MODEL` (default Amazon Nova Pro on Bedrock). Claude Haiku 4.5, Sonnet 4.5 and Opus 4.5 can be called from a developer login on this AWS account, but the server's own role is refused ("model use case details have not been submitted for this account"), so the live site cannot use them yet; the newer Claude models are refused for the account altogether. On synthetic labels, **no model beat the rules alone** and Nova was worse than the rules on damaged labels (30 of 40 strengths right against 34); Claude Haiku and Sonnet matched the rules (`docs/BENCHMARKS.md`, B7). Rules work without any model, and a model's output is only ever kept if its quote is found in the text that was read.
-- Cognito's default email sender is capped at 50 messages a day, so sign-ups beyond that need Amazon SES. The Telegram link-by-code and the account pages were tested against the fake API and in Chrome, not yet live in Telegram. The helper has not been evaluated with real families: its refusal rules are keyword-based and can miss an unusual phrasing, which is why every answer is also checked for advice before it is sent.
-- Reminders arrive by browser notification (Web Push) and Telegram. WhatsApp and SMS are **not built**: they need a paid sender account and a phone number per person, which this project avoids. The interface is English and Hindi; other languages need a translator to review them before they are added.
-- **Where the data comes from limits where it can be used.** Interaction severities come from DDInter 2.0 (US/EU-centred drug labelling and literature) and the FDA CYP table; they are not a view of how Indian practice rates the same pairs, and many Indian brands are combinations the reference data has never heard of (the combination list in `carecircle/brands.py` is hand-written and unverified). Recalls come from openFDA, which lists US recalls only, so they are looked up only for a circle in a US time zone.
-- **Not for commercial use as it stands.** DDInter is CC BY-NC-SA 4.0. A commercial service would need a licence for an interaction source (or its own curated one), a licensed brand-to-ingredient master for India, clinician review of every rule, and the regulatory and privacy steps for health data (in India, the DPDP Act, including the patient's own consent, which this project records only as a note and not as legal consent).
-- Per-process rate limiting; TLS comes from Caddy in the production compose only (the dev compose has none); one shared database credential across circles; a single server in one availability zone with no replica. The database keeps snapshots only, so a hard crash can lose up to the last minute; the recovery copies are a backup taken before every deploy, one every 6 hours in S3 and a daily EBS snapshot (`deploy/RESTORE.md`). FalkorDB 4.22.1 crashes when it replays a write log in which a graph was deleted and then written again, which is why there is no write log (`docs/FALKORDB_CRASH.md`).
+- Severity weights (minor .1, moderate .3, major .7) and staleness half-life are **assumptions**, not clinical values. Sources can disagree; flags are for discussion with a prescriber or pharmacist, and **no flag is never a statement that nothing interacts.**
+- **The enzyme layer is small**: 63 of the 1,833 medicines in the reference graph; a medicine outside it gets interaction flags only from the DDInter pairs.
+- **Which model.** The optional structuring model is Amazon Nova Pro. Claude models can be called from a developer login on this AWS account but not yet from the server's role, so the live site cannot use them. On synthetic labels no model beat the rules alone. A model's output is only kept if its quote is found in the text that was read, and the photo itself is never sent to it.
+- **Not evaluated with real families**, and the helper's refusal rules are keyword-based and can miss an unusual phrasing (every answer is also scanned for advice). WhatsApp and SMS are not built. The interface is English and Hindi.
+- **Data limits where it can be used.** Severities are US/EU-centred, many Indian brands are combinations the data has never heard of, and recalls are US-only. DDInter is CC BY-NC-SA, so **not for commercial use as it stands**; a service would need licensed data, clinician review and the regulatory steps for health data.
+- **A demo deployment**: one server in one availability zone, snapshots only (a hard crash can lose up to a minute), per-process rate limiting. The rollback step of the deploy has not been run on the live site. All of it, with the reasons: [Limits in full](docs/DETAILS.md#limits-in-full).
 
 ## Data and licences
 Interaction data: **DDInter 2.0**, CC BY-NC-SA 4.0 (**non-commercial** use; attribution required), downloaded by `scripts/fetch_reference.py`, not stored in this repository.
@@ -126,40 +107,9 @@ Deployed on one AWS EC2 instance (t3.large, Docker Compose, Caddy for HTTPS, Bed
 GRAPHMEM_ADMIN_KEY=change-me docker compose up -d --build
 open http://localhost:8000          # press "Start a demo circle"     (FalkorDB Browser: http://localhost:3000)
 ```
-Without Docker (needs a FalkorDB on :6379, e.g. `docker run -p 6379:6379 falkordb/falkordb`):
-```bash
-python -m venv .venv && .venv/bin/pip install -r requirements.txt          # Windows: .venv/Scripts
-python scripts/fetch_reference.py                                           # DDInter + FDA tables into data/ref (gitignored)
-python -c "from carecircle import reference as r; print(r.load())"          # build the shared cc_ref graph
-(cd web && npm ci && npm run build)                                         # the React app (served by the API from web/dist)
-python -m graphmem.api                                                      # http://127.0.0.1:8000
-python -m pytest -q tests                                                   # the whole suite, against a live FalkorDB
-(cd web && npm test)                                                        # UI unit tests; `npm run dev` for hot reload (proxies to :8000)
-PORT=8000 python scripts/ui_e2e.py && PORT=8000 python scripts/ui_e2e_accounts.py    # browser walk-throughs: demo, then accounts (need Chrome and `pip install playwright`)
-PYTHONPATH=. python bench/care_bench.py                                     # benchmarks below (`--out run.json`, then `python bench/gate.py bench/baselines/care_bench.json run.json` compares two runs)
-```
-Optional: `CC_COGNITO_POOL_ID` / `CC_COGNITO_CLIENT_ID` (email sign-up through Amazon Cognito; unset = built-in accounts), `CC_ASSISTANT=0` (the helper answers from rules only), `CC_MODEL` / `AWS_REGION` + AWS credentials let Amazon Bedrock (default `us.amazon.nova-pro-v1:0`; a Claude id such as `us.anthropic.claude-haiku-4-5-20251001-v1:0` works where the account allows it) structure what the OCR read;
-`CC_LLM=0` or no credentials falls back to rules. `CC_COOKIE_SESSIONS=1` keeps the session in an httpOnly cookie (on in the live deployment), `GRAPHMEM_DB_PASSWORD` makes the database itself require a password (on in the live deployment), `GRAPHMEM_RO_PASSWORD` turns on the read-only database user (required by the production compose file), `CC_REMINDERS=0` switches the reminder loop off, and `CC_EXTERNAL=0` stops every outgoing lookup (RxNorm, openFDA). Set `TELEGRAM_BOT_TOKEN` to also run the Telegram bot in the server process (`/link <key> <circle>`, then send a photo, voice note or text).
 
-**Look inside the graph.** `python scripts/seed_explore.py` loads two small synthetic graphs (a care circle and an agent's memory); then open FalkorDB Browser at <http://localhost:3000>, connect to `localhost:6379`, and run the queries in [`docs/EXPLORE.md`](docs/EXPLORE.md): the regimen and its history, who has not seen a change, why an agent decided something, and PageRank over the interaction graph. A test runs every query in that guide, so they work. The live site does not expose the Browser (one login would show every family's circle); the Graph tab shows each circle's own graph and the Cypher behind it.
+Without Docker, settings (Cognito, model, cookie sessions, database password, reminders, Telegram) and how to look inside the graph: [Running it and settings](docs/DETAILS.md#running-it-and-settings).
 
 ## More detail
 
-The full technical write-up lives in [`docs/DETAILS.md`](docs/DETAILS.md), one section each:
-
-- [Where FalkorDB fits](docs/DETAILS.md#where-falkordb-fits)
-- [Why the graph is the product](docs/DETAILS.md#why-the-graph-is-the-product)
-- [Three graphs, on purpose](docs/DETAILS.md#three-graphs-on-purpose)
-- [Graph data model](docs/DETAILS.md#graph-data-model)
-- [Queries and algorithms](docs/DETAILS.md#queries-and-algorithms)
-- [Connect your agent stack](docs/DETAILS.md#connect-your-agent-stack)
-- [Accounts, circles and the helper](docs/DETAILS.md#accounts-circles-and-the-helper)
-- [More than medicines](docs/DETAILS.md#more-than-medicines)
-- [What is in the app](docs/DETAILS.md#what-is-in-the-app)
-- [The demo story (90 seconds)](docs/DETAILS.md#the-demo-story-90-seconds)
-- [Measured (one laptop; B-series and load test repeated 7 times each, see `docs/BENCHMARKS.md`)](docs/DETAILS.md#measured-one-laptop-b-series-and-load-test-repeated-7-times-each-see-docsbenchmarksmd)
-- [What runs, and how it is checked](docs/DETAILS.md#what-runs-and-how-it-is-checked)
-- [Operations](docs/DETAILS.md#operations)
-- [Layout](docs/DETAILS.md#layout)
-
-Other documents: [`docs/HAZARDS.md`](docs/HAZARDS.md) (what can go wrong and the test behind each), [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md), [`docs/SCENARIOS.md`](docs/SCENARIOS.md), [`docs/API.md`](docs/API.md), [`docs/TRACK02.md`](docs/TRACK02.md). How many tests and scenarios there are right now: `python scripts/counts.py` (the number is produced, not typed here).
+The full write-up is [`docs/DETAILS.md`](docs/DETAILS.md) (where FalkorDB fits, the graph model, queries and algorithms, agents, what is in each screen, the 90-second demo, measurements, operations). Also: [`docs/HAZARDS.md`](docs/HAZARDS.md) (what can go wrong and the test behind each), [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md), [`docs/SCENARIOS.md`](docs/SCENARIOS.md), [`docs/API.md`](docs/API.md), [`docs/TRACK02.md`](docs/TRACK02.md). How many tests and scenarios there are right now: `python scripts/counts.py` (produced, not typed here).

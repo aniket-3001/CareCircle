@@ -145,10 +145,13 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
 
     mcp_http.install(app, gm, limiter, bad_auth)             # the MCP server at /mcp, with the same keys and limits
 
+    role = os.getenv("CC_ROLE", "all").lower()   # "all" (default): serve and run the loops; "api": serve only; "worker": run the Telegram/reminder loops (and answer /health)
+    background = role in ("all", "worker")
+
     @app.on_event("startup")
     async def _telegram():                    # optional front door: set TELEGRAM_BOT_TOKEN to poll Telegram in this process
         token = os.getenv("TELEGRAM_BOT_TOKEN")
-        if token:
+        if token and background:
             import asyncio
             from carecircle import telegram
             app.state.tg = asyncio.create_task(telegram.poll(gm, token))
@@ -156,7 +159,7 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
     @app.on_event("startup")
     async def _reminders():                   # the reminder loop does not need Telegram: Web Push alone is enough to start it
         from carecircle import reminders
-        if reminders.wanted() and os.getenv("CC_REMINDERS", "1") != "0":
+        if background and reminders.wanted() and os.getenv("CC_REMINDERS", "1") != "0":
             import asyncio
             send = None
             if os.getenv("TELEGRAM_BOT_TOKEN"):

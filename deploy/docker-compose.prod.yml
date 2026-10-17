@@ -32,6 +32,7 @@ services:
       CC_WHISPER: base                                  # the speech model baked into the image (Dockerfile): no download at the first voice note
       FALKORDB_HOST: falkordb
       CC_COOKIE_SESSIONS: ${CC_COOKIE_SESSIONS:-0}      # 1 = the session is an httpOnly cookie instead of a token in the page's storage (README, Accounts)
+      CC_ROLE: ${CC_ROLE:-all}                          # all = serve and run the Telegram/reminder loops; api = serve only; worker = loops only (see docs/DETAILS.md, Operations)
       CC_DEMO: ${CC_DEMO:-1}
       CC_DEMO_MAX: ${CC_DEMO_MAX:-300}                  # oldest demo circle is deleted beyond this many
       CC_MODEL: ${CC_MODEL:-us.amazon.nova-pro-v1:0}
