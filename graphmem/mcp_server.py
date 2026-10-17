@@ -110,10 +110,14 @@ def build(gm: GraphMem, agent: Union[str, Callable[[], str]]) -> MCPServer:
 
     # Convenience tools for the most common calls (thin wrappers over the same operations).
     @server.tool()
-    async def remember(tenant: str, session: str, role: str, content: str) -> str:
-        """Append a message to a session's persistent history."""
-        return json.dumps(await ops.invoke(gm, me(), tenant, "add_episode",
-                                           {"session": session, "role": role, "content": content}))
+    async def remember(tenant: str, session: str, role: str, content: str, about: str = "") -> str:
+        """Append a message to a session's persistent history. Give `about` (the id of an entry or of the person in this circle) to make it a note about that record:
+        it is shown beside the entry as "noted by <you>, unverified" and found by recall with the path to the entry. A note never changes the record."""
+        try:
+            args = {"session": session, "role": role, "content": content, **({"about": about} if about else {})}
+            return json.dumps(await ops.invoke(gm, me(), tenant, "add_episode", args))
+        except Exception as e:
+            return json.dumps({"error": f"{type(e).__name__}: {e}"})
 
     @server.tool()
     async def recall(tenant: str, query: str, hops: int = 2) -> str:

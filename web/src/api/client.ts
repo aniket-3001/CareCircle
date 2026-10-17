@@ -1,4 +1,4 @@
-import type { ChainCheck, Digest, Review, ShareLink, ShareRow, ConsentView, PatientView, Outcomes, EntrySource, Candidate, StockRow, Counts, Followup, FollowupSuggestion, Handover, AllergyCheck, Appointment, CareProfile, Visit, DrugInfo, Reading, Trend, Recalls, SoleKnowers,
+import type { ChainCheck, EntryNotes, Digest, Review, ShareLink, ShareRow, ConsentView, PatientView, Outcomes, EntrySource, Candidate, StockRow, Counts, Followup, FollowupSuggestion, Handover, AllergyCheck, Appointment, CareProfile, Visit, DrugInfo, Reading, Trend, Recalls, SoleKnowers,
   Account, AuthConfig, CareGraph, ChatMessage, CheckResult, Divergence, FhirBundle, GiveRecord, GiveResult, Hubs, GInfluence, GCommunities, GPath, IntakeResult, Invite, Member, Reminder, People,
   Profile, Receipt, RegimenEntry, Session, TimelineEvent, CircleInfo, TodayView,
 } from './types';
@@ -91,6 +91,7 @@ export function apiFor(s: Session) {
     forgetPerson: (confirm: string) => op<{ receipt: string; forgotten: boolean; removed_entries: number }>('care_forget_person', { person: p, confirm }),
     today: (now: number) => op<TodayView>('care_today', { person: p, now }),
     resolve: (text: string, n = 8) => op<Candidate[]>('care_drug_search', { text, n }),
+    entryNotes: (dose_id: string) => op<EntryNotes>('care_entry_notes', { dose_id }),
     entrySource: (dose_id: string) => op<EntrySource>('care_entry_source', { dose_id }),
     outcomes: (now: number) => op<Outcomes>('care_outcomes', { person: p, days: 7, now }),
     consent: () => op<ConsentView>('care_consent', { person: p }),

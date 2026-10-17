@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { EntrySource as Src } from '../api/types';
+import type { EntryNotes, EntrySource as Src } from '../api/types';
 import { tr } from '../lib/i18n';
+import { nameOf } from '../lib/format';
 import { useApp } from '../state';
 
 /** What an entry was read from: the text the server read from the photo, voice note or document, with the quoted line marked. Loaded when asked for. */
@@ -8,11 +9,13 @@ export function EntrySource({ dose }: { dose: string }): React.JSX.Element {
   const app = useApp();
   const [src, setSrc] = useState<Src | 'error' | null>(null);
   const [open, setOpen] = useState(false);
+  const [notes, setNotes] = useState<EntryNotes | null>(null);
 
   function toggle(): void {
     const next = !open;
     setOpen(next);
     if (next && src === null) app.api.entrySource(dose).then(setSrc, () => setSrc('error'));
+    if (next && notes === null) app.api.entryNotes(dose).then(setNotes, () => undefined);
   }
 
   const shown = (s: Src): React.ReactNode => {
@@ -28,6 +31,13 @@ export function EntrySource({ dose }: { dose: string }): React.JSX.Element {
       </button>
       {open && (
         <div className="item__sub" data-testid="source-text">
+          {notes && notes.notes.length > 0 && (
+            <div data-testid="entry-notes">
+              <b>{tr('Notes about this entry')}</b>{notes.stale ? <> · {tr('the entry has changed since')}</> : null}
+              <ul className="steps">{notes.notes.map((n) => <li key={n.id}><span><span className="muted small">{n.kind === 'handover' ? `${tr('Handover note from')} ${nameOf(n.by)}` : `${tr('Noted by')} ${n.by}, ${tr('unverified')}`}</span> {n.text}</span></li>)}</ul>
+              <span className="muted small">{tr('Notes are not part of the record: an agent’s note is not confirmed by anyone and changes no dose, flag or history.')}</span>
+            </div>
+          )}
           {src === null && tr('Loading…')}
           {src === 'error' && tr('Could not load it.')}
           {src && src !== 'error' && (

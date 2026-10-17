@@ -81,9 +81,24 @@ class TenantMemory(GraphAlgoMixin, CareChainMixin, CareConsentMixin, CareReviewM
         return (await g.query(cypher, params or {})).result_set
 
     # ---------------------------------------------------------------- episodic
+    async def _note_target(self, about: str) -> str:
+        """What a note may be about: an entry, or the person, of THIS circle, found in this circle's own graph ('entry' or 'person'). Anything else is refused, so a
+        note can never be attached to something that is not here, or to another circle's record."""
+        if not isinstance(about, str) or not 1 <= len(about) <= 120:
+            raise ValueError("`about` is the id of an entry or of the person in this circle")
+        if await self._q("MATCH (x:Dose {id:$a}) RETURN x.id", {"a": about}, scope="read", checked=True):
+            return "entry"
+        if await self._q("MATCH (p:Person {id:$a, role:'patient'}) RETURN p.id", {"a": about}, scope="read", checked=True):
+            return "person"
+        raise ValueError("a note must be about an entry or the person of this circle, and no such id is here")
+
     async def add_episode(self, session: str, role: str, content: str, *, agent: Optional[str] = None,
-                          at: Optional[int] = None) -> dict:
-        """Append an immutable event to a session. Ordering (seq + NEXT edge) is assigned atomically in-graph."""
+                          at: Optional[int] = None, about: str = "") -> dict:
+        """Append an immutable event to a session. Ordering (seq + NEXT edge) is assigned atomically in-graph.
+
+        `about` (an entry id or the person of this circle) makes it a NOTE about that record: kept in the session as usual, linked to it with an ABOUT edge, and shown
+        beside the entry as "noted by <agent>, unverified". A note never changes the record: it adds an episode and an edge, and no dose, flag, checklist or log entry is
+        read from it or altered by it. The target is checked first and must exist in this circle."""
         if not isinstance(content, str) or not content.strip():
             raise ValueError("an episode needs some content")
         if len(content) > MAX_EPISODE_CHARS:
@@ -92,6 +107,7 @@ class TenantMemory(GraphAlgoMixin, CareChainMixin, CareConsentMixin, CareReviewM
             raise ValueError("a session id is 1 to 120 characters")
         if not ROLE_RE.match(role or ""):
             raise ValueError("role is a short lowercase label such as user, agent, assistant, system or tool")
+        kind = await self._note_target(about) if about else ""
         ts, eid = at or now_ms(), new_id("ep")
         rows = await self._q(
             """
@@ -108,7 +124,16 @@ class TenantMemory(GraphAlgoMixin, CareChainMixin, CareConsentMixin, CareReviewM
             """,
             {"sid": session, "eid": eid, "role": role, "content": content, "agent": agent or self.agent, "ts": ts},
         )
-        return {"id": rows[0][0], "seq": rows[0][1], "session": session}
+        out = {"id": rows[0][0], "seq": rows[0][1], "session": session}
+        if about:
+            label = "Dose" if kind == "entry" else "Person"
+            linked = await self._q(f"MATCH (e:Episode {{id:$eid}}), (t:{label} {{id:$a}}) CREATE (e)-[:ABOUT]->(t) SET e.about=$a, e.unverified=true RETURN count(t)",
+                                   {"eid": eid, "a": about}, checked=True)
+            if not linked or not linked[0][0]:                 # the entry went between the check and the link: keep nothing readable
+                await self._q("MATCH (e:Episode {id:$eid}) SET e.content='[removed]', e.redacted=true", {"eid": eid}, checked=True)
+                raise ValueError("the entry this note was about is gone, so the note was not attached")
+            out.update(about=about, about_kind=kind, label=f"noted by {agent or self.agent}, unverified")
+        return out
 
     async def add_episodes(self, session: str, items: list, *, agent: Optional[str] = None) -> dict:
         """Append several events to one session in a single write: one authorisation, one query, and a contiguous block of sequence numbers with
@@ -291,7 +316,7 @@ class TenantMemory(GraphAlgoMixin, CareChainMixin, CareConsentMixin, CareReviewM
         return {"count": len(facts), "facts": [await self.assert_fact(**f) for f in facts]}
 
     async def recall(self, query: str, *, as_of: Optional[int] = None, hops: int = 2, limit: int = 10,
-                     mode: str = "hybrid") -> list[dict]:
+                     mode: str = "hybrid", notes: bool = True) -> list[dict]:
         """Entity-anchored graph recall. Every result carries its provenance (source episodes) and the graph path
         that reached it. `as_of` answers 'what did we believe at time T'. `mode`: 'hybrid' (default: graph recall, plus vector
         matches fused by reciprocal rank when embeddings are enabled), 'lexical' (graph only) or 'vector' (vector only)."""
@@ -376,7 +401,33 @@ class TenantMemory(GraphAlgoMixin, CareChainMixin, CareConsentMixin, CareReviewM
                 if r[1] is not None:
                     by[r[0]]["provenance"].append(dict(episode=r[1], session=r[2], seq=r[3], agent=r[4], ts=r[5],
                                                        redacted=r[6]))
+        if notes:
+            items = items + await self._recall_notes(toks)
         return items
+
+    async def _recall_notes(self, toks: list, n: int = 5) -> list[dict]:
+        """Notes (episodes written ABOUT an entry or the person) that match the query, each with the path to what it is about. They are labelled as unverified and, if the
+        entry has since changed, say so. They are NOT facts and never change the record."""
+        rows = await self._q(
+            """MATCH (e:Episode)-[:ABOUT]->(t) WHERE e.redacted = false
+                 AND any(tok IN $toks WHERE toLower(e.content) CONTAINS tok OR toLower(coalesce(t.drug, t.id, '')) CONTAINS tok)
+               OPTIONAL MATCH (t)-[:FOR]->(p:Person)
+               RETURN e.id, e.content, e.agent, e.ts, e.session, labels(t)[0], t.id, t.drug, t.dose_text, t.freq_text, t.status, t.cur, p.id
+               ORDER BY e.ts DESC LIMIT $n""", {"toks": toks, "n": n}, scope="read", checked=True)
+        out = []
+        for eid, text, agent, ts, sess, lab, tid, drug, dose, freq, status, cur, person in rows:
+            if lab == "Dose":
+                desc = " ".join(x for x in (drug, dose, freq) if x)
+                changed = not cur
+                path = f"{person} -> {desc} (entry {tid}, {status}{', since changed' if changed else ''}) <- note by {agent}, unverified"
+                about = {"type": "entry", "id": tid, "drug": drug, "dose_text": dose, "freq_text": freq, "status": status, "current": bool(cur), "person": person}
+            else:
+                desc, changed, path = tid, False, f"{tid} <- note by {agent}, unverified"
+                about = {"type": "person", "id": tid}
+            out.append(dict(id=eid, kind="note", subject=desc, predicate="has an unverified note", object=text[:300], text=text, agent=agent, ts=ts,
+                            label=f"noted by {agent}, unverified" + ("; the entry it is about has since changed" if changed else ""), unverified=True,
+                            about=about, path=path, hop=1, support=1, conf=0.0, current=not changed, provenance=[dict(episode=eid, session=sess, agent=agent, ts=ts)]))
+        return out
 
     @staticmethod
     def _fact_row(r, hop: int, path: str, base: float) -> dict:

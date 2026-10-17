@@ -20,7 +20,7 @@ Content-Type: application/json
 
 | Operation | Scope | Arguments (* required) | What it does |
 |---|---|---|---|
-| `add_episode` | write | `session`*, `role`*, `content`*, `agent`, `at` | Append an immutable event to a session. Ordering (seq + NEXT edge) is assigned atomically in-graph. |
+| `add_episode` | write | `session`*, `role`*, `content`*, `agent`, `at`, `about` | Append an immutable event to a session. Ordering (seq + NEXT edge) is assigned atomically in-graph. |
 | `add_episodes` | write | `session`*, `items`*, `agent` | Append several events to one session in a single write: one authorisation, one query, and a contiguous block of sequence numbers with |
 | `assert_facts` | write | `facts`* | Assert several facts with one authorisation. Each item takes the arguments of assert_fact (subject, predicate, obj, and optionally |
 | `ingest` | write | `session`*, `role`*, `content`* | Store a message as an episode, extract facts from it, and link each fact to that episode. |
@@ -29,7 +29,7 @@ Content-Type: application/json
 | `search_episodes` | read | `query`*, `limit` |  |
 | `search_text` | read | `query`*, `limit` | Full-text search over episode content (FalkorDB full-text index, prefix match on every word, best score first). |
 | `assert_fact` | write | `subject`*, `predicate`*, `obj`*, `sources`, `conf`, `exclusive`, `valid_from`, `agent`, `at`, `inferred_from` | Create-or-reinforce a fact. `exclusive` predicates (one value at a time, e.g. 'lives_in') supersede |
-| `recall` | read | `query`*, `as_of`, `hops`, `limit`, `mode` | Entity-anchored graph recall. Every result carries its provenance (source episodes) and the graph path |
+| `recall` | read | `query`*, `as_of`, `hops`, `limit`, `mode`, `notes` | Entity-anchored graph recall. Every result carries its provenance (source episodes) and the graph path |
 | `fact_history` | read | `subject`*, `predicate`* | Full bi-temporal chain for (subject, predicate): every value ever held, oldest first. |
 | `embed_missing` | write | `limit` | Backfill vectors for current facts that have none (e.g. after enabling embeddings on an existing graph). |
 | `forget_fact` | write | `fact_id`*, `reason`*, `redact_sources` | Retract a fact: close it, blank its content, drop its links, leave a tombstone with the reason. |
@@ -96,8 +96,9 @@ Content-Type: application/json
 | `care_watch` | write | `person`*, `drug`*, `on` |  |
 | `care_watched` | read | `person`* |  |
 | `care_witness` | write | `person`*, `drug`*, `slot`* | A carer other than the one who gave the dose confirms they saw it given. Idempotent for the same witness; refused for the giver. |
-| `care_handover` | write | `person`*, `text`* |  |
+| `care_handover` | write | `person`*, `text`*, `about` |  |
 | `care_handovers` | read | `person`*, `limit` |  |
+| `care_entry_notes` | read | `dose_id`* | The notes written about one entry: by agents (labelled "noted by <agent>, unverified") and handover notes addressed to it. They sit beside the entry and are |
 | `care_sole_knowers` | read | `person`* | For each medicine on record, who knows about its current entry (the carer who recorded it plus everyone who acknowledged it). An entry known |
 | `care_hubs` | read | `person`* | Graph-algorithm views: which medicines sit in most hazards within this regimen, and the PageRank hubs of the reference graph |
 | `care_graph` | read | `person`*, `include_history`, `now` | The circle as a graph: nodes and edges, each with plain-language metadata (read scope). |

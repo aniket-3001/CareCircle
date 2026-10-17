@@ -88,6 +88,8 @@ export const HI_MORE: Record<string, string> = {
   'Saved under the brand': 'इस ब्रांड नाम से सहेजा गया',
   'A second brand of the same medicine is then kept as a separate entry and flagged as a possible duplicate, not written over this one.': 'उसी दवा का दूसरा ब्रांड तब अलग प्रविष्टि के रूप में रखा जाता है और संभावित दोहरे के रूप में चिह्नित होता है, इसे बदला नहीं जाता।',
   'recorded as the plain medicine': 'सामान्य दवा के रूप में दर्ज',
+  'Notes about this entry': 'इस प्रविष्टि के बारे में टिप्पणियाँ', 'the entry has changed since': 'इसके बाद प्रविष्टि बदल गई है', 'Handover note from': 'हस्तांतरण टिप्पणी, भेजने वाला', 'Noted by': 'द्वारा नोट किया गया', 'unverified': 'असत्यापित',
+  'Notes are not part of the record: an agent’s note is not confirmed by anyone and changes no dose, flag or history.': 'टिप्पणियाँ रिकॉर्ड का हिस्सा नहीं हैं: किसी एजेंट की टिप्पणी की किसी ने पुष्टि नहीं की है और वह कोई खुराक, चेतावनी या इतिहास नहीं बदलती।',
   'This is a combination product.': 'यह एक संयुक्त (कॉम्बिनेशन) दवा है।', 'usually contains': 'में आम तौर पर होता है', 'printed strength': 'छपी हुई मात्रा',
   'Each ingredient is saved on its own, so confirm each one. From a hand-written list: check the pack.': 'हर घटक अलग से सहेजा जाता है, इसलिए हर एक की पुष्टि करें। यह हाथ से लिखी सूची से है: पैक देख लें।',
   'not checked': 'जाँचा नहीं गया', 'Another medicine: type its name': 'कोई और दवा: उसका नाम लिखें', 'Medicine name': 'दवा का नाम',

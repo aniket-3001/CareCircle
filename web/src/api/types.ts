@@ -447,3 +447,13 @@ export interface Visit {
   allergy_hits: AllergyCheck['hits'];
   regimen: RegimenEntry[];
 }
+
+/** What was written ABOUT an entry: by agents ("noted by <agent>, unverified") and handover notes. Never part of the record itself. */
+export interface EntryNotes {
+  dose_id: string;
+  drug: string;
+  status: string;
+  stale: boolean;
+  notes: { id: string; kind: 'agent_note' | 'handover'; text: string; by: string; at: number; label: string }[];
+  note: string;
+}

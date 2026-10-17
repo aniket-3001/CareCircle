@@ -41,14 +41,33 @@ class CareCustodyMixin:
         await self._q("MATCH (g:Give {key:$k}) SET g.witness=$me, g.witness_at=$t", {"k": key, "me": me, "t": now_ms()})
         return {"witnessed": True, "by": me}
 
-    async def care_handover(self, person: str, text: str) -> dict:
+    async def care_entry_notes(self, dose_id: str) -> dict:
+        """The notes written about one entry: by agents (labelled "noted by <agent>, unverified") and handover notes addressed to it. They sit beside the entry and are
+        NOT part of the record: they never change a dose, a flag, the checklist or the history log. `stale` says the entry has changed since they were written."""
+        head = await self._q("MATCH (x:Dose {id:$id}) RETURN x.cur, x.status, x.drug", {"id": dose_id}, scope="read")
+        if not head:
+            raise KeyError(dose_id)
+        cur, status, drug = head[0]
+        notes = [dict(id=r[0], kind="agent_note", text=r[1], by=r[2], at=r[3], label=f"noted by {r[2]}, unverified")
+                 for r in await self._q("MATCH (e:Episode)-[:ABOUT]->(:Dose {id:$id}) WHERE e.redacted = false RETURN e.id, e.content, e.agent, e.ts", {"id": dose_id}, scope="read")]
+        notes += [dict(id=r[0], kind="handover", text=r[1], by=r[2], at=r[3], label=f"handover note from {r[2]}")
+                  for r in await self._q("MATCH (h:Handover)-[:ABOUT]->(:Dose {id:$id}) RETURN h.id, h.text, h.by, h.at", {"id": dose_id}, scope="read")]
+        notes.sort(key=lambda n: n["at"])
+        return {"dose_id": dose_id, "drug": drug, "status": status, "stale": not bool(cur), "notes": notes,
+                "note": "Notes are written about this entry by agents and carers. They are not part of the record: they do not change a dose, a flag or the history, and an agent's note is not confirmed by anyone."}
+
+    async def care_handover(self, person: str, text: str, about: str = "") -> dict:
         from .textcheck import fit
         text = fit(text, 400, "a handover note")
         if not text:
             raise ValueError("a handover note needs some text")
         hid = new_id("hand")
+        if about and not await self._q("MATCH (x:Dose {id:$a})-[:FOR]->(:Person {id:$p}) RETURN x.id", {"a": about, "p": norm(person)}, scope="read", checked=True):
+            raise ValueError("a handover note can be about an entry of this person; no such entry here")
         await self._q("CREATE (:Handover {id:$id, person:$p, text:$t, by:$by, at:$at})", {"id": hid, "p": norm(person), "t": text, "by": norm(self.agent), "at": now_ms()})
-        return {"id": hid}
+        if about:                                               # the note is attached to the entry it is about, so the next carer who opens the entry sees it
+            await self._q("MATCH (h:Handover {id:$id}), (x:Dose {id:$a}) CREATE (h)-[:ABOUT]->(x)", {"id": hid, "a": about}, checked=True)
+        return {"id": hid, **({"about": about} if about else {})}
 
     async def care_handovers(self, person: str, limit: int = 30) -> list[dict]:
         rows = await self._q("MATCH (h:Handover {person:$p}) RETURN h.id, h.text, h.by, h.at ORDER BY h.at DESC LIMIT $n", {"p": norm(person), "n": max(1, min(int(limit), 200))}, scope="read")
