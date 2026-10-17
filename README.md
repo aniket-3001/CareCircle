@@ -4,7 +4,7 @@
 
 # Care Circle
 
-**One shared, verified memory of a loved one's medicines, for the family who look after them.** *Graph Hacks 2026 (WeMakeDevs x FalkorDB), Track 02: Agent Memory & Coordination.*
+**Closing the loop, for the family who look after a loved one and the agents that work beside them.** One shared memory of their medicines: what is on record, who has seen each change, and what an agent noted about it. *Graph Hacks 2026 (WeMakeDevs x FalkorDB), Track 02: Agent Memory & Coordination.*
 
 It is 9 pm. Ravi has just changed his mother's warfarin dose by phone. His sister Meena is on the night shift and has not seen it. Tomorrow a pharmacist adds an antibiotic that interacts with it, and nobody holds the whole picture. Care Circle keeps that picture in one FalkorDB graph: carers add a medicine by **photo, voice note, PDF/Word or text** (web app or Telegram), and the circle knows what is on record, **who has seen each change**, which entries **interact** according to public sources, and which dose slots are **already given**.
 
@@ -18,13 +18,23 @@ Live: **https://3-228-70-117.sslip.io** (press **Start a demo circle**) · The s
 
 A cardiologist writes **Telma-AM** (telmisartan with amlodipine). A second doctor, months later, writes plain **amlodipine** for the ankle swelling. On the shelf they are two boxes; in the body it is amlodipine twice. Care Circle reads the Telma-AM line as *two* ingredients (a hand-written brand list, marked unverified, with "check the pack"), keeps the plain amlodipine as its own entry, and shows both under the same ingredient: "this may be the same medicine from two sources", with who recorded each and the quoted line. It says nothing about what to do. (Browser scenario U14 walks it; `tests/test_duplicates.py` holds the rule.)
 
+## Handoffs without the hand-wringing (the Track 02 demo, 60 seconds)
+
+At night, one agent records a dose change and writes a **note about that entry** (why it changed). In the morning a **different agent, with its own key, in a new session**, asks what it knows about warfarin and gets the note back **with the path to the entry**. Before acting it checks who has not seen the change: Meena has not, so it **holds off** until she presses "I have seen this", then proceeds and attaches its own note. The notes never change a dose, a flag or the history; they are labelled *"noted by night-agent, unverified"*.
+
+```bash
+python scripts/agent_memory_demo.py --url http://localhost:8099 --admin-key ADMIN      # two real MCP clients, two keys, one throwaway circle
+```
+
+The same story runs in CI (`tests/test_agent_memory_demo.py`). The helper that answers carers reads its own conversation too: "and what about Ravi?" and "why is the second one flagged?" are read against what it just said, and when it cannot tell which one is meant it asks.
+
 ## Why it is different
 
 - **It does the daily job.** "Twice daily" becomes suggested clock times a person confirms; **Today** lists each slot, who gave it, and a second carer who taps the same slot is told who got there first.
 - **One memory for the whole circle**, not a chat per person: what is on record now, what it replaced, which carer has not yet seen the change.
 - **Every flag shows its work**: the source (DDInter 2.0 or the FDA table), the graph edge, and the exact line of the photo or voice note. An unrated pair is shown *unrated*, never "safe".
 - **Code decides, AI only structures.** A model may turn OCR text into *proposed* fields; each quote must appear in the text that was read, and nothing reaches the regimen until a person confirms it. The photo itself is never sent to a model.
-- **Agents can use the same memory**: MCP, LangChain and LlamaIndex tools, and graph algorithms on a circle's graph, with the same keys and read-only checks.
+- **Agents can use the same memory**: MCP, LangChain and LlamaIndex tools, and graph algorithms on a circle's graph, with the same keys and read-only checks. An agent's note about an entry sits beside it, labelled unverified, and can never rewrite what a carer confirmed.
 
 ![Add screen: the text read from a sample label, the quoted line with a "quote verified" badge, and the proposed entry to confirm](docs/img/ui-add.png)
 

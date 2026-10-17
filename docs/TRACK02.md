@@ -2,7 +2,18 @@
 
 The brief: *build agents that remember across sessions and share state with each other. Memory should persist, update over time, and be available to every agent that needs it.*
 
-Care Circle is the product built on this. The memory engine under it (`graphmem/`) is generic: any agent can use it over HTTP (`docs/API.md`) or MCP, and Care Circle's carers, helper and Telegram bot are agents of the same kind.
+Care Circle is the product built on this. The memory engine under it (`graphmem/`) is generic: any agent can use it over HTTP (`docs/API.md`) or MCP.
+
+## Where the engine and the care record meet (added after the round 3 review)
+
+The review's diagnosis was fair: the engine fitted the brief, but the product's own agents did not use it. What changed:
+
+- **The helper remembers its conversation.** Each answer stores what it was about and the order it listed things; the next question is read against it ("and what about Ravi?", "why is the second one flagged?"). When a reference cannot be resolved it asks which one; it never guesses and never asks the model to. The no-advice check applies to every follow-up. (`tests/test_helper_memory.py`)
+- **Agent memory is joined to the care record.** `add_episode` / MCP `remember` take `about` (an entry or the person of this circle; checked first). The note is an ABOUT edge from an episode, labelled "noted by <agent>, unverified", shown beside the entry, and returned by `recall` with the path to the entry. It cannot change a dose, a flag, the checklist or the history log (a test compares the whole record before and after), and erasing the entry redacts it. Handover notes attach to entries the same way. (`tests/test_agent_notes.py`)
+- **One demo shows an agent remembering and a second agent holding off** until the carer it affects has seen the change (`scripts/agent_memory_demo.py`, run in CI as `tests/test_agent_memory_demo.py`).
+- **Agents cannot use up shared state.** Claiming reminders needs the owner's right; everyone else reads them with `care_reminders`. (`tests/test_scope_enforced.py`)
+
+What is genuinely this project's, and what is not: episodes, facts with validity times, skills, handoffs and grants are what any agent-memory library does (Graphiti, Zep and Mem0 among them); the engine is not claimed as new. What is specific here is the care coordination built on it: who has seen what, one claim per dose slot (and per tablet), reminders that are delivered or handed back, and notes that sit beside a human-confirmed record without ever rewriting it.
 
 Everything below is checked by `tests/test_track02.py` (18 tests, one section per bullet, driven over the public HTTP API like an outside agent) and `bench/track02_stress.py` (load plus an audit of what was stored). Both run in CI or by hand.
 
@@ -15,7 +26,7 @@ Everything below is checked by `tests/test_track02.py` (18 tests, one section pe
 | **Persistent conversation history** | Sessions live in FalkorDB, not in a process: a fresh server and database client read the same history, numbering continues, long histories page backwards. Care Circle's helper chat is stored per carer, survives a restart, and can be cleared. | `history(before_seq)`, `care_chat_*` | `test_2`, `test_2b` |
 | **Shared state between agents** | Agents granted on a tenant read and write the same graph, so what one learns is available to the next, with who wrote it. A fork lets an agent explore on a copy and merge or discard; a space lets tenants publish chosen facts to others. | `recall`, forks (`/v1/tenants/{t}/forks`), spaces | `test_3a`, `test_3c` |
 | **Handoffs** | A task is created, claimed (one owner), handed to a named agent with a note and a plan, accepted only by that agent, resumed with the whole context in one call, and completed. A plan remembers which facts it was derived from, so when one changes the plan is reported out of date. | `create_task`, `claim_task`, `handoff`, `accept`, `resume`, `complete`, `create_plan`, `check_plan` | `test_3b` |
-| **High-concurrency reads and writes** | One conditional write per claim (a single winner however many race); sequence numbers assigned inside the database in one statement; reads run on the read path while writes land; FalkorDB's own unique constraints back it up; a full queue is retried with backoff and then answered 503, never dropped. | `graphmem/db.py` (`RetryingGraph`), the queries in `memory.py` | `test_4a` to `test_4e`, `bench/track02_stress.py` |
+| **High-concurrency reads and writes** | One conditional write per claim (a single winner however many race; ticking a combination tablet is one claim over all its ingredients, with the same guarantee); sequence numbers assigned inside the database in one statement; reads run on the read path while writes land; FalkorDB's own unique constraints back it up; a full queue is retried with backoff and then answered 503, never dropped. | `graphmem/db.py` (`RetryingGraph`), the queries in `memory.py` | `test_4a` to `test_4e`, `bench/track02_stress.py` |
 | **Separate memory per user or tenant** | One graph per tenant (`mem__<id>`), per circle in Care Circle. Every call checks the agent's grant and scope; read scope can run as a database user that may only call `GRAPH.RO_QUERY`; keys are stored only as hashes; revocation applies on the next call; deleting a tenant drops its graph. Public reference data is a separate graph that holds nobody's data. | `graphmem/policy.py`, `docs/API.md` | `test_5a` to `test_5d`, `tests/test_adversarial.py` |
 
 ## Misuse is refused, not stored
@@ -44,7 +55,7 @@ In-process against a local FalkorDB (no network), laptop, Windows + Docker Deskt
 | 30 agents, 30 tenants | 477 | 296 | 531 | 486 | all pass |
 | 150 agents, 50 tenants | 427 | 285 | 532 | 489 | all pass |
 
-Against the **live server** (`https://3-228-70-117.sslip.io`, a t3.large, called from India so about 300 ms of each request is network): 40 agents and 20 tenants, all four audits pass with no request errors. The throwaway tenants and agents were removed afterwards.
+A run of this script against the live server is **not** a result to cite: it ran on 17 October against the production database and caused the outage written up in `docs/FALKORDB_CRASH.md`, and the script now refuses any server that is not this machine unless told it is disposable.
 
 Latency under contention (150 agents all writing one session, local): median 130 ms, but the slowest 5 per cent of `add_episode` calls wait about 2 s, because FalkorDB runs one writer at a time per graph and a hot session is one graph. A single engine-level writer sustains about 780 `add_episode` per second into one session. `assert_fact` and reads on the same tenant stay near their median. With a realistic number of agents (30) the p99 is about 140 ms.
 
