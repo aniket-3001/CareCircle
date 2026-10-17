@@ -26,8 +26,10 @@ class CareConsentMixin:
         note = fit(note, 200, "the note")
         person = await self._known_person(person)
         cid = new_id("cons")
+        last = (await self._q("MATCH (c:Consent)-[:FOR]->(:Person {id:$p}) RETURN max(c.at)", {"p": norm(person)}, scope="read"))[0][0] or 0
+        at = max(now_ms(), int(last) + 1)                     # strictly later than the one before it, so "newest wins" never depends on the clock's resolution
         await self._q("MATCH (p:Person {id:$p}) CREATE (:Consent {id:$id, status:$s, who:$w, note:$n, by:$by, at:$t})-[:FOR]->(p)",
-                      {"p": norm(person), "id": cid, "s": status, "w": who, "n": note, "by": norm(self.agent), "t": now_ms()})
+                      {"p": norm(person), "id": cid, "s": status, "w": who, "n": note, "by": norm(self.agent), "t": at})
         return {"id": cid, "status": status}
 
     async def care_consent(self, person: str) -> dict:
