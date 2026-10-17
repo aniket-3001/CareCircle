@@ -96,9 +96,11 @@ Content-Type: application/json
 | `care_watch` | write | `person`*, `drug`*, `on` |  |
 | `care_watched` | read | `person`* |  |
 | `care_witness` | write | `person`*, `drug`*, `slot`* | A carer other than the one who gave the dose confirms they saw it given. Idempotent for the same witness; refused for the giver. |
-| `care_handover` | write | `person`*, `text`*, `about` |  |
+| `care_handover` | write | `person`*, `text`*, `about`, `to` | A note from this carer to the next. `about` attaches it to the entry it concerns (the next carer who opens the entry sees it). `to` addresses it to one named |
+| `care_handover_accept` | write | `handover_id`* | The carer a note was addressed to accepts it. Only that carer can; accepting twice changes nothing. It records who accepted and when, and says whether the entry |
 | `care_handovers` | read | `person`*, `limit` |  |
 | `care_entry_notes` | read | `dose_id`* | The notes written about one entry: by agents (labelled "noted by <agent>, unverified") and handover notes addressed to it. They sit beside the entry and are |
+| `care_reminders_sent` | read | `person`*, `limit` | The reminders that really went out for this person, newest first: who was told, about what, when and through which channel. A reminder that was claimed but |
 | `care_sole_knowers` | read | `person`* | For each medicine on record, who knows about its current entry (the carer who recorded it plus everyone who acknowledged it). An entry known |
 | `care_hubs` | read | `person`* | Graph-algorithm views: which medicines sit in most hazards within this regimen, and the PageRank hubs of the reference graph |
 | `care_graph` | read | `person`*, `include_history`, `now` | The circle as a graph: nodes and edges, each with plain-language metadata (read scope). |

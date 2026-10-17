@@ -244,7 +244,14 @@ export interface Counts {
   coverage: { statement: string; rated: number; unrated: number; not_listed: number; pairs_possible: number };
   note: string;
 }
-export interface Handover { id: string; text: string; by: string; at: number }
+export interface Handover {
+  id: string; text: string; by: string; at: number;
+  /** The carer it is addressed to, whether it is still waiting ('open'), accepted, or just a note for whoever is next; and whether the entry it is about has changed since. */
+  to: string | null; status: 'note' | 'open' | 'accepted'; accepted_by: string | null; accepted_at: number | null;
+  about: string | null; about_drug: string | null; stale: boolean;
+  /** Addressed to the carer who is looking. */
+  for_me: boolean;
+}
 export interface GiveRecord {
   witness?: string | null;
   needs_second_carer?: boolean;
@@ -353,6 +360,8 @@ export interface FhirBundle {
 export interface People {
   patients: string[];
   carers: string[];
+  /** The agent id of the carer who is looking. */
+  you?: string;
 }
 
 // ---- accounts, circles, assistant

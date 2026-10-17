@@ -764,5 +764,50 @@ def u21(w, b, r):
     ctx.close()
 
 
+@scenario("U22", "A handoff: one carer writes a note about an entry and addresses it to the other, who accepts it; a change to the entry marks the note")
+def u22(w, b, r):
+    errs = []
+    pe, oe = f"u22p-{rid()}@scenario.test", f"u22o-{rid()}@scenario.test"
+    ctxp, pp = new_page(b, errs=errs)
+    ui_signup(pp, "Pia", pe)
+    ui_circle(pp)
+    pu = api_user(w, pe)
+    c = circle_of(pu)
+    ctxo, po = new_page(b, errs=errs)
+    ui_signup(po, "Ola", oe)
+    expect(po.get_by_text("Set up your first circle")).to_be_visible()
+    ou = api_user(w, oe)
+    w.join(pu, c, ou)
+    e = pu.ok(c, "care_record", person="mum", drug="warfarin", dose_text="5 mg", freq_text="at bedtime")
+    ou.ok(c, "care_ack", dose_id=e["id"])                                                       # Ola has acted, so she is a carer in the record
+    pp.goto(f"{BASE}/#/circle")
+    pp.reload()
+    tab(pp, "Circle")
+    pp.get_by_test_id("handover").wait_for(timeout=20000)
+    pp.get_by_label("Write a note for the next carer").fill("The warfarin dose went down tonight")
+    pp.get_by_test_id("handover-about").select_option(value=e["id"])
+    pp.get_by_test_id("handover-to").select_option(index=1)
+    pp.get_by_test_id("handover-add").click()
+    row = pp.get_by_test_id("handover-row").first
+    expect(row).to_contain_text("waiting to be accepted", timeout=15000)
+    r.check("Warfarin" in row.inner_text(), "the note shows which entry it is about and who it is for", row.inner_text())
+    po.goto(f"{BASE}/#/circle")
+    po.reload()
+    tab(po, "Circle")
+    po.get_by_test_id("handover-accept").wait_for(timeout=20000)
+    r.check(pp.get_by_test_id("handover-accept").count() == 0, "the sender is not offered an Accept button")
+    po.get_by_test_id("handover-accept").click()
+    expect(po.get_by_test_id("handover-row").first).to_contain_text("accepted by", timeout=15000)
+    r.check(po.get_by_test_id("handover-accept").count() == 0, "after accepting, the button is gone")
+    pu.ok(c, "care_record", person="mum", drug="warfarin", dose_text="3 mg", freq_text="at bedtime")        # the entry the note is about changes
+    pp.reload()
+    tab(pp, "Circle")
+    expect(pp.get_by_test_id("handover-row").first).to_contain_text("the entry has changed since", timeout=15000)
+    r.check(True, "once the entry changes, the note says so")
+    r.check(not [x for x in errs if x.startswith("pageerror")], "no errors in either browser", errs[:3])
+    ctxp.close()
+    ctxo.close()
+
+
 if __name__ == "__main__":
     sys.exit(1 if main() else 0)

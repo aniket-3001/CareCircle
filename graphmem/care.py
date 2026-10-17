@@ -598,7 +598,7 @@ class CareMixin:
     async def care_people(self) -> dict:
         """Patients and carers known in this circle."""
         rows = await self._q("MATCH (p:Person) RETURN p.id, p.role ORDER BY p.role, p.id", scope="read")
-        return {"patients": [r[0] for r in rows if r[1] == "patient"], "carers": [r[0] for r in rows if r[1] == "carer"]}
+        return {"patients": [r[0] for r in rows if r[1] == "patient"], "carers": [r[0] for r in rows if r[1] == "carer"], "you": norm(self.agent)}
 
     async def care_hubs(self, person: str) -> dict:
         """Graph-algorithm views: which medicines sit in most hazards within this regimen, and the PageRank hubs of the reference graph
