@@ -80,7 +80,7 @@ class Reminders:
 
     async def _send(self, mem, n: dict, members: set, chats: dict, webpush) -> int:
         text = n["message"]["text"]
-        got, tried, failed = 0, 0, 0
+        got, tried, failed, via = 0, 0, 0, []
         for chat in chats.get(n["notify"], []):
             if self.send_chat is None:
                 continue
@@ -88,6 +88,7 @@ class Reminders:
             try:
                 await self.send_chat(chat, text)
                 got += 1
+                via.append("telegram")
             except Exception as e:
                 failed += 1
                 print("reminder send error", type(e).__name__, flush=True)
@@ -97,12 +98,18 @@ class Reminders:
                 try:
                     r = await webpush.push_status(self.gm, agent, text)
                     got += r["sent"]
+                    via += ["browser"] * r["sent"]
                     failed += r["failed"]                           # a 503 or a timeout is a failure to retry; a device that is gone, or none allowed, is "nowhere to go"
                 except Exception as e:
                     failed += 1
                     print("reminder push error", type(e).__name__, flush=True)
         if got == 0 and failed > 0 and n.get("claim"):
             await mem.care_nudge_release(n["claim"], MAX_TRIES)     # every attempt failed: hand the reminder back so the next pass sends it
+        if got > 0:
+            try:
+                await mem.care_reminder_logged(n, via)               # it went out: keep that, so "has Meena been reminded?" has an answer
+            except Exception as e:                                   # never let the log stop a delivery
+                print("reminder log error", type(e).__name__, flush=True)
         return got
 
     async def _next_wake(self, mem, t: int) -> int:

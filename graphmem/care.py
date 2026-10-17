@@ -388,7 +388,7 @@ class CareMixin:
                         tpl = (f"{carer.split(chr(45))[0].capitalize()} has not yet seen the change to {u['drug']} made {u['age_hours']} hours ago. "
                                "Please check with them.") if kind == "escalate" else (
                                f"The change to {u['drug']} made {u['age_hours']} hours ago is not yet acknowledged. Please open it and confirm.")
-                        sent.append({"kind": kind, "about_carer": carer, "notify": to, "drug": u["drug"], "age_hours": u["age_hours"],
+                        sent.append({"kind": kind, "about_carer": carer, "notify": to, "drug": u["drug"], "age_hours": u["age_hours"], "dose": u["dose"], "person": norm(person),
                                      "message": reword(tpl, facts), "claim": key})
         return sent
 

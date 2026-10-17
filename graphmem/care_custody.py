@@ -53,7 +53,9 @@ class CareCustodyMixin:
         notes += [dict(id=r[0], kind="handover", text=r[1], by=r[2], at=r[3], label=f"handover note from {r[2]}")
                   for r in await self._q("MATCH (h:Handover)-[:ABOUT]->(:Dose {id:$id}) RETURN h.id, h.text, h.by, h.at", {"id": dose_id}, scope="read")]
         notes.sort(key=lambda n: n["at"])
-        return {"dose_id": dose_id, "drug": drug, "status": status, "stale": not bool(cur), "notes": notes,
+        reminders = [dict(id=r[0], kind=r[1], to=r[2], at=r[3], channels=list(r[4] or []))
+                     for r in await self._q("MATCH (r:Reminder)-[:ABOUT]->(:Dose {id:$id}) RETURN r.id, r.kind, r.to, r.at, r.channels ORDER BY r.at", {"id": dose_id}, scope="read")]
+        return {"dose_id": dose_id, "drug": drug, "status": status, "stale": not bool(cur), "notes": notes, "reminders": reminders,
                 "note": "Notes are written about this entry by agents and carers. They are not part of the record: they do not change a dose, a flag or the history, and an agent's note is not confirmed by anyone."}
 
     async def care_handover(self, person: str, text: str, about: str = "") -> dict:

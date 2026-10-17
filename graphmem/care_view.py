@@ -301,6 +301,7 @@ class CareViewMixin:
         rid, t = new_id("rcpt"), now_ms()
         await self._q("MATCH (e)-[:ABOUT]->(:Dose {id:$id}) WHERE e.content IS NOT NULL SET e.content='[removed]', e.redacted=true", {"id": dose_id})       # what was written about it goes with it
         await self._q("MATCH (h:Handover)-[:ABOUT]->(:Dose {id:$id}) DETACH DELETE h", {"id": dose_id})
+        await self._q("MATCH (r:Reminder)-[:ABOUT]->(:Dose {id:$id}) DETACH DELETE r", {"id": dose_id})
         await self._q("MATCH (x:Dose {id:$id}) OPTIONAL MATCH (n:Nudge) WHERE n.key CONTAINS $id DETACH DELETE n, x", {"id": dose_id})
         await self._q("CREATE (:Receipt {id:$r, kind:'dose', hash:$h, at:$t, by:$by, reason:$why, removed:'dose, quote, links, acknowledgements', kdf:$kdf})",
                       {"r": rid, "h": digest, "t": t, "by": norm(self.agent), "why": reason[:200], "kdf": kdf})
@@ -359,6 +360,7 @@ class CareViewMixin:
             await self._q("UNWIND $ids AS i MATCH (n:Nudge) WHERE n.key CONTAINS i DELETE n", {"ids": ids})
             await self._q("MATCH (e)-[:ABOUT]->(:Dose)-[:FOR]->(:Person {id:$p}) WHERE e.content IS NOT NULL SET e.content='[removed]', e.redacted=true", {"p": p})
         await self._q("MATCH (e)-[:ABOUT]->(:Person {id:$p}) WHERE e.content IS NOT NULL SET e.content='[removed]', e.redacted=true", {"p": p})
+        await self._q("MATCH (r:Reminder {person:$p}) DETACH DELETE r", {"p": p})
         await self._q("MATCH (x:Dose)-[:FOR]->(:Person {id:$p}) DETACH DELETE x", {"p": p})
         await self._q("MATCH (pr:Product {person:$p}) DETACH DELETE pr", {"p": p})                       # the tablets go with the person
         await self._q("MATCH (q:Person {id:$p, role:'patient'}) DETACH DELETE q", {"p": p})

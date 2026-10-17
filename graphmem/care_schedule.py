@@ -14,7 +14,7 @@ from typing import Optional
 
 from carecircle import schedule as sched
 
-from .db import norm, now_ms
+from .db import new_id, norm, now_ms
 from .textcheck import product_name, shown_name
 
 DEFAULT_TZ = "Asia/Kolkata"            # used until a circle sets its own; the web app sets it from the browser on first use
@@ -307,6 +307,25 @@ class CareScheduleMixin:
                 "ingredients": names, "already": already, "note": note}
 
     # ------------------------------------------------------------------ reminders about the checklist
+    async def care_reminder_logged(self, n: dict, channels: list) -> None:
+        """Keep a record that a reminder really went out: who was told, about which entry, when, and through what. Written by the delivery loop only (not an operation a
+        caller can reach), so the helper can answer "has Meena been reminded?" and an entry can show the reminders sent about it."""
+        if self._guard:
+            await self._guard("write")
+        rid = new_id("rem")
+        await self._q("CREATE (:Reminder {id:$id, kind:$k, to:$to, about_carer:$ab, drug:$d, person:$p, dose:$ds, at:$t, channels:$ch, text:$tx})",
+                      {"id": rid, "k": n.get("kind", ""), "to": norm(n.get("notify", "")), "ab": norm(n.get("about_carer", "")), "d": n.get("drug", ""), "p": n.get("person", ""),
+                       "ds": n.get("dose", ""), "t": now_ms(), "ch": sorted(set(channels)), "tx": (n.get("message") or {}).get("text", "")[:300]}, checked=True)
+        if n.get("dose"):
+            await self._q("MATCH (r:Reminder {id:$id}), (x:Dose {id:$ds}) CREATE (r)-[:ABOUT]->(x)", {"id": rid, "ds": n["dose"]}, checked=True)
+
+    async def care_reminders_sent(self, person: str, limit: int = 30) -> list[dict]:
+        """The reminders that really went out for this person, newest first: who was told, about what, when and through which channel. A reminder that was claimed but
+        never delivered is not here."""
+        rows = await self._q("MATCH (r:Reminder {person:$p}) RETURN r.id, r.kind, r.to, r.about_carer, r.drug, r.dose, r.at, r.channels, r.text ORDER BY r.at DESC LIMIT $n",
+                             {"p": norm(person), "n": max(1, min(int(limit), 200))}, scope="read")
+        return [dict(id=r[0], kind=r[1], to=r[2], about_carer=r[3], drug=r[4], dose=r[5], at=r[6], channels=list(r[7] or []), text=r[8]) for r in rows]
+
     async def care_slot_edges(self, person: str, now: Optional[int] = None) -> list[int]:
         """The moments today and tomorrow when a dose slot changes state (an hour before it, at it, 90 minutes after it): when a reminder could next be due.
         Used by the delivery loop to leave a quiet circle alone until then."""
@@ -357,5 +376,5 @@ class CareScheduleMixin:
                     continue
                 what = f"{product_name(i['label']) if i.get('label') else shown_name(i['drug'])} {i['dose_text']}".strip()
                 text = (f"{what}, {i['time']}: due now." if i["state"] == "due" else f"{what}, {i['time']}: not marked as given yet. Please check with the others and mark it if it was given.")
-                out.append({"kind": "slot_" + i["state"], "notify": c, "drug": i["drug"], "slot": i["slot"], "claim": key, "message": {"text": text, "source": "template"}})
+                out.append({"kind": "slot_" + i["state"], "notify": c, "drug": i["drug"], "slot": i["slot"], "claim": key, "dose": i["dose_id"], "person": norm(person), "message": {"text": text, "source": "template"}})
         return out

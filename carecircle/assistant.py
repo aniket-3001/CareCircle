@@ -110,11 +110,30 @@ class Facts:
 
 
 async def gather(mem, person: str, now: int) -> Facts:
-    check, div, tl, gives, people, sole = await asyncio.gather(mem.care_check(person), mem.care_divergence(person, now), mem.care_timeline(person, limit=12, now=now),
-                                                               mem.care_gives(person, limit=10), mem.care_people(), mem.care_sole_knowers(person))
+    check, div, tl, gives, people, sole, sent = await asyncio.gather(mem.care_check(person), mem.care_divergence(person, now), mem.care_timeline(person, limit=12, now=now),
+                                                                    mem.care_gives(person, limit=10), mem.care_people(), mem.care_sole_knowers(person), mem.care_reminders_sent(person, limit=20))
     f = Facts(person, now, check, div, tl, gives, people)
     f.sole = sole
+    f.sent = sent
     return f
+
+
+REMINDED = re.compile(r"\b(remind\w*|nudge\w*|notif\w*|told|alerted|pinged|why did i get|who was (told|reminded)|reminders?)\b", re.I)
+
+
+def _a_reminded(f: Facts, q: str) -> str:
+    """What the reminder log holds: reminders that really went out, who was told, about which medicine, when, and through what. A reminder that was only due is not here."""
+    sent = getattr(f, "sent", None) or []
+    low = q.lower()
+    carer = next((c for c in f.div["carers"] if _who(c).lower() in low or c.split("-")[0].lower() in low), None)
+    drug = next((r["drug"] for r in f.regimen if r["drug"] in low), None)
+    rows = [s for s in sent if (not carer or s["to"] == carer.lower()) and (not drug or s["drug"] == drug)]
+    if not rows:
+        who = f" to {_who(carer)}" if carer else ""
+        return f"No reminder{who} has gone out yet for this record." + (" A reminder is only counted once it was delivered by Telegram or in a browser." if sent == [] else "")
+    shown = rows[:4]
+    return ("Reminders that went out: " + "; ".join(f"{_who(s['to'])} was told about {_title(s['drug']) or 'a dose'} ({_ago(s['at'], f.now)}, by {' and '.join(sorted(set(s['channels']))) or 'the app'})" for s in shown)
+            + (f"; {len(rows) - len(shown)} more" if len(rows) > len(shown) else "") + ".")
 
 
 SOLE = re.compile(r"\b(only (one|\w+) (carer )?(who )?knows?|who alone|single point|sole(ly)? (knows|aware)|nobody else (knows|has been told))\b", re.I)
@@ -334,6 +353,8 @@ def _ask_plain(question: str, facts: Facts, checker, generate=None, lang: str = 
                                f"The published label for {_title(about)} (what its maker or regulator wrote, not advice for her) is behind the book icon next to it on Today, with a link to the full label."),
                     "source": "refusal", "links": [{"tab": "today", "label": "Open Today"}]}
         return {"answer": REFUSAL, "source": "refusal", "links": []}
+    if REMINDED.search(q) and not UNSEEN.search(q):
+        return {"answer": _a_reminded(facts, q), "source": "rules", "links": [{"tab": "circle", "label": "Open Circle"}]}
     drug = next((r["drug"] for r in facts.regimen if r["drug"] in low), None)
     if sum(1 for r in facts.regimen if r["drug"] in low) >= 2 and FLAGS.search(q) and not (UNSEEN.search(q) or DOSES.search(q)):
         return {"answer": _a_flags(facts, q), "source": "rules", "links": [{"tab": "today", "label": "Open Today"}, {"tab": "graph", "label": "Open Graph"}]}        # a pair: its flag, not one medicine's
