@@ -74,3 +74,50 @@ async def test_a_receipt_is_keyed_so_a_guessed_line_cannot_be_checked_by_hashing
     assert same["matches"] is True and other["matches"] is False
     with pytest.raises(PermissionDenied):
         await b.care_receipt_check(out["receipt"], drug="warfarin")                      # only the owner may test guesses
+
+
+SECRET = "s" * 40
+
+
+async def test_with_a_server_secret_the_receipt_key_is_not_in_the_graph_at_all(gm, monkeypatch):
+    """The per-circle key lived in the same graph as the receipts, so a backup of the graph held both and a guessed line could be tried offline. With a server
+    secret the key is derived from it and the circle's id, and nothing key-like is written to the graph."""
+    monkeypatch.setenv("CC_RECEIPT_SECRET", SECRET)
+    t, owner, a, b = await circle(gm)
+    e = await a.care_record("asha", "warfarin", dose_text="5 mg", freq_text="bedtime", source_type="typed", at=1_000_000)
+    out = await owner.care_forget(e["id"], reason="entered twice")
+    assert (await owner._q("MATCH (s:Setting {key:'receipt_key'}) RETURN count(s)", scope="read"))[0][0] == 0
+    assert (await owner.care_receipts())[0]["keyed_by"] == "server"
+    args = dict(drug="warfarin", dose_text="5 mg", freq_text="bedtime", quote="", by="carer-a", at=1_000_000)
+    assert (await owner.care_receipt_check(out["receipt"], **args))["matches"] is True
+    monkeypatch.setenv("CC_RECEIPT_SECRET", "t" * 40)                                  # a holder of the graph who guesses another secret gets nothing
+    assert (await owner.care_receipt_check(out["receipt"], **args))["matches"] is False
+    monkeypatch.delenv("CC_RECEIPT_SECRET")
+    with pytest.raises(ValueError):                                                    # without the secret the server cannot even answer
+        await owner.care_receipt_check(out["receipt"], **args)
+
+
+async def test_a_receipt_made_before_the_secret_existed_still_checks_and_the_same_line_differs_per_circle(gm, monkeypatch):
+    t, owner, a, b = await circle(gm)
+    e = await a.care_record("asha", "warfarin", dose_text="5 mg", freq_text="bedtime", source_type="typed", at=1_000_000)
+    old = await owner.care_forget(e["id"])
+    monkeypatch.setenv("CC_RECEIPT_SECRET", SECRET)
+    args = dict(drug="warfarin", dose_text="5 mg", freq_text="bedtime", quote="", by="carer-a", at=1_000_000)
+    assert (await owner.care_receipt_check(old["receipt"], **args))["matches"] is True and (await owner.care_receipts())[0]["keyed_by"] == "graph"
+    t2, owner2, a2, _ = await circle(gm)
+    e2 = await a2.care_record("asha", "warfarin", dose_text="5 mg", freq_text="bedtime", source_type="typed", at=1_000_000)
+    new2 = await owner2.care_forget(e2["id"])
+    e3 = await a.care_record("asha", "warfarin", dose_text="5 mg", freq_text="bedtime", source_type="typed", at=1_000_000)
+    new1 = await owner.care_forget(e3["id"])
+    assert new1["sha256"] != new2["sha256"]                                            # same line, two circles: two different keys
+
+
+async def test_a_short_receipt_secret_is_refused(gm, monkeypatch):
+    monkeypatch.setenv("CC_RECEIPT_SECRET", "short")
+    t, owner, a, b = await circle(gm)
+    with pytest.raises(ValueError):                                                    # the log needs the key on the first write, so a bad secret is never used quietly
+        await a.care_record("asha", "warfarin", dose_text="5 mg", source_type="typed", at=1_000)
+    from graphmem.api import create_app
+    with pytest.raises(ValueError):                                                    # and the server will not start with it
+        async with create_app(gm, admin_key="x").router.lifespan_context(None):
+            pass

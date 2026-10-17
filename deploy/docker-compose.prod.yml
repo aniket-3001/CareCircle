@@ -36,6 +36,8 @@ services:
       CC_DEMO: ${CC_DEMO:-1}
       CC_DEMO_MAX: ${CC_DEMO_MAX:-300}                  # oldest demo circle is deleted beyond this many
       CC_MODEL: ${CC_MODEL:-us.amazon.nova-pro-v1:0}
+      CC_RECEIPT_SECRET: ${CC_RECEIPT_SECRET:-}            # keys erase receipts; kept out of the circle graphs and their backups (32+ characters; see docs/DETAILS.md)
+      CC_RECEIPT_SECRET_PARAM: ${CC_RECEIPT_SECRET_PARAM:-}   # or the name of a Parameter Store SecureString read at run time, so it is never written to disk
       CC_INTAKE_LLM: ${CC_INTAKE_LLM:-0}                # label reading by the model is opt-in: B7 found no gain over the rules (docs/BENCHMARKS.md)
       CC_COGNITO_POOL_ID: ${CC_COGNITO_POOL_ID:-}        # set both to sign people in with Amazon Cognito (email codes); empty = built-in email and password
       CC_COGNITO_CLIENT_ID: ${CC_COGNITO_CLIENT_ID:-}

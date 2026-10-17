@@ -90,3 +90,19 @@ async def test_entries_from_before_the_log_can_be_adopted_and_are_then_covered(g
     assert [e["kind"] for e in await o.care_chain_events()] == ["adopted"] and (await o.care_chain_events())[0]["by"] == "c"
     await o._q("MATCH (x:Dose {id:$i}) SET x.dose_text = '50 mg'", {"i": a["id"]}, scope="admin")   # a later quiet change to the adopted entry
     assert (await o.care_chain_verify())["first_problem"]["why"].startswith("the entry was changed")
+
+
+async def test_with_a_server_secret_the_log_still_verifies_and_older_events_keep_their_old_key(gm, monkeypatch):
+    """Erased entries leave a keyed hash in the log; with the key in the same graph a backup could test guesses against it. New events use the server key;
+    events written before it existed are still checked with the circle's own key."""
+    t = tid(gm, "chs")
+    await gm.grant("ch-a", t, ("read", "write", "admin"))
+    a = gm.open("ch-a", t)
+    await a.care_record("asha", "metformin", dose_text="500 mg", freq_text="daily", source_type="typed")
+    monkeypatch.setenv("CC_RECEIPT_SECRET", "k" * 40)
+    e = await a.care_record("asha", "warfarin", dose_text="5 mg", freq_text="bedtime", source_type="typed")
+    await a.care_forget(e["id"])
+    v = await a.care_chain_verify()
+    assert v["ok"] is True and v["entries_logged"] == 2
+    kinds = {r[0]: r[1] for r in await a._q("MATCH (e:Event) RETURN e.seq, coalesce(e.kdf, 'graph') ORDER BY e.seq", scope="read")}
+    assert kinds[1] == "graph" and set(list(kinds.values())[1:]) == {"server"}

@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import hmac
+import os
 import secrets
 import json
 from datetime import datetime, timezone
@@ -23,6 +24,25 @@ from carecircle.safety import scan_advice
 from .db import new_id, norm, now_ms
 
 H = 3_600_000
+_secret_cache: dict = {}
+
+
+def server_secret() -> bytes:
+    """The secret that keys erase receipts when it is set: CC_RECEIPT_SECRET (32 or more characters), or the SecureString parameter named by CC_RECEIPT_SECRET_PARAM,
+    read once with the server's own role and kept only in memory. It is never stored in a circle's graph, so a copy of the graph (a backup, a dump) holds the
+    receipts but not the key that would let someone test guesses against them. Empty when neither is set."""
+    s = os.getenv("CC_RECEIPT_SECRET", "")
+    param = os.getenv("CC_RECEIPT_SECRET_PARAM", "")
+    if not s and param:
+        if param not in _secret_cache:
+            import boto3
+            _secret_cache[param] = boto3.client("ssm", region_name=os.getenv("AWS_REGION", "us-east-1")).get_parameter(Name=param, WithDecryption=True)["Parameter"]["Value"]
+        s = _secret_cache[param]
+    if s and len(s) < 32:
+        raise ValueError("the receipt secret must be at least 32 characters")
+    return s.encode()
+
+
 ENZYMES = {
     "CYP3A": "A liver and gut enzyme family that clears the largest share of commonly used medicines.",
     "CYP2D6": "A liver enzyme that clears many heart, mood and pain medicines; people differ a lot in how active it is.",
@@ -275,11 +295,12 @@ class CareViewMixin:
             raise KeyError(dose_id)
         drug, dt, ft, quote, by, at, status, product = rows[0]
         owner = await self._q("MATCH (x:Dose {id:$id})-[:FOR]->(p:Person) RETURN p.id", {"id": dose_id}, scope="write")
-        digest = await self._receipt_mac([drug, dt, ft, quote, by, at])
+        kdf = await self._receipt_kdf()
+        digest = await self._receipt_mac([drug, dt, ft, quote, by, at], kdf)
         rid, t = new_id("rcpt"), now_ms()
         await self._q("MATCH (x:Dose {id:$id}) OPTIONAL MATCH (n:Nudge) WHERE n.key CONTAINS $id DETACH DELETE n, x", {"id": dose_id})
-        await self._q("CREATE (:Receipt {id:$r, kind:'dose', hash:$h, at:$t, by:$by, reason:$why, removed:'dose, quote, links, acknowledgements'})",
-                      {"r": rid, "h": digest, "t": t, "by": norm(self.agent), "why": reason[:200]})
+        await self._q("CREATE (:Receipt {id:$r, kind:'dose', hash:$h, at:$t, by:$by, reason:$why, removed:'dose, quote, links, acknowledgements', kdf:$kdf})",
+                      {"r": rid, "h": digest, "t": t, "by": norm(self.agent), "why": reason[:200], "kdf": kdf})
         if owner:                                                   # close the gap: the entry before it becomes current again
             await self._care_rechain(owner[0][0], drug, product)
         await self._chain_note("erase", dose_id, digest, norm(self.agent))      # the log says an entry was erased, and by whom, without saying what it held
@@ -322,7 +343,8 @@ class CareViewMixin:
         doses = await self._q("MATCH (x:Dose)-[:FOR]->(:Person {id:$p}) RETURN x.id", {"p": p}, scope="admin")      # owners only
         ids = [r[0] for r in doses]
         gives = (await self._q("MATCH (g:Give {person:$p}) RETURN count(g)", {"p": p}))[0][0]
-        digest = await self._receipt_mac([p, sorted(ids)])
+        kdf = await self._receipt_kdf()
+        digest = await self._receipt_mac([p, sorted(ids)], kdf)
         await self._q("MATCH (g:Give {person:$p}) DELETE g", {"p": p})
         await self._q("MATCH (v:Prevented {person:$p}) DELETE v", {"p": p})
         await self._q("MATCH (h:Handover {person:$p}) DELETE h", {"p": p})
@@ -340,13 +362,23 @@ class CareViewMixin:
         await self._q("MATCH (c:Chain) DELETE c")
         await self._chain_note("erase_person", p, digest, norm(self.agent))
         rid = new_id("rcpt")
-        await self._q("CREATE (:Receipt {id:$r, kind:'person', hash:$h, at:$t, by:$by, reason:'', removed:$rm})",
-                      {"r": rid, "h": digest, "t": now_ms(), "by": norm(self.agent), "rm": f"{len(ids)} entries, {gives} dose records"})
+        await self._q("CREATE (:Receipt {id:$r, kind:'person', hash:$h, at:$t, by:$by, reason:'', removed:$rm, kdf:$kdf})",
+                      {"r": rid, "h": digest, "t": now_ms(), "by": norm(self.agent), "rm": f"{len(ids)} entries, {gives} dose records", "kdf": kdf})
         left = (await self._q("MATCH (x:Dose)-[:FOR]->(:Person {id:$p}) RETURN count(x)", {"p": p}, scope="read"))[0][0]
         return {"receipt": rid, "forgotten": left == 0, "removed_entries": len(ids), "removed_dose_records": gives, "sha256": digest}
 
-    async def _receipt_key(self) -> bytes:
-        """The circle's own random key for receipts: made once, kept in the circle's graph, never returned by any operation."""
+    async def _receipt_kdf(self) -> str:
+        """'server' when a server secret is set (the key is derived from it and this circle's id and is stored nowhere), else 'graph' (the older way: a random
+        key kept in the circle's own graph, which protects against API users but not against anyone who holds a copy of the graph)."""
+        return "server" if await asyncio.to_thread(server_secret) else "graph"
+
+    async def _receipt_key(self, kdf: str = "graph") -> bytes:
+        """The key for receipts: derived from the server secret and the circle's id ('server'), or the circle's own random key kept in its graph ('graph')."""
+        if kdf == "server":
+            secret = await asyncio.to_thread(server_secret)
+            if not secret:
+                raise ValueError("this receipt was made with the server's receipt secret, which is not set here, so it cannot be checked")
+            return hmac.new(secret, b"cc-receipt-v2|" + self.tenant.encode("utf-8"), hashlib.sha256).digest()
         rows = await self._q("MATCH (s:Setting {key:'receipt_key'}) RETURN s.value LIMIT 1", scope="read", checked=True)
         if rows:
             return bytes.fromhex(rows[0][0])
@@ -355,21 +387,21 @@ class CareViewMixin:
         rows = await self._q("MATCH (s:Setting {key:'receipt_key'}) RETURN s.value LIMIT 1", scope="read", checked=True)
         return bytes.fromhex(rows[0][0])
 
-    async def _receipt_mac(self, parts: list) -> str:
-        return hmac.new(await self._receipt_key(), json.dumps(parts, sort_keys=True).encode("utf-8"), hashlib.sha256).hexdigest()
+    async def _receipt_mac(self, parts: list, kdf: str = "graph") -> str:
+        return hmac.new(await self._receipt_key(kdf), json.dumps(parts, sort_keys=True).encode("utf-8"), hashlib.sha256).hexdigest()
 
     async def care_receipt_check(self, receipt: str, drug: str = "", dose_text: str = "", freq_text: str = "", quote: str = "", by: str = "", at: int = 0) -> dict:
         """Does a copy someone kept (the medicine, strength, frequency, quoted line, writer and time) match what a dose receipt says was erased? Admin only."""
-        rows = await self._q("MATCH (r:Receipt {id:$r, kind:'dose'}) RETURN r.hash", {"r": receipt}, scope="admin")
+        rows = await self._q("MATCH (r:Receipt {id:$r, kind:'dose'}) RETURN r.hash, coalesce(r.kdf, 'graph')", {"r": receipt}, scope="admin")
         if not rows:
             raise KeyError(receipt)
-        mine = await self._receipt_mac([norm(drug), dose_text, freq_text, quote, norm(by), at])
+        mine = await self._receipt_mac([norm(drug), dose_text, freq_text, quote, norm(by), at], rows[0][1])
         return {"receipt": receipt, "matches": hmac.compare_digest(mine, rows[0][0])}
 
     async def care_receipts(self) -> list[dict]:
         """Receipts of everything that was removed for good (hash, who, when), newest first."""
-        rows = await self._q("MATCH (r:Receipt) RETURN r.id, r.kind, r.hash, r.at, r.by, r.reason, r.removed ORDER BY r.at DESC", scope="read")
-        return [dict(receipt=r[0], kind=r[1], sha256=r[2], at=r[3], when=iso(r[3]), by=who(r[4]), reason=r[5], removed=r[6]) for r in rows]
+        rows = await self._q("MATCH (r:Receipt) RETURN r.id, r.kind, r.hash, r.at, r.by, r.reason, r.removed, coalesce(r.kdf, 'graph') ORDER BY r.at DESC", scope="read")
+        return [dict(receipt=r[0], kind=r[1], sha256=r[2], at=r[3], when=iso(r[3]), by=who(r[4]), reason=r[5], removed=r[6], keyed_by=r[7]) for r in rows]
 
     # ------------------------------------------------------------------ the helper assistant: the conversation is kept in the circle's graph
     async def care_chat_ask(self, person: str, question: str, now: Optional[int] = None, daily_limit: int = 60, lang: str = "") -> dict:

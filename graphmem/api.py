@@ -149,6 +149,12 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
     background = role in ("all", "worker")
 
     @app.on_event("startup")
+    async def _receipt_secret():              # a wrong secret stops the server here, with the reason, instead of failing every write later
+        import asyncio
+        from graphmem.care_view import server_secret
+        await asyncio.to_thread(server_secret)
+
+    @app.on_event("startup")
     async def _telegram():                    # optional front door: set TELEGRAM_BOT_TOKEN to poll Telegram in this process
         token = os.getenv("TELEGRAM_BOT_TOKEN")
         if token and background:

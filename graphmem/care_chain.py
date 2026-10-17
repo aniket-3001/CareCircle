@@ -41,7 +41,7 @@ ENTRY_FIELDS = "x.drug, coalesce(x.product, ''), x.dose_text, x.freq_text, x.act
 
 
 class CareChainMixin:
-    async def _chain_append(self, kind: str, ref: str, body: str) -> int:
+    async def _chain_append(self, kind: str, ref: str, body: str, kdf: str = "graph") -> int:
         """Add one event to the end of the log. Returns its sequence number. Retries when another writer got there first."""
         by = norm(self.agent)
         for _ in range(MAX_TRIES):
@@ -56,9 +56,9 @@ class CareChainMixin:
             h = link(prev, seq, kind, ref, by, at, body)
             rows = await self._q(
                 """MATCH (c:Chain {k:'head'}) WHERE c.seq = $s0 AND c.hash = $prev
-                   CREATE (:Event {seq:$seq, kind:$kind, ref:$ref, by:$by, at:$at, body:$body, prev:$prev, hash:$h})
+                   CREATE (:Event {seq:$seq, kind:$kind, ref:$ref, by:$by, at:$at, body:$body, prev:$prev, hash:$h, kdf:$kdf})
                    SET c.seq = $seq, c.hash = $h RETURN $seq""",
-                {"s0": seq0, "prev": prev, "seq": seq, "kind": kind, "ref": ref, "by": by, "at": at, "body": body, "h": h}, checked=True)
+                {"s0": seq0, "prev": prev, "seq": seq, "kind": kind, "ref": ref, "by": by, "at": at, "body": body, "h": h, "kdf": kdf}, checked=True)
             if rows:
                 return seq
         raise RuntimeError("the history log is busy; try again")
@@ -67,19 +67,21 @@ class CareChainMixin:
         """Log an entry as it now stands."""
         rows = await self._q(f"MATCH (x:Dose {{id:$id}}) RETURN {ENTRY_FIELDS}", {"id": dose_id}, checked=True)
         if rows:
-            await self._chain_append(kind, dose_id, entry_body(await self._receipt_key(), *rows[0]))
+            kdf = await self._receipt_kdf()
+            await self._chain_append(kind, dose_id, entry_body(await self._receipt_key(kdf), *rows[0]), kdf)
 
     async def _chain_note(self, kind: str, ref: str, *parts: str) -> None:
         """Log something other than an entry (a mistake mark, an undo, an erase): the body is a keyed hash of the given words."""
-        await self._chain_append(kind, ref, hmac.new(await self._receipt_key(), json.dumps(list(parts), ensure_ascii=False).encode("utf-8"), hashlib.sha256).hexdigest())
+        kdf = await self._receipt_kdf()
+        await self._chain_append(kind, ref, hmac.new(await self._receipt_key(kdf), json.dumps(list(parts), ensure_ascii=False).encode("utf-8"), hashlib.sha256).hexdigest(), kdf)
 
     async def care_chain_verify(self, person: str = "") -> dict:
         """Walk the log from the start and say whether it is intact, and whether each logged entry still matches what is stored now."""
-        evs = await self._q("MATCH (e:Event) RETURN e.seq, e.kind, e.ref, e.by, e.at, e.body, e.prev, e.hash ORDER BY e.seq", scope="read")
+        evs = await self._q("MATCH (e:Event) RETURN e.seq, e.kind, e.ref, e.by, e.at, e.body, e.prev, e.hash, coalesce(e.kdf, 'graph') ORDER BY e.seq", scope="read")
         head = await self._q("MATCH (h:Chain {k:'head'}) RETURN h.seq, h.hash", scope="read")
-        key = await self._receipt_key()
+        keys: dict[str, bytes] = {}
         prev, bad, entries, adopted = GENESIS, None, 0, 0
-        for n, (seq, kind, ref, by, at, body, p, h) in enumerate(evs, 1):
+        for n, (seq, kind, ref, by, at, body, p, h, kdf) in enumerate(evs, 1):
             if seq != n:
                 bad = {"seq": n, "why": "an event is missing or out of order"}
                 break
@@ -91,7 +93,9 @@ class CareChainMixin:
                 entries += 1
                 adopted += kind == "adopted"
                 now = await self._q(f"MATCH (x:Dose {{id:$id}}) RETURN {ENTRY_FIELDS}", {"id": ref}, scope="read")
-                if now and entry_body(key, *now[0]) != body:
+                if kdf not in keys:
+                    keys[kdf] = await self._receipt_key(kdf)
+                if now and entry_body(keys[kdf], *now[0]) != body:
                     bad = {"seq": seq, "why": "the entry was changed after it was logged"}
                     break
         if bad is None and head and (head[0][0] != len(evs) or head[0][1] != prev):
@@ -108,10 +112,11 @@ class CareChainMixin:
         before is not knowable (there was nothing to compare with), and the event records who adopted them and when, so it cannot pass for an original write."""
         done = {e[0] for e in await self._q("MATCH (e:Event) WHERE e.kind IN ['entry','adopted'] RETURN e.ref", scope="read")}
         rows = await self._q(f"MATCH (x:Dose) RETURN x.id, {ENTRY_FIELDS} ORDER BY x.created_at, x.id", scope="read")
-        key, n = await self._receipt_key(), 0
+        kdf = await self._receipt_kdf()
+        key, n = await self._receipt_key(kdf), 0
         for r in rows:
             if r[0] not in done:
-                await self._chain_append("adopted", r[0], entry_body(key, *r[1:]))
+                await self._chain_append("adopted", r[0], entry_body(key, *r[1:]), kdf)
                 n += 1
         return {"adopted": n, "note": "Entries from before the log began were added to it as they read now; changes to them are caught from this moment."}
 
