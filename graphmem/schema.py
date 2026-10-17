@@ -13,12 +13,12 @@ MIGRATIONS: list[tuple[int, str, list[tuple]]] = [
     (4, "follow-up checklist", [("index", "Followup", "id"), ("index", "Followup", "person")]),
     (5, "products: a tablet is a node, its entries point at it, and the schedule lives on it", [
         ("index", "Product", "key"),
-        # one (:Product) per person and tablet: a combination brand (kind 'combination', named for the brand) or the medicine itself (kind 'medicine')
+        # one (:Product) per person and tablet: a brand as printed (kind 'product') or the medicine itself (kind 'medicine')
         ("cypher", """MATCH (x:Dose)-[:FOR]->(p:Person) WHERE NOT (x)-[:VIA]->(:Product)
-                      WITH x, p, CASE WHEN coalesce(x.product, '') <> '' THEN 'combination' ELSE 'medicine' END AS kind,
+                      WITH x, p, CASE WHEN coalesce(x.product, '') <> '' THEN 'product' ELSE 'medicine' END AS kind,
                            CASE WHEN coalesce(x.product, '') <> '' THEN x.product ELSE x.drug END AS nm
                       MERGE (pr:Product {key: p.id + '|' + kind + '|' + nm})
-                        ON CREATE SET pr.name = nm, pr.kind = kind, pr.person = p.id, pr.combo = CASE WHEN kind = 'combination' THEN nm ELSE '' END
+                        ON CREATE SET pr.name = nm, pr.kind = kind, pr.person = p.id, pr.combo = CASE WHEN kind = 'product' THEN nm ELSE '' END
                       MERGE (x)-[:VIA]->(pr)"""),
         # the times, the course end and who confirmed them: from the latest CURRENT entry (an older entry's times were replaced)
         ("cypher", """MATCH (x:Dose {cur: true})-[:VIA]->(pr:Product) WHERE x.slots IS NOT NULL AND pr.slots IS NULL

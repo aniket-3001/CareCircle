@@ -6,7 +6,7 @@ import type { Candidate, IntakeResult, Proposal } from '../api/types';
 import { PageHead } from '../components/PageHead';
 import { Pill, Spinner } from '../components/Pill';
 import { useToast } from '../components/Toast';
-import { title } from '../lib/format';
+import { productName, title } from '../lib/format';
 import { useApp } from '../state';
 import { tr } from '../lib/i18n';
 
@@ -169,7 +169,7 @@ export function ProposalCard({ p, kind, sourceText, sourceId = '', goToday = tru
     setBusy(true);
     try {
       const edited = [drug !== (p.drug_candidates[0]?.name ?? '') && 'drug', dose !== p.dose_text && 'dose', freq !== p.freq_text && 'freq'].filter(Boolean).join(',');
-      const r = await app.api.record({ edited, drug, dose_text: dose, freq_text: freq, source_type: kind, quote: p.quote, source_text: sourceText || p.quote, source_ref: sourceId, product: p.combination ?? '', product_strength: p.combination_strength ?? '' });
+      const r = await app.api.record({ edited, drug, dose_text: dose, freq_text: freq, source_type: kind, quote: p.quote, source_text: sourceText || p.quote, source_ref: sourceId, product: p.combination ?? p.brand ?? '', product_strength: p.combination_strength ?? '' });
       await app.api.confirm(r.id);
       toast(`Saved ${title(drug)}. ${r.warning ? `${r.warning} ` : ''}The other carers will be asked to acknowledge it.`);
       app.bump();
@@ -191,6 +191,11 @@ export function ProposalCard({ p, kind, sourceText, sourceId = '', goToday = tru
         <p className="muted small" data-testid="combination-note">
           {tr('This is a combination product.')} <b>{p.combination}</b> {tr('usually contains')} {(p.combination_ingredients ?? []).map(title).join(' + ')}
           {p.combination_strength ? ` (${tr('printed strength')}: ${p.combination_strength})` : ''}. {tr('Each ingredient is saved on its own, so confirm each one. From a hand-written list: check the pack.')}
+        </p>
+      )}
+      {p.brand && !p.combination && !p.possible_combination && (
+        <p className="muted small" data-testid="brand-note">
+          {tr('Saved under the brand')} <b>{productName(p.brand)}</b>. {tr('A second brand of the same medicine is then kept as a separate entry and flagged as a possible duplicate, not written over this one.')}
         </p>
       )}
       {p.possible_combination && (

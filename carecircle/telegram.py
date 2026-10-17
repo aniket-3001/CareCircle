@@ -205,14 +205,17 @@ class Bot:
             cid = os.urandom(4).hex()
             top = p["drug_candidates"][0]["name"]
             combo = p.get("combination", "")
+            brand = "" if combo else p.get("brand", "")
             note = ""
             if combo:                                                # one card per ingredient, each saved as that product's entry, never over a plain one
                 note = (f"\n{combo} is a combination that usually contains {' + '.join(p.get('combination_ingredients') or [top])}"
                         f"{' (printed strength ' + p['combination_strength'] + ')' if p.get('combination_strength') else ''}. "
                         "Each ingredient is saved on its own; confirm each one. From a hand-written list: check the pack.")
+            elif brand and not p.get("possible_combination"):
+                note = f"\nSaved under the brand {brand}: a second brand of the same medicine stays a separate entry and is flagged as a possible duplicate."
             elif p.get("possible_combination"):
                 note = f"\n{p['possible_combination']} may be a combination product. Only one ingredient was read from it; check the pack for any others."
-            await self._hold(cid, chat, {"drug": top, "dose_text": p.get("dose_text", ""), "freq_text": p.get("freq_text", ""), "product": combo, "product_strength": p.get("combination_strength", ""),
+            await self._hold(cid, chat, {"drug": top, "dose_text": p.get("dose_text", ""), "freq_text": p.get("freq_text", ""), "product": combo or brand, "product_strength": p.get("combination_strength", ""),
                                  "quote": p["quote"], "source_ref": sid, "source_type": kinds.get(src["kind"], "typed")})
             alt = ", ".join(c["name"] for c in p["drug_candidates"][1:])
             await self.api.send(chat, f"I read: {top} {p.get('dose_text', '')} {p.get('freq_text', '')}{note}\nFrom: \"{p['quote'][:120]}\""

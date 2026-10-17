@@ -26,7 +26,7 @@ from carecircle.safety import judgement, reword
 from carecircle.verify import quote_in_source
 
 from .db import new_id, norm, now_ms
-from .textcheck import fit
+from .textcheck import fit, product_name
 
 _checker: Optional[Checker] = None
 _algos: Optional[Algos] = None
@@ -83,9 +83,9 @@ def _ingredient_of(name: str) -> str:
 class CareMixin:
     @staticmethod
     def _pkey(person: str, product: str, drug: str) -> str:
-        """The key of the (:Product) a tablet is: a combination brand (kind 'combination', named for the brand) or the medicine itself (kind 'medicine'). One node per
+        """The key of the (:Product) a tablet is: a brand as printed (kind 'product': a combination such as Telma-AM, or a one-ingredient brand such as Storvas) or the medicine itself (kind 'medicine'). One node per
         person and tablet; every entry of it points at it with VIA, and the times it is taken at live on it."""
-        return f"{person}|combination|{product}" if product else f"{person}|medicine|{drug}"
+        return f"{person}|product|{product}" if product else f"{person}|medicine|{drug}"
     # ------------------------------------------------------------------ record / confirm
     async def _known_person(self, person: str) -> str:
         """The person's id, refused if it is a near miss of someone already in the circle ("ashaa" for "asha"): a slip of the keyboard would otherwise start a second
@@ -162,7 +162,7 @@ class CareMixin:
             {"p": norm(person), "d": d, "id": did, "dt": dose_text, "ft": freq_text, "ts": ts, "now": now_ms(), "a": action, "st": status,
              "src": source_type, "q": quote[:200], "v": verified, "by": norm(self.agent), "ed": ",".join(sorted({x for x in edited.split(",") if x in ("drug", "dose", "freq")})),
              "sref": stored["id"] if stored else "", "pr": product, "ps": product_strength,
-             "pk": pk, "pn": product or d, "pkind": "combination" if product else "medicine", "pcombo": product})
+             "pk": pk, "pn": product or d, "pkind": "product" if product else "medicine", "pcombo": product})
         if status == "confirmed":
             await self._care_activate(did)
             if action == "set" and cur and ts >= cur[0][3] and not (cur[0][2] and same(cur[0][2], freq_text)):
@@ -292,7 +292,7 @@ class CareMixin:
             {"p": norm(person), "t": t, "today": today}, scope="read")
         out = []
         for drug, es in rows:
-            names = [(e["product"] or "entered as the medicine itself") for e in es]
+            names = [(product_name(e["product"]) if e["product"] else "recorded as the plain medicine") for e in es]
             title = drug[:1].upper() + drug[1:]
             out.append({"kind": "duplicate", "ingredient": drug, "entries": list(es),
                         "meaning": f"{title} is on record {len(es)} times: {'; '.join(names)}. It may be the same medicine from two sources.",

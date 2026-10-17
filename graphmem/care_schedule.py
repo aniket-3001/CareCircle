@@ -177,8 +177,10 @@ class CareScheduleMixin:
                 byp[r.get("product_key") or r["product"]] = {"members": [r], "product": r["product"], "label": r["product"], "ingredients": []}
                 out.append(byp[r.get("product_key") or r["product"]])
         for g in out:
-            if g["product"]:
+            if g["product"] and len(g["members"]) > 1:                 # a combination: one tablet, several ingredients
                 g["ingredients"] = [m["drug"] for m in g["members"]]
+            elif g["product"]:                                         # a one-ingredient brand (Storvas): the medicine's own row, with its brand kept
+                g["brand"], g["label"] = g["product"], ""
         return out
 
     async def _origins(self, person: str) -> dict:
@@ -221,9 +223,11 @@ class CareScheduleMixin:
         for g in self._groups(reg):
             ms, first = g["members"], g["members"][0]
             base = {"dose_id": first["id"], "dose_ids": [m["id"] for m in ms], "drug": first["drug"], "freq_text": first["freq_text"],
-                    "dose_text": (first["dose_text"] or first.get("product_strength", "")) if not g["product"] else next((m.get("product_strength") for m in ms if m.get("product_strength")), "")}
-            if g["product"]:
+                    "dose_text": (first["dose_text"] or first.get("product_strength", "")) if not g["label"] else next((m.get("product_strength") for m in ms if m.get("product_strength")), "")}
+            if g["label"]:
                 base["label"], base["ingredients"] = g["label"], g["ingredients"]
+            elif g.get("brand"):
+                base["brand"] = g["brand"]
             if all(m["as_needed"] for m in ms):
                 as_needed.append(base)
                 continue

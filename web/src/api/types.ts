@@ -40,6 +40,7 @@ export interface TodayItem {
   dose_ids?: string[];
   label?: string;
   ingredients?: string[];
+  brand?: string;
   drug: string;
   dose_text: string;
   freq_text: string;
@@ -222,6 +223,8 @@ export interface Proposal {
   combination_strength?: string;
   /** The name as written, when it looks like a known brand plus a suffix (Stamlo-T) that the list does not have: it may hold more than the one ingredient read. */
   possible_combination?: string;
+  /** The brand as printed ("storvas"), kept on the record so a second brand of the same medicine is flagged, not a silent overwrite. */
+  brand?: string;
 }
 
 export interface IntakeResult {

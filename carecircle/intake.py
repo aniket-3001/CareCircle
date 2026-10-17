@@ -141,17 +141,38 @@ _NOT_A_MEDICINE_LINE = re.compile(r"^(take|taken|store|keep|qty|quantity|refills
 
 
 _NOT_A_SUFFIX = {"tab", "tabs", "tablet", "tablets", "cap", "caps", "syp", "inj", "od", "bd", "bid", "tid", "qid", "prn", "sos", "hs", "pm", "mg", "ml", "mcg", "iu",
-                 "once", "twice", "with", "after", "and", "the", "for", "one", "two", "use", "take", "per", "day", "daily", "at", "in", "of", "to"}
-_STEM = re.compile(r"(?<![A-Za-z])(" + "|".join(sorted(map(re.escape, ALIASES), key=len, reverse=True)) + r")[ \-]([A-Za-z]{1,4})(?![A-Za-z])", re.I)
+                 "sr", "xr", "er", "cr", "xl", "mr", "once", "twice", "with", "after", "and", "the", "for", "one", "two", "use", "take", "per", "day", "daily", "at", "in", "of", "to"}
+_STEMS = "|".join(sorted(map(re.escape, ALIASES), key=len, reverse=True))
+# "Stamlo-T", "Storvas EZ", "Stamlo-5 Beta" (a strength between the parts), and "StamloBeta" (glued, the suffix starting with a capital)
+_STEM = re.compile(r"(?<![A-Za-z])(" + _STEMS + r")[ \-]+(?:\d+(?:\.\d+)?\s*(?:mg|mcg)?[ \-]*)?([A-Za-z]{1,4})(?![A-Za-z])", re.I)
+_STEM_GLUED = re.compile(r"(?<![A-Za-z])((?i:" + _STEMS + r"))([A-Z][a-z]{0,3})(?![A-Za-z])")
+_BRAND_WORD = re.compile(r"(?<![A-Za-z])(" + _STEMS + r")(?![A-Za-z])", re.I)
+_GENERIC_SYNONYMS = {"aspirin", "paracetamol"}              # in the alias list as other names for a generic, not brands
+
+
+def _stem_matches(quote: str):
+    yield from _STEM.finditer(quote or "")
+    yield from _STEM_GLUED.finditer(quote or "")
 
 
 def unlisted_suffix(quote: str, ingredient: str) -> str:
-    """A brand written as a known one-ingredient brand plus a short suffix ("Stamlo-T", "Storvas-EZ", "Pantocid-D") is very often a COMBINATION the hand-written
-    list does not have, and reading it as the plain brand silently loses the other ingredient. Returns the name as written when `quote` has one for this
-    ingredient ("" otherwise) so the proposal can say so; it cannot say what the other ingredient is, only that the pack must be checked."""
-    for m in _STEM.finditer(quote or ""):
+    """A brand written as a known one-ingredient brand plus a short suffix ("Stamlo-T", "Storvas-EZ", "StamloBeta", "Stamlo-5 Beta") is very often a COMBINATION the
+    hand-written list does not have, and reading it as the plain brand silently loses the other ingredient. Returns the name as written when `quote` has one for
+    this ingredient ("" otherwise) so the proposal can say so and the entry is kept under that name; it cannot say what the other ingredient is, only that the pack
+    must be checked."""
+    for m in _stem_matches(quote):
         if ALIASES.get(m.group(1).lower()) == ingredient and m.group(2).lower() not in _NOT_A_SUFFIX and not brands.find(m.group(0)):
             return m.group(0)
+    return ""
+
+
+def brand_of(quote: str, ingredient: str) -> str:
+    """The brand a one-ingredient medicine was printed as ("Storvas 10 mg" -> "storvas"), or "". Kept on the record so a second brand of the same medicine (Atorva
+    after Storvas) is a second entry that is flagged as a possible duplicate, not a silent change of the first."""
+    for m in _BRAND_WORD.finditer(quote or ""):
+        w = m.group(1).lower()
+        if w not in _GENERIC_SYNONYMS and ALIASES.get(w) == ingredient:
+            return w
     return ""
 
 
@@ -204,6 +225,15 @@ def rule_proposals(text: str, checker) -> list[dict]:
             continue
         cands = checker.candidates(line, 3)
         if not cands or cands[0]["score"] < 0.8:                  # line must actually contain a drug name
+            glued = _STEM_GLUED.search(line) if i not in covered else None
+            if glued and glued.group(2).lower() not in _NOT_A_SUFFIX and not brands.find(glued.group(0)) and ALIASES.get(glued.group(1).lower()):
+                generic = ALIASES[glued.group(1).lower()]               # "StamloBeta": the stem names a medicine, the rest looks like a suffix: keep it, flagged
+                gc = checker.candidates(generic, 3)
+                if gc:
+                    out.append({"drug_candidates": gc, "dose_text": (DOSE_RE.search(line).group(0) if DOSE_RE.search(line) else ""),
+                                "freq_text": (FREQ_RE.search(line).group(0) if FREQ_RE.search(line) else ""), "quote": line[:200], "method": "rules"})
+                    covered.add(i)
+                    continue
             word = re.match(r"\s*([A-Za-z][A-Za-z\-]{3,30})\b", line)
             looks_like_one = DOSE_RE.search(line) or re.match(r"\s*[A-Za-z][A-Za-z\-]*[ \-]+\d", line)       # "Name 500 mg" or "Name 1 daily": a name, then a number
             if (i not in covered and word and looks_like_one and not _NOT_A_MEDICINE_LINE.match(line)
@@ -314,9 +344,15 @@ def propose(text: str, checker) -> list[dict]:
         p["verified"] = quote_in_source(p["quote"], text)
         props.append(p)
     for p in props:
-        if not p.get("combination"):
-            tok = unlisted_suffix(p["quote"], p["drug_candidates"][0]["name"])
+        if not p.get("combination") and not p["drug_candidates"][0].get("unchecked"):
+            ing = p["drug_candidates"][0]["name"]
+            tok = unlisted_suffix(p["quote"], ing)
             if tok:
                 p["possible_combination"] = tok                  # not "the plain brand": the name goes on past the brand, and the list does not know it
+                p["brand"] = tok                                 # so it is kept under the name as printed
+            elif p.get("method") == "rules":
+                b = brand_of(p["quote"], ing)
+                if b:
+                    p["brand"] = b
         p["needs_human"] = True                                  # always: nothing is written without a person confirming
     return props

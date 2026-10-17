@@ -42,9 +42,9 @@ async def test_a_plain_medicine_and_a_combination_are_distinct_products_and_ingr
     for ing in ("telmisartan", "amlodipine"):
         await a.care_record("asha", ing, freq_text="once daily", product="Telma-AM", product_strength="40/5 mg", at=2_000)
     got = await products(a)
-    assert set(got) == {"asha|medicine|amlodipine", "asha|combination|telma-am"}, got
-    assert got["asha|combination|telma-am"][2] == "telma-am" and got["asha|combination|telma-am"][4] == "40/5 mg" and got["asha|medicine|amlodipine"][2] == ""
-    n = await a._q("MATCH (:Product {key:'asha|combination|telma-am'})<-[:VIA]-(x:Dose) RETURN count(x)", scope="read")
+    assert set(got) == {"asha|medicine|amlodipine", "asha|product|telma-am"}, got
+    assert got["asha|product|telma-am"][2] == "telma-am" and got["asha|product|telma-am"][4] == "40/5 mg" and got["asha|medicine|amlodipine"][2] == ""
+    n = await a._q("MATCH (:Product {key:'asha|product|telma-am'})<-[:VIA]-(x:Dose) RETURN count(x)", scope="read")
     assert n == [[2]]                                                                                    # both ingredients' entries sit under the one node
     await assert_invariants(a)
 
@@ -105,7 +105,7 @@ async def test_erasing_the_last_entry_removes_its_product_and_erasing_the_person
     e = (await a.care_record("asha", "warfarin", dose_text="5 mg", freq_text="daily", at=1_000))["id"]
     f = (await a.care_record("asha", "amlodipine", freq_text="daily", product="Telma-AM", at=1_000))["id"]
     await a.care_forget(e, reason="entered twice")
-    assert set(await products(a)) == {"asha|combination|telma-am"}                                             # warfarin's tablet went with its only entry
+    assert set(await products(a)) == {"asha|product|telma-am"}                                             # warfarin's tablet went with its only entry
     await assert_invariants(a)
     await a.care_forget_person("asha", confirm="asha")
     assert await products(a) == {}
@@ -116,7 +116,7 @@ async def test_marking_a_mistake_and_restoring_it_keeps_one_product_and_the_chai
     e = (await a.care_record("asha", "telmisartan", freq_text="daily", product="Telma-AM", at=1_000))["id"]
     await a.care_mark_mistake(e, "wrong brand")
     await a.care_restore_entry(e)
-    assert set(await products(a)) == {"asha|combination|telma-am"}
+    assert set(await products(a)) == {"asha|product|telma-am"}
     v = await a.care_chain_verify()
     assert v["ok"] is True and v["entries_logged"] == 1
     await assert_invariants(a)

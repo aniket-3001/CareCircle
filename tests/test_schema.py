@@ -59,8 +59,8 @@ async def test_migration_5_gives_every_old_entry_a_product_and_moves_the_schedul
     rows = (await g.query("MATCH (x:Dose)-[:VIA]->(pr:Product) RETURN x.id, pr.key, pr.kind, pr.combo, pr.slots, pr.sched_first, pr.strength ORDER BY x.id")).result_set
     by = {r[0]: r for r in rows}
     assert len(rows) == 3 and (await g.query("MATCH (x:Dose) WHERE NOT (x)-[:VIA]->(:Product) RETURN count(x)")).result_set == [[0]]       # every entry has one product
-    assert by["old-1"][1] == by["old-2"][1] == "asha|combination|telma-am"                                                          # both ingredients share ONE product node
-    assert by["old-1"][2:5] == ["combination", "telma-am", ["09:00"]] and by["old-1"][5] == 2 and by["old-1"][6] == "40/5 mg"       # times, earliest first-confirmed, strength
+    assert by["old-1"][1] == by["old-2"][1] == "asha|product|telma-am"                                                          # both ingredients share ONE product node
+    assert by["old-1"][2:5] == ["product", "telma-am", ["09:00"]] and by["old-1"][5] == 2 and by["old-1"][6] == "40/5 mg"       # times, earliest first-confirmed, strength
     met = [r for r in rows if r[2] == "medicine"][0]
     assert met[1] == "asha|medicine|metformin" and met[3] == "" and met[4] == ["08:00", "20:00"]
     again = await schema.migrate(g, mk)

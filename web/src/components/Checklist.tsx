@@ -2,7 +2,7 @@ import { CalendarClock, Check, Clock } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { StockRow, Suggestion, TodayItem, TodayView } from '../api/types';
 import { useT, tr } from '../lib/i18n';
-import { nameOf, shown, title } from '../lib/format';
+import { nameOf, productName, shown, title } from '../lib/format';
 import { useApp, useLoad } from '../state';
 import { Pill } from './Pill';
 import { Sheet } from './Sheet';
@@ -84,6 +84,7 @@ function Checked({ today, error, onGive, busy, onSet, zone, setting, closeSet, t
           <div key={`${i.dose_id}|${i.time}`} className="item" data-testid="slot" data-state={i.state}>
             <div>
               <div className="item__title"><Clock size={16} aria-hidden="true" /> {i.time} · {shown(i)} <span className="muted">{i.dose_text}</span></div>
+              {i.brand && <div className="item__sub muted" data-testid="slot-brand">{t('as')} {productName(i.brand)}</div>}
               {i.ingredients && <div className="item__sub muted" data-testid="slot-ingredients">{t('one tablet of')} {i.ingredients.map(title).join(' + ')}</div>}
               <div className="item__sub">
                 <Pill tone={STATE[i.state].tone}>{t(STATE[i.state].text)}</Pill>
