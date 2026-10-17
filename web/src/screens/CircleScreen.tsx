@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { useState } from 'react';
 import { Followups } from '../components/Followups';
 import { Handover } from '../components/Handover';
+import { Consent } from '../components/Consent';
 import { Outcomes } from '../components/Outcomes';
 import { Appointments } from '../components/Appointments';
 import { Async } from '../components/Async';
@@ -96,6 +97,7 @@ export function CircleScreen(): React.JSX.Element {
           <Followups />
           <Handover />
           <Outcomes />
+          <Consent />
           <Appointments />
           <Doses />
         </div>

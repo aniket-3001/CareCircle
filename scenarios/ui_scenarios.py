@@ -542,5 +542,31 @@ def u15(w, b, r):
     ctx.close()
 
 
+@scenario("U16", "The person's say: a carer writes down their answer, and the view written for them lists what is kept and makes no promise of safety")
+def u16(w, b, r):
+    errs = []
+    ctx, pg = new_page(b, errs=errs)
+    email = f"u16-{rid()}@scenario.test"
+    ui_signup(pg, "Consen", email)
+    ui_circle(pg, "Mum's medicines", "Mum")
+    expect(pg.get_by_text("Nothing on record yet")).to_be_visible()
+    u = api_user(w, email)
+    c = circle_of(u)
+    u.ok(c, "care_record", person="mum", drug="metformin", dose_text="500 mg", freq_text="twice daily")
+    tab(pg, "Circle")
+    pg.get_by_test_id("consent").locator("summary").click()
+    expect(pg.get_by_test_id("consent-status")).to_contain_text("Not asked yet", timeout=15000)
+    pg.get_by_test_id("consent-answer").select_option("agreed")
+    pg.get_by_test_id("consent-save").click()
+    expect(pg.get_by_test_id("consent-status")).to_contain_text("Noted as agreed", timeout=15000)
+    r.check(True, "the answer is written down with who gave it")
+    pg.get_by_test_id("patient-view-toggle").click()
+    expect(pg.get_by_test_id("patient-view")).to_be_visible(timeout=15000)
+    text = pg.get_by_test_id("patient-view").inner_text().lower()
+    r.check("metformin" in text and "does not give advice" in text and "who can see it" in text, "the view for the person lists the medicines, who sees them, and says it gives no advice", text[:200])
+    r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
+    ctx.close()
+
+
 if __name__ == "__main__":
     sys.exit(1 if main() else 0)

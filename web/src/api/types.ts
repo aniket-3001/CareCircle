@@ -76,6 +76,18 @@ export interface Outcomes {
   note: string;
 }
 
+export interface ConsentEntry { id: string; status: 'agreed' | 'declined' | 'not_asked'; who: string; note: string; by: string; at: number }
+export interface ConsentView { status: ConsentEntry['status']; current: ConsentEntry | null; history: ConsentEntry[]; note: string }
+export interface PatientView {
+  person: string;
+  medicines: { drug: string; dose_text: string; freq_text: string; slots: string[]; recorded_by: string }[];
+  who_can_see: string[];
+  what_is_kept: string[];
+  what_is_not: string[];
+  your_rights: string;
+  consent: ConsentEntry | null;
+}
+
 export interface StockRow {
   dose_id: string;
   drug: string;

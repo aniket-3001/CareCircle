@@ -103,6 +103,9 @@ Content-Type: application/json
 | `care_graph` | read | `person`*, `include_history`, `now` | The circle as a graph: nodes and edges, each with plain-language metadata (read scope). |
 | `care_timeline` | read | `person`*, `limit`, `now` | Everything that happened for this person, newest first, as plain sentences. |
 | `care_history_digest` | read | `person`*, `upto` | A fingerprint of what was written about a person: each entry's fixed fields are chained (hash of the one before + this one), oldest first. |
+| `care_consent_set` | write | `person`*, `status`*, `who`, `note` | Write down whether the person knows this record exists and agrees to it, who answered, and when. Newest entry stands; older ones stay in the history. |
+| `care_consent` | read | `person`* | The current answer (newest) and the history. 'not_asked' when nothing was written down. |
+| `care_patient_view` | read | `person`* | What this record holds about the person, in plain words, for the person themselves to read: the medicines, who can see them, and how to have it removed. |
 | `care_outcomes` | read | `person`*, `days`, `now` | Counts from the record over the last `days` local days: doses marked given against the times that were due, entries recorded or marked as mistakes, and |
 | `care_entry_source` | read | `dose_id`* | What an entry was read from: the full text the server read from the photo, voice note or document (not the image itself, which is never kept), |
 | `care_drug_search` | read | `text`*, `n` | Search the reference list by name (starts with, then contains). For a person who knows what the medicine is called. |
