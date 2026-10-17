@@ -101,6 +101,6 @@ Earlier probing of the memory engine itself (handing a task to an agent with no 
 
 ## What scenario testing does not do
 
-- It runs against a local server; the production site uses Cognito for sign-in, so account scenarios cannot sign up there. The memory and care operations are exercised on the live site with the anonymous demo circle.
+- It also runs against the live site: set `SCENARIO_URL` and `SCENARIO_COGNITO=<pool id>:<app client id>` and every user becomes a throwaway Cognito user (a made-up `@scenario.test` address) that is removed at the end. On 17 Oct 2026 this ran 42 scenarios against production: all passed except one that signs up with the app's own passwords, which a Cognito site does not offer (skipped), and a rate-limit scenario that sent its requests one at a time (too slow over the internet to reach the per-minute limit; now parallel, and passing live).
 - A scenario only checks what someone thought to ask. The list above is what was thought of; it will not be complete.
 - Nothing here replaces a clinical review. The app records and cross-checks; it does not advise, and no scenario tests whether any medicine information is *right* for a person.

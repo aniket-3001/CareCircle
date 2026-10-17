@@ -113,7 +113,9 @@ def n5(w: World, r):
 @scenario("N6", "Rate limits: a flood from one carer is slowed, other people are not affected")
 def n6(w: World, r):
     priya, omar, mallory, c = w.team()
-    noisy = [priya.op(c, "care_regimen", person="mum")[0] for _ in range(750)]                       # the limit is 600 a minute per person
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(16) as pool:                                                              # in parallel: one at a time over the internet takes longer than the minute
+        noisy = list(pool.map(lambda _: priya.op(c, "care_regimen", person="mum")[0], range(750)))     # the limit is 600 a minute per person
     r.check(set(noisy) <= {200, 429}, "a flood gets 200s then 429s, nothing else", sorted(set(noisy)))
     r.check(429 in noisy, "and the limit does kick in", noisy.count(429))
     r.check(omar.op(c, "care_regimen", person="mum")[0] == 200, "Omar is not slowed by Priya's flood", "")
