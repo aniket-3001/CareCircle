@@ -1,7 +1,8 @@
 """Track 02 load test: many agents reading and writing at once over the HTTP API, then a consistency audit of what was stored.
 
   PYTHONPATH=. python bench/track02_stress.py                         # in-process app against the local FalkorDB (no network hop)
-  python bench/track02_stress.py --url https://host --admin-key KEY    # a deployed server (creates and removes its own throwaway tenants)
+  python bench/track02_stress.py --url https://host --admin-key KEY --disposable-server    # a deployed server that may be crashed (creates and removes its own throwaway tenants)
+  NEVER the live site: a run of this against it caused the outage in docs/FALKORDB_CRASH.md
 
 Phases (each prints throughput and p50/p95/p99 latency per operation, and checks the result is exact):
   A  write storm      W agents append to ONE shared session and assert facts at the same time
@@ -12,6 +13,7 @@ Phases (each prints throughput and p50/p95/p99 latency per operation, and checks
 """
 import argparse
 import asyncio
+import re
 import statistics
 import sys
 import time
@@ -222,8 +224,13 @@ async def main(a):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--url")
+    ap.add_argument("--disposable-server", action="store_true", help="required for any server that is not this machine: the run writes and deletes many graphs and can crash the database")
     ap.add_argument("--admin-key", default="")
     ap.add_argument("--agents", type=int, default=30)
     ap.add_argument("--per-agent", type=int, default=20)
     ap.add_argument("--tenants", type=int, default=30)
-    sys.exit(asyncio.run(main(ap.parse_args())))
+    args = ap.parse_args()
+    if args.url and not args.disposable_server and not re.match(r"https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(/|$)", args.url):
+        sys.exit(f"refusing to load-test {args.url}: it is not this machine. A run of this script against the live site caused the outage in docs/FALKORDB_CRASH.md. "
+                 "Use a throwaway copy, and pass --disposable-server to say so.")
+    sys.exit(asyncio.run(main(args)))

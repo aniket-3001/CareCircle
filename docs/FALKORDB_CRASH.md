@@ -12,6 +12,12 @@ At 08:13 UTC the live site began answering 502. The database container was resta
 
 What this does not say: that FalkorDB is unsafe in general. Snapshot loading worked every time it was tried, including after a hard kill.
 
+## How it was triggered, said plainly
+
+The crashing graph, `mem__tt-stress-a-…`, is named the way `bench/track02_stress.py` names the throwaway tenants it creates. That script can be pointed at a deployed server with `--url`, and the name shows that **this outage came from a load test run against the live site, not from visitors**. Real circles were never the trigger; they were only the ones that would have lost data on a crash.
+
+What would have been cheaper to try first, and was not: never run the stress script against production (it now refuses a non-local server unless told the server is disposable), and never reuse a graph name after `GRAPH.DELETE` (the shared demo circle is still dropped and rebuilt under the same name on a seed-version change, which is the pattern the log held; with the log off it is harmless, but it is the pattern to avoid if the log is ever turned back on). Switching the append-only log off for every real circle is the broader fix: it removes the replay path, at the cost of up to a minute of writes after a hard crash instead of about a second. It was chosen because the exact sequence that leaves the bad effect in the log is **not pinned down** (point 3 above), so avoiding the trigger could not be shown to be enough. That reasoning is a judgement, not a measurement.
+
 ## What was done
 
 - **The database now persists by snapshots only** (`--appendonly no --save 60 1 --save 300 100`), so there is no log to replay (`deploy/docker-compose.prod.yml`). Tested in a throwaway container with the same write, delete, write-again pattern, a clean stop and a hard kill: no crash, all graphs back. The cost: after a hard crash up to the last minute of writes is lost (before, about a second).
