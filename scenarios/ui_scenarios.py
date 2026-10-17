@@ -3,6 +3,7 @@
   SCENARIO_URL=http://localhost:8099 python scenarios/ui_scenarios.py [prefix]
 """
 import os
+import re
 import sys
 import time
 import traceback
@@ -652,6 +653,48 @@ def u18(w, b, r):
     pg.get_by_test_id("chain-check").click()
     expect(pg.get_by_test_id("chain-verdict")).to_contain_text("unbroken", timeout=15000)
     r.check("3 entries" in pg.get_by_test_id("chain-verdict").inner_text(), "the stored log is unbroken and holds all three entries", pg.get_by_test_id("chain-verdict").inner_text())
+    r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
+    ctx.close()
+
+
+@scenario("U19", "In Hindi, every screen reads in Hindi: no English sentence is left in the markup")
+def u19(w, b, r):
+    errs = []
+    ctx, pg = new_page(b, errs=errs)
+    email = f"u19-{rid()}@scenario.test"
+    ui_signup(pg, "Hindi", email)
+    ui_circle(pg, "Mum's medicines", "Mum")
+    u = api_user(w, email)
+    c = circle_of(u)
+    for d, dose, f in (("warfarin", "5 mg", "at bedtime"), ("metformin", "500 mg", "twice daily"), ("clarithromycin", "500 mg", "twice daily")):
+        u.ok(c, "care_record", person="mum", drug=d, dose_text=dose, freq_text=f)
+    pg.get_by_test_id("lang-toggle").click()
+    STOP = {"the", "and", "to", "of", "is", "a", "this", "with", "for", "you", "your", "not", "are", "be", "on", "in", "it", "or", "that", "from", "has", "have", "can", "will"}
+    DATA = ".print-only, [data-testid=quote], .quote, [data-testid=timeline], [data-testid=cypher], pre, code, input, textarea, svg, [data-testid=graph-canvas]"
+    left = []
+    for t in ("today", "add", "circle", "graph", "history", "account"):
+        pg.goto(f"{BASE}/#/{t}")
+        pg.reload()
+        pg.wait_for_timeout(1800)
+        for d in ("today-more", "circle-more"):
+            if pg.get_by_test_id(d).count():
+                pg.get_by_test_id(d).evaluate("e => { e.open = true; }")
+        texts = pg.evaluate("""(sel) => {
+            const bad = document.querySelectorAll(sel), out = [];
+            const w = document.createTreeWalker(document.querySelector('#root') || document.body, NodeFilter.SHOW_TEXT);
+            for (let n = w.nextNode(); n; n = w.nextNode()) {
+              const e = n.parentElement; if (!e || e.closest(sel)) continue;
+              const s = n.textContent.replace(/\s+/g, ' ').trim(); if (s) out.push(s);
+            }
+            for (const e of document.querySelectorAll('[placeholder],[aria-label],[title]')) for (const a of ['placeholder', 'aria-label', 'title']) if (e.getAttribute(a)) out.push(e.getAttribute(a));
+            return out; }""", DATA)
+        for s in texts:
+            words = [x.lower() for x in re.findall(r"[A-Za-z']+", s)]
+            if len(words) >= 3 and sum(x in STOP for x in words) >= 2 and not re.search(r"[ऀ-ॿ]", s):
+                left.append(f"{t}: {s[:400]}")
+    if left and os.getenv("U19_DUMP"):
+        open(os.getenv("U19_DUMP"), "w", encoding="utf-8").write(chr(10).join(dict.fromkeys(left)))
+    r.check(not left, f"no English sentence is left on any screen in Hindi ({len(left)} found)", left[:6])
     r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
     ctx.close()
 
