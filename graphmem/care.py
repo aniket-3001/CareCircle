@@ -350,8 +350,17 @@ class CareMixin:
                                "Please check with them.") if kind == "escalate" else (
                                f"The change to {u['drug']} made {u['age_hours']} hours ago is not yet acknowledged. Please open it and confirm.")
                         sent.append({"kind": kind, "about_carer": carer, "notify": to, "drug": u["drug"], "age_hours": u["age_hours"],
-                                     "message": reword(tpl, facts)})
+                                     "message": reword(tpl, facts), "claim": key})
         return sent
+
+    async def care_nudge_release(self, claim: str, max_tries: int = 5) -> bool:
+        """Hand a claimed reminder back because it could not be delivered anywhere, so the next pass produces it again. After `max_tries` hand-backs it stays used
+        (a destination that keeps failing must not be tried for ever). Not an operation callers can reach: only the delivery loop uses it."""
+        if self._guard:
+            await self._guard("write")
+        rows = await self._q("MATCH (n:Nudge {key:$k}) WHERE coalesce(n.tries, 0) < $m SET n.fresh = true, n.tries = coalesce(n.tries, 0) + 1 RETURN n.tries",
+                             {"k": claim, "m": max_tries}, checked=True)
+        return bool(rows)
 
     async def care_reminders(self, person: str, now: Optional[int] = None, remind_after_h: float = 4, escalate_after_h: float = 12) -> list[dict]:
         """Reminders that are due, as a read-only preview: nothing is claimed, so looking at them never uses them up (care_nudges claims and delivers).

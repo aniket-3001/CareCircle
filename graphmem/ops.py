@@ -79,6 +79,8 @@ async def invoke(gm: GraphMem, agent: str, tenant: str, op: str, args: dict[str,
         raise TypeError("arguments must be an object")
     check_text(args)
     mem = gm.open(agent, tenant)
+    if OPS[op] != "read" and getattr(gm, "reminders", None) is not None:
+        gm.reminders.touch(tenant)                  # a write: the reminder loop should look at this circle again soon
     if mem._guard:                                  # the scope the table above names is enforced here, once, for every operation: an operation that
         await mem._guard(OPS[op])                   # writes through a path that skips the per-query check (a claim, a delete) cannot be reached with a read-only key
     if op == "forget_fact":  # must also delete copies published to shared spaces

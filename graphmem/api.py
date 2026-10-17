@@ -152,6 +152,18 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
             from carecircle import telegram
             app.state.tg = asyncio.create_task(telegram.poll(gm, token))
 
+    @app.on_event("startup")
+    async def _reminders():                   # the reminder loop does not need Telegram: Web Push alone is enough to start it
+        from carecircle import reminders
+        if reminders.wanted() and os.getenv("CC_REMINDERS", "1") != "0":
+            import asyncio
+            send = None
+            if os.getenv("TELEGRAM_BOT_TOKEN"):
+                from carecircle import telegram
+                send = telegram._OffLoop(telegram.TgApi(os.environ["TELEGRAM_BOT_TOKEN"])).send
+            gm.reminders = reminders.Reminders(gm, send)
+            app.state.rem = asyncio.create_task(gm.reminders.run())
+
     async def agent_id(request: Request, authorization: Optional[str] = Header(None)) -> str:
         ip = client_ip(request)
         who = await gm.authenticate(_bearer(authorization))

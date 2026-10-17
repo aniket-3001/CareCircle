@@ -186,6 +186,23 @@ class CareScheduleMixin:
         return await self.care_give(person, drug, f"{day.isoformat()} {time}")
 
     # ------------------------------------------------------------------ reminders about the checklist
+    async def care_slot_edges(self, person: str, now: Optional[int] = None) -> list[int]:
+        """The moments today and tomorrow when a dose slot changes state (an hour before it, at it, 90 minutes after it): when a reminder could next be due.
+        Used by the delivery loop to leave a quiet circle alone until then."""
+        import datetime as dt
+        t = now_ms() if now is None else now
+        tz = await self._tz()
+        today = sched.local_date(t, tz)
+        out: list[int] = []
+        for r in await self.care_regimen(person, t):
+            if r["as_needed"] or not r["slots"]:
+                continue
+            for n in (0, 1):
+                for hhmm in r["slots"]:
+                    m = sched.slot_moment_ms(today + dt.timedelta(days=n), hhmm, tz)
+                    out += [m - 60 * 60_000, m, m + 90 * 60_000]
+        return sorted(set(out))
+
     async def care_slot_nudges(self, person: str, now: Optional[int] = None, hold: Optional[set] = None) -> list[dict]:
         """Reminders for today's slots, each produced once per carer: when a slot is due ('Metformin 08:00 is due') and when it is still not marked given
         90 minutes later. Said about the record, not about the person. A slot already marked given produces none."""
@@ -204,7 +221,7 @@ class CareScheduleMixin:
                 key = f"stock|{norm(person)}|{norm(s['drug'])}|{s['counted_at']}|{c}"
                 r = await self._q("MERGE (n:Nudge {key:$k}) ON CREATE SET n.at=$t, n.fresh=true WITH n, n.fresh AS fresh SET n.fresh=false RETURN fresh", {"k": key, "t": t}, checked=True)
                 if r[0][0]:
-                    out.append({"kind": "stock", "notify": c, "drug": s["drug"], "slot": "",
+                    out.append({"kind": "stock", "notify": c, "drug": s["drug"], "slot": "", "claim": key,
                                 "message": {"text": f"{s['drug'].capitalize()}: about {s['days_left']} day{'s' if s['days_left'] != 1 else ''} of doses left on the record ({s['doses_left']}). Please check the pack.", "source": "template"}})
         for i in today["items"]:
             if i["state"] not in ("due", "not_marked"):
@@ -219,5 +236,5 @@ class CareScheduleMixin:
                     continue
                 what = f"{i['drug'].capitalize()} {i['dose_text']}".strip()
                 text = (f"{what}, {i['time']}: due now." if i["state"] == "due" else f"{what}, {i['time']}: not marked as given yet. Please check with the others and mark it if it was given.")
-                out.append({"kind": "slot_" + i["state"], "notify": c, "drug": i["drug"], "slot": i["slot"], "message": {"text": text, "source": "template"}})
+                out.append({"kind": "slot_" + i["state"], "notify": c, "drug": i["drug"], "slot": i["slot"], "claim": key, "message": {"text": text, "source": "template"}})
         return out

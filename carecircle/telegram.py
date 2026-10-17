@@ -246,35 +246,10 @@ class Bot:
         return out
 
     async def deliver_nudges(self, now: Optional[int] = None) -> int:
-        """Send each due reminder once (care_nudges claims it) to every place its recipient asked for it: the linked chat and any browser that allowed
-        notifications. One claim, several channels, so a reminder is never produced twice however many ways it is delivered."""
-        from . import webpush
-        g = await self.gm._ctl()
-        chats: dict[str, list] = {}
-        circles: dict[str, set] = {}
-        for chat, agent, circle in (await g.query("MATCH (c:TgChat) RETURN c.chat, c.agent, c.circle")).result_set:
-            chats.setdefault(agent.lower(), []).append(chat)
-            circles.setdefault(circle, set()).add(agent)
-        if webpush.enabled():
-            subbed = {r[0] for r in (await g.query("MATCH (s:PushSub) RETURN DISTINCT s.agent")).result_set}
-            for agent, circle in (await g.query("MATCH (a:Account)-[:MEMBER]->(t:Tenant) RETURN a.agent, t.id")).result_set:
-                if agent in subbed:
-                    circles.setdefault(circle, set()).add(agent)
-        sent = 0
-        from .accounts import Accounts
-        hold = await Accounts(self.gm).quiet_now(now if now is not None else int(time.time() * 1000))
-        for circle, members in circles.items():
-            mem = self.gm.open(sorted(members)[0], circle)
-            for person in (await mem.care_people())["patients"]:
-                for n in [*await mem.care_nudges(person, now=now, hold=hold), *await mem.care_slot_nudges(person, now=now, hold=hold)]:
-                    text = n["message"]["text"]
-                    for chat in chats.get(n["notify"], []):
-                        await self.api.send(chat, text)
-                        sent += 1
-                    for agent in members:
-                        if agent.lower() == n["notify"]:
-                            sent += await webpush.push(self.gm, agent, text)
-        return sent
+        """Send each due reminder once to every place its recipient asked for it (the linked chat and any browser that allowed notifications). The work is
+        done by carecircle.reminders, which also runs without a bot; this keeps the bot's own entry point (and its tests) as they were."""
+        from .reminders import Reminders
+        return await Reminders(self.gm, self.api.send).deliver(now, use_wake=False)
 
 
 async def poll(gm, token: str, nudge_every: float = 20.0) -> None:                       # pragma: no cover - needs a real bot token
@@ -291,21 +266,13 @@ async def poll(gm, token: str, nudge_every: float = 20.0) -> None:              
                     offset = u["update_id"] + 1
                     try:
                         await bot.handle(u)
+                        if getattr(gm, "reminders", None) is not None:
+                            gm.reminders.wake.clear()          # the bot may have written anywhere: look at every circle again soon
                     except Exception as e:
                         print("handler error", type(e).__name__, e, flush=True)
             except Exception as e:
                 print("poll error", type(e).__name__, e, flush=True)
                 await asyncio.sleep(3)
 
-    async def reminders():
-        while True:
-            try:
-                n = await bot.deliver_nudges()
-                if n:
-                    print("reminders sent", n, flush=True)
-            except Exception as e:
-                print("reminder error", type(e).__name__, e, flush=True)
-            await asyncio.sleep(nudge_every)
-
     print("telegram bot polling", flush=True)
-    await asyncio.gather(updates(), reminders())
+    await updates()                                      # reminders are delivered by carecircle.reminders, started beside this (with or without a bot)
