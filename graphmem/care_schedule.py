@@ -15,6 +15,7 @@ from typing import Optional
 from carecircle import schedule as sched
 
 from .db import norm, now_ms
+from .textcheck import product_name, shown_name
 
 DEFAULT_TZ = "Asia/Kolkata"            # used until a circle sets its own; the web app sets it from the browser on first use
 H = 3_600_000
@@ -304,7 +305,7 @@ class CareScheduleMixin:
                 r = await self._q("MERGE (n:Nudge {key:$k}) ON CREATE SET n.at=$t, n.fresh=true WITH n, n.fresh AS fresh SET n.fresh=false RETURN fresh", {"k": key, "t": t}, checked=True)
                 if r[0][0]:
                     out.append({"kind": "stock", "notify": c, "drug": s["drug"], "slot": "", "claim": key,
-                                "message": {"text": f"{s['drug'].capitalize()}: about {s['days_left']} day{'s' if s['days_left'] != 1 else ''} of doses left on the record ({s['doses_left']}). Please check the pack.", "source": "template"}})
+                                "message": {"text": f"{shown_name(s['drug'])}: about {s['days_left']} day{'s' if s['days_left'] != 1 else ''} of doses left on the record ({s['doses_left']}). Please check the pack.", "source": "template"}})
         for i in today["items"]:
             if i["state"] not in ("due", "not_marked"):
                 continue
@@ -316,7 +317,7 @@ class CareScheduleMixin:
                                   {"k": key, "t": t}, checked=True)
                 if not r[0][0]:
                     continue
-                what = f"{(i.get('label') or i['drug']).capitalize()} {i['dose_text']}".strip()
+                what = f"{product_name(i['label']) if i.get('label') else shown_name(i['drug'])} {i['dose_text']}".strip()
                 text = (f"{what}, {i['time']}: due now." if i["state"] == "due" else f"{what}, {i['time']}: not marked as given yet. Please check with the others and mark it if it was given.")
                 out.append({"kind": "slot_" + i["state"], "notify": c, "drug": i["drug"], "slot": i["slot"], "claim": key, "message": {"text": text, "source": "template"}})
         return out

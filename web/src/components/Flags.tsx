@@ -1,7 +1,7 @@
 import { Route } from 'lucide-react';
 import type { CheckResult } from '../api/types';
 import { SEVERITY, sevKey } from '../design/levels';
-import { title } from '../lib/format';
+import { productName, title } from '../lib/format';
 import { Pill, type Tone } from './Pill';
 import { tr } from '../lib/i18n';
 
@@ -20,7 +20,7 @@ export function Flags({ check }: { check: CheckResult }): React.JSX.Element {
             <b>{title(d.ingredient)} {tr('is on record more than once')}</b>
             <Pill tone="warn">{tr('possible duplicate')}</Pill>
           </div>
-          <span className="muted small">{d.entries.map((e) => `${e.product ? title(e.product) : tr('entered as the medicine itself')}${e.dose_text ? ` ${e.dose_text}` : ''}`).join(' · ')}. {tr('It may be the same medicine from two sources. Discuss with a prescriber or pharmacist.')}</span>
+          <span className="muted small">{d.entries.map((e) => `${e.product ? productName(e.product) : tr('entered as the medicine itself')}${e.dose_text ? ` ${e.dose_text}` : ''}`).join(' · ')}. {tr('It may be the same medicine from two sources. Discuss with a prescriber or pharmacist.')}</span>
         </div>
       ))}
       {check.direct.map((f) => {

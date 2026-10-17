@@ -1,7 +1,7 @@
 import { PackageX } from 'lucide-react';
 import { Async } from './Async';
 import { Pill } from './Pill';
-import { title } from '../lib/format';
+import { plural, title } from '../lib/format';
 import { useLoad } from '../state';
 import { tr } from '../lib/i18n';
 
@@ -14,7 +14,7 @@ export function Recalls(): React.JSX.Element | null {
       <div className="card-head"><h2 id="recall-title">{tr('Recalls to check')}</h2><PackageX size={20} aria-hidden="true" /></div>
       <Async state={state}>
         {(r) => r.recalls.length === 0 ? (
-          <p className="muted">No ongoing recall is listed for the {r.checked.length} medicines on record (openFDA, US recalls). That does not cover every country or every pack.</p>
+          <p className="muted">No ongoing recall is listed for the {plural(r.checked.length, 'medicine')} on record (openFDA, US recalls). That does not cover every country or every pack.</p>
         ) : (
           <div className="rows">
             {r.recalls.map((x) => (

@@ -579,3 +579,18 @@ async def test_bot_says_when_it_shows_fewer_cards_than_it_read(gm, monkeypatch):
     api.out.clear()
     await bot.handle({"message": {"chat": {"id": 1}, "text": "\n".join(f"{d} 10 mg" for d in ("metformin", "warfarin", "amlodipine", "atorvastatin", "omeprazole", "sertraline", "lisinopril", "digoxin", "furosemide", "tramadol"))}})
     assert sum(1 for o in api.out if o[2]) == 8 and any("will show the first 8" in o[1] for o in api.out)
+
+
+def test_names_read_the_same_everywhere_vitamin_letters_and_product_capitals():
+    """N9: 'Vitamin d' in the graph and in reminders, 'Telma-am' for Telma-AM."""
+    from graphmem.textcheck import product_name, shown_name
+    assert shown_name("vitamin d") == "Vitamin D" and shown_name("vitamin b12") == "Vitamin B12" and shown_name("acetylsalicylic acid") == "Acetylsalicylic acid" and shown_name("") == ""
+    assert product_name("telma-am") == "Telma-AM" and product_name("ecosprin gold") == "Ecosprin Gold" and product_name("cardace-h") == "Cardace-H"
+
+
+async def test_the_graph_and_the_stock_reminder_name_vitamin_d_properly(gm):
+    t, c = await circle(gm, "ravi")
+    await c["ravi"].care_record("asha", "vitamin d", dose_text="1000 IU", freq_text="once daily")
+    g = await c["ravi"].care_graph("asha")
+    labels = {n["label"] for n in g["nodes"].values()} if isinstance(g["nodes"], dict) else {n["label"] for n in g["nodes"]}
+    assert any(l.startswith("Vitamin D") for l in labels) and not any(l.startswith("Vitamin d") for l in labels), sorted(labels)

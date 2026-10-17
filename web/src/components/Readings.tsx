@@ -5,7 +5,7 @@ import { Async } from './Async';
 import { Pill, Spinner } from './Pill';
 import { Sheet } from './Sheet';
 import { useToast } from './Toast';
-import { ago, nameOf, title } from '../lib/format';
+import { ago, nameOf, plural, title } from '../lib/format';
 import { useApp, useLoad } from '../state';
 import { tr } from '../lib/i18n';
 
@@ -136,7 +136,7 @@ export function Readings(): React.JSX.Element {
                   <div key={c.dose} className="item">
                     <div>
                       <div className="item__title">{c.action === 'stop' ? 'Stopped' : c.text} <Pill tone="mute">{new Date(c.at).toLocaleDateString()}</Pill></div>
-                      <div className="item__sub">{trend.window_days} days before: {c.before.n} readings{c.before.mean !== null ? `, mean ${c.before.mean}` : ''}. After: {c.after.n} readings{c.after.mean !== null ? `, mean ${c.after.mean}` : ''}.</div>
+                      <div className="item__sub">{plural(trend.window_days, 'day')} before: {plural(c.before.n, 'reading')}{c.before.mean !== null ? `, mean ${c.before.mean}` : ''}. After: {plural(c.after.n, 'reading')}{c.after.mean !== null ? `, mean ${c.after.mean}` : ''}.</div>
                     </div>
                   </div>
                 ))}

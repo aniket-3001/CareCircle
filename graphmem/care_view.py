@@ -22,6 +22,7 @@ from typing import Optional
 from carecircle.safety import scan_advice
 
 from .db import new_id, norm, now_ms
+from .textcheck import shown_name
 
 H = 3_600_000
 _secret_cache: dict = {}
@@ -86,7 +87,7 @@ def who(agent: Optional[str]) -> str:
 
 
 def _title(drug: str) -> str:
-    return drug[:1].upper() + drug[1:] if drug else drug
+    return shown_name(drug)
 
 
 class CareViewMixin:

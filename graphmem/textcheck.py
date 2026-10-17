@@ -43,3 +43,16 @@ class Clean(BaseModel):
     def _no_bad_text(self):
         check_text(self.model_dump(), "the request")
         return self
+
+
+def shown_name(s: str) -> str:
+    """A medicine's name for people to read: 'vitamin d' -> 'Vitamin D', 'vitamin b12' -> 'Vitamin B12', 'acetylsalicylic acid' -> 'Acetylsalicylic acid'.
+    The first letter is capitalised and nothing else is lower-cased; a lone letter (with digits) after 'vitamin' is a vitamin's name, so it is capitalised too.
+    The same rule as `title` in the web app, so a name reads the same in a reminder, the graph and the screens."""
+    import re
+    return (s[:1].upper() + s[1:]) if not s else re.sub(r"(?<=\bvitamin )[a-z]\d*\b", lambda m: m.group(0).upper(), s[:1].upper() + s[1:], flags=re.I)
+
+
+def product_name(p: str) -> str:
+    """A combination product's name as it is usually printed: 'telma-am' -> 'Telma-AM' (short parts after a hyphen in capitals). The same rule as `productName` in the web app."""
+    return " ".join("-".join((x.upper() if i > 0 and len(x) <= 3 else x[:1].upper() + x[1:]) for i, x in enumerate(w.split("-"))) for w in p.split(" "))

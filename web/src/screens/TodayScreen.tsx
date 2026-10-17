@@ -13,7 +13,7 @@ import { Counts } from '../components/Counts';
 import { Readings } from '../components/Readings';
 import { Recalls } from '../components/Recalls';
 import { Scale } from '../components/Scale';
-import { ago, nameOf, plural, title } from '../lib/format';
+import { ago, nameOf, plural, productName, title } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { useApp, useLoad } from '../state';
 
@@ -72,7 +72,7 @@ export function TodayScreen(): React.JSX.Element {
                           </span>
                           <div>
                             <div className="item__title">
-                              {title(r.drug)} <span className="muted">{r.dose_text} {r.freq_text}</span>{r.product ? <span className="pill pill--mute" style={{ marginLeft: 6 }}>{t('as')} {title(r.product)}</span> : null}
+                              {title(r.drug)} <span className="muted">{r.dose_text} {r.freq_text}</span>{r.product ? <> <span className="pill pill--mute">{t('as')} {productName(r.product)}</span></> : null}
                             </div>
                             <div className="item__sub">
                               added by {nameOf(r.by)} {SOURCE[r.source]}, {ago(r.since, app.now())}

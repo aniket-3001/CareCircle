@@ -52,7 +52,8 @@ URL = re.compile(r"https?://|www\.|```|\]\(|<[a-z/][^>]*>", re.I)
 
 
 def _title(s: str) -> str:
-    return s[:1].upper() + s[1:] if s else s
+    from graphmem.textcheck import shown_name
+    return shown_name(s)
 
 
 def _who(agent: str) -> str:

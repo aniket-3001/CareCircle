@@ -12,7 +12,7 @@ import asyncio
 from typing import Optional
 
 from .db import new_id, norm, now_ms
-from .textcheck import fit
+from .textcheck import fit, shown_name
 
 DAY = 86_400_000
 
@@ -33,15 +33,15 @@ class CareFollowupsMixin:
 
         pairs = [tuple(sorted(x["drugs"])) for x in check["direct"]] + [tuple(sorted((x["x"], x["y"]))) for x in check["enzyme_paths"]]
         for a, b in sorted(set(pairs)):
-            add(f"pair|{a}|{b}", "prescriber", f"Ask the prescriber or pharmacist about {a.title()} and {b.title()} together", [a, b])
+            add(f"pair|{a}|{b}", "prescriber", f"Ask the prescriber or pharmacist about {shown_name(a)} and {shown_name(b)} together", [a, b])
         for hit in allergies["hits"]:
-            add(f"allergy|{hit['drug']}", "prescriber", f"Ask the prescriber about the recorded {hit['allergy']} allergy and {hit['drug'].title()}", [hit["drug"]])
+            add(f"allergy|{hit['drug']}", "prescriber", f"Ask the prescriber about the recorded {hit['allergy']} allergy and {shown_name(hit['drug'])}", [hit["drug"]])
         for carer, v in sorted(div["carers"].items()):
             for u in v["unacknowledged"]:
-                add(f"unseen|{carer}|{u['drug']}", "carer", f"Make sure {carer.title()} has seen {u['drug'].title()}", [u["drug"]])
+                add(f"unseen|{carer}|{u['drug']}", "carer", f"Make sure {carer.title()} has seen {shown_name(u['drug'])}", [u["drug"]])
         for r in check["regimen"]:
             if t - r["since"] <= 7 * DAY:
-                add(f"new|{r['drug']}", "pharmacist", f"Tell the pharmacist about {r['drug'].title()} {r['dose_text']}".strip(), [r["drug"]])
+                add(f"new|{r['drug']}", "pharmacist", f"Tell the pharmacist about {shown_name(r['drug'])} {r['dose_text']}".strip(), [r["drug"]])
         return out
 
     async def _followup_keys(self, p: str) -> set[str]:

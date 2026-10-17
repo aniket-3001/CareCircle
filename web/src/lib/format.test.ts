@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ago, nameOf, pct, plural, title, whenLocal } from './format';
+import { ago, nameOf, pct, plural, productName, shown, title, whenLocal } from './format';
 
 describe('format', () => {
   it('names agents without their circle suffix', () => {
@@ -34,4 +34,14 @@ describe('whenLocal', () => {
     expect(s).toMatch(/16 Oct|Oct 16/);
     expect(s.length).toBeGreaterThan(8);
   });
+});
+
+it('shows a combination product as it is printed, and a row by its product when it has one', () => {
+  expect(productName('telma-am')).toBe('Telma-AM');
+  expect(productName('glycomet-gp')).toBe('Glycomet-GP');
+  expect(productName('ecosprin gold')).toBe('Ecosprin Gold');
+  expect(shown({ drug: 'amlodipine', label: 'telma-am' })).toBe('Telma-AM');
+  expect(shown({ drug: 'vitamin d' })).toBe('Vitamin D');
+  expect(plural(1, 'flag')).toBe('1 flag');
+  expect(plural(2, 'flag')).toBe('2 flags');
 });

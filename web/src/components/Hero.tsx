@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import type { CheckResult } from '../api/types';
 import { SEVERITY, levelVars, sevKey, worstSeverity } from '../design/levels';
-import { title } from '../lib/format';
+import { plural, title } from '../lib/format';
 import { useT } from '../lib/i18n';
 import { useSettle } from '../lib/useSettle';
 import { FaceIcon } from './Face';
@@ -36,7 +36,7 @@ export function Hero({ check, chips }: { check: CheckResult; chips: Chip[] }): R
     <section className={`hero${noData ? ' hero--neutral' : ''}`} style={noData ? undefined : levelVars(sev)} aria-labelledby="hero-title" data-testid="verdict" data-state={j.state}>
       <div className="hero-top">
         <div className="badge">
-          <span className="sr-only">{n} flags</span>
+          <span className="sr-only">{plural(n, 'flag')}</span>
           <span className="badge-num" aria-hidden="true" data-testid="flag-count" data-n={n}>
             {shown}
           </span>

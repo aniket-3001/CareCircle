@@ -88,7 +88,7 @@ export function HistoryScreen(): React.JSX.Element {
   async function doErase(): Promise<void> {
     try {
       const r = await app.api.forgetPerson(typed);
-      toast(`All records of ${title(app.session.person)} removed (${r.removed_entries} entries). Receipt ${r.receipt}.`);
+      toast(`All records of ${title(app.session.person)} removed (${plural(r.removed_entries, 'entry', 'entries')}). Receipt ${r.receipt}.`);
       setErase(false); setTyped('');
       app.bump();
     } catch (e) {
