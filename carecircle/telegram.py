@@ -199,9 +199,20 @@ class Bot:
         sid = ""
         if link and kinds.get(src["kind"]):                          # keep what was read, so the saved entry can be checked against it and points back at it
             sid = await self.gm.open(link["agent"], link["circle"]).care_store_source(src["kind"], src["text"], src.get("file_sha256", ""), src.get("file_bytes", 0))
-        if len(props) > MAX_CARDS:
-            await self.api.send(chat, f"I read {len(props)} medicines and will show the first {MAX_CARDS}. Send the rest again in a separate message.")
-        for p in props[:MAX_CARDS]:
+        cards, seen_combo = [], {}
+        for p in props:                                             # one card per tablet: a combination's ingredients are confirmed or discarded together
+            c = p.get("combination", "")
+            if c and c in seen_combo:
+                seen_combo[c]["members"].append(p)
+            else:
+                card = {"p": p, "members": [p]}
+                cards.append(card)
+                if c:
+                    seen_combo[c] = card
+        if len(cards) > MAX_CARDS:
+            await self.api.send(chat, f"I read {len(cards)} medicines and will show the first {MAX_CARDS}. Send the rest again in a separate message.")
+        for card in cards[:MAX_CARDS]:
+            p = card["p"]
             cid = os.urandom(4).hex()
             top = p["drug_candidates"][0]["name"]
             combo = p.get("combination", "")
@@ -215,8 +226,14 @@ class Bot:
                 note = f"\nSaved under the brand {brand}: a second brand of the same medicine stays a separate entry and is flagged as a possible duplicate."
             elif p.get("possible_combination"):
                 note = f"\n{p['possible_combination']} may be a combination product. Only one ingredient was read from it; check the pack for any others."
-            await self._hold(cid, chat, {"drug": top, "dose_text": p.get("dose_text", ""), "freq_text": p.get("freq_text", ""), "product": combo or brand, "product_strength": p.get("combination_strength", ""),
-                                 "quote": p["quote"], "source_ref": sid, "source_type": kinds.get(src["kind"], "typed")})
+            def entry(q):
+                return {"drug": q["drug_candidates"][0]["name"], "dose_text": q.get("dose_text", ""), "freq_text": q.get("freq_text", ""), "product": combo or brand,
+                        "product_strength": q.get("combination_strength", ""), "quote": q["quote"], "source_ref": sid, "source_type": kinds.get(src["kind"], "typed")}
+            held = entry(p)
+            if combo and len(card["members"]) > 1:
+                held["also"] = [entry(q) for q in card["members"][1:]]
+                note += f"\nThis one confirmation saves all {len(card['members'])} ingredients together ({', '.join(q['drug_candidates'][0]['name'] for q in card['members'])})."
+            await self._hold(cid, chat, held)
             alt = ", ".join(c["name"] for c in p["drug_candidates"][1:])
             await self.api.send(chat, f"I read: {top} {p.get('dose_text', '')} {p.get('freq_text', '')}{note}\nFrom: \"{p['quote'][:120]}\""
                                 f"{' (quote verified)' if p.get('verified') else ' (could not verify the quote)'}"
@@ -231,14 +248,17 @@ class Bot:
         if not link or not p or kind != "ok":
             return await self.api.send(chat, "Discarded." if kind == "no" else "That request expired.")
         mem = self.gm.open(link["agent"], link["circle"])
-        r = await mem.care_record(person or await self._patient(mem), p["drug"], dose_text=p["dose_text"], freq_text=p["freq_text"],
-                                  source_type=p["source_type"], quote=p["quote"], source_ref=p.get("source_ref", ""),
-                                  source_text=p.get("source_text", ""), product=p.get("product", ""), product_strength=p.get("product_strength", ""))
-        if r["status"] == "pending":
-            await mem.care_confirm(r["id"])                          # the person just confirmed by tapping
         who = person or await self._patient(mem)
-        again = [d["meaning"] for d in await mem.care_duplicates(who) if d["ingredient"] == p["drug"]]
-        await self.api.send(chat, f"Saved {p['drug']}{' (from ' + p['product'] + ')' if p.get('product') else ''} for {who}. Other carers will be asked to acknowledge it."
+        saved = []
+        for q in [p] + list(p.get("also") or []):                    # a combination's ingredients are all saved by the one confirmation
+            r = await mem.care_record(who, q["drug"], dose_text=q["dose_text"], freq_text=q["freq_text"],
+                                      source_type=q["source_type"], quote=q["quote"], source_ref=q.get("source_ref", ""),
+                                      source_text=q.get("source_text", ""), product=q.get("product", ""), product_strength=q.get("product_strength", ""))
+            if r["status"] == "pending":
+                await mem.care_confirm(r["id"])                      # the person just confirmed by tapping
+            saved.append(q["drug"])
+        again = [d["meaning"] for d in await mem.care_duplicates(who) if d["ingredient"] in saved]
+        await self.api.send(chat, f"Saved {' + '.join(saved)}{' (from ' + p['product'] + ')' if p.get('product') else ''} for {who}. Other carers will be asked to acknowledge it."
                                   + (f"\n{again[0]}" if again else ""))
 
     async def _cmd_ack(self, chat, mem, person):

@@ -43,6 +43,7 @@ REPRODUCTIONS = {
            "tests/test_tablet_tick.py::test_a_refused_tablet_writes_nothing_not_even_the_ingredient_that_was_free",
            "tests/test_tablet_tick.py::test_two_carers_ticking_one_tablet_at_once_have_exactly_one_winner_and_never_split_it"],
     "H17": ["tests/test_carecircle.py::test_bot_saves_a_combination_as_its_own_product_and_never_over_a_plain_entry",
+            "tests/test_carecircle.py::test_a_combination_in_the_bot_is_one_card_so_it_cannot_be_half_confirmed",
             "tests/test_care_schedule.py::test_a_combination_is_one_row_with_its_name_and_strength_and_one_tick",
             "tests/test_brands.py::test_no_ingredient_is_lost_to_the_order_of_the_lines",
             "tests/test_brand_product.py::test_b1_two_brands_of_one_molecule_are_two_entries_and_a_possible_duplicate",

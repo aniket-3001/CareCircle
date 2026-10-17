@@ -561,9 +561,8 @@ async def test_bot_saves_a_combination_as_its_own_product_and_never_over_a_plain
     api.out.clear()
     await bot.handle({"message": {"chat": {"id": 1}, "text": "Telma-AM 40 once daily"}})
     cards = [o for o in api.out if o[2]]
-    assert len(cards) == 2 and all("Telma-AM" in o[1] and "combination" in o[1] for o in cards)           # the bot says what it read it as
-    for o in cards:
-        await bot.handle({"callback_query": {"message": {"chat": {"id": 1}}, "data": o[2][0][0]["callback_data"]}})
+    assert len(cards) == 1 and "Telma-AM" in cards[0][1] and "combination" in cards[0][1] and "saves all 2 ingredients together" in cards[0][1]      # one card for the one tablet
+    await bot.handle({"callback_query": {"message": {"chat": {"id": 1}}, "data": cards[0][2][0][0]["callback_data"]}})
     reg = {(r["drug"], r["product"], r["dose_text"]) for r in await c["ravi"].care_regimen("asha")}
     assert ("amlodipine", "", "5 mg") in reg and ("amlodipine", "telma-am", "") in reg and ("telmisartan", "telma-am", "") in reg      # the plain entry is untouched
     assert [d["ingredient"] for d in await c["ravi"].care_duplicates("asha")] == ["amlodipine"]
@@ -594,3 +593,31 @@ async def test_the_graph_and_the_stock_reminder_name_vitamin_d_properly(gm):
     g = await c["ravi"].care_graph("asha")
     labels = {n["label"] for n in g["nodes"].values()} if isinstance(g["nodes"], dict) else {n["label"] for n in g["nodes"]}
     assert any(l.startswith("Vitamin D") for l in labels) and not any(l.startswith("Vitamin d") for l in labels), sorted(labels)
+
+
+async def test_a_combination_in_the_bot_is_one_card_so_it_cannot_be_half_confirmed(gm, monkeypatch):
+    """B7: the bot sent one Confirm card per ingredient; confirming one and discarding the other left half a tablet on record."""
+    monkeypatch.setenv("CC_LLM", "0")
+    t, c = await circle(gm, "ravi")
+    await c["ravi"].care_record("asha", "warfarin", dose_text="5 mg", freq_text="at bedtime")                  # the circle's person is Asha
+    key = await gm.issue_key("ravi")
+    api = FakeApi(); bot = Bot(gm, api, Checker())
+    await bot.handle({"message": {"chat": {"id": 7771}, "text": f"/link {key} {t}"}})
+    api.out.clear()
+    await bot.handle({"message": {"chat": {"id": 7771}, "text": "Telma-AM 40 once daily" + chr(10) + "Metformin 500 mg twice daily"}})
+    cards = [o for o in api.out if o[2]]
+    assert len(cards) == 2                                                                               # the tablet and the metformin: not three
+    tablet = next(o for o in cards if "Telma-AM" in o[1])
+    discard = tablet[2][0][1]["callback_data"]
+    await bot.handle({"callback_query": {"message": {"chat": {"id": 7771}}, "data": discard}})
+    assert [r["drug"] for r in await c["ravi"].care_regimen("asha")] == ["warfarin"]                       # discarding saved neither ingredient
+    again = [o for o in api.out if o[2] and "Telma-AM" in o[1]][0]
+    await bot.handle({"callback_query": {"message": {"chat": {"id": 7771}}, "data": again[2][0][0]["callback_data"]}})
+    assert [r["drug"] for r in await c["ravi"].care_regimen("asha")] == ["warfarin"]                       # the discarded card is gone: it cannot be confirmed later
+    api.out.clear()
+    await bot.handle({"message": {"chat": {"id": 7771}, "text": "Telma-AM 40 once daily"}})
+    ok = [o for o in api.out if o[2]][0]
+    await bot.handle({"callback_query": {"message": {"chat": {"id": 7771}}, "data": ok[2][0][0]["callback_data"]}})
+    assert {(r["drug"], r["product"]) for r in await c["ravi"].care_regimen("asha")} == {("warfarin", ""), ("telmisartan", "telma-am"), ("amlodipine", "telma-am")}   # one tap saved both
+    assert "telmisartan + amlodipine" in api.out[-1][1] or "amlodipine + telmisartan" in api.out[-1][1]
+    await (await gm._ctl()).query("MATCH (c:TgChat {chat:7771}) DELETE c")                                    # leave no chat link behind for other tests
