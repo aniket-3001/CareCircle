@@ -147,14 +147,25 @@ function Doses(): React.JSX.Element {
   const reg = useLoad((a) => a.api.regimen());
   const log = useLoad((a) => a.api.gives(), [app.rev]);
   const watched = useLoad((a) => a.api.watched(), [app.rev]);
+  const today = useLoad((a) => a.api.today(a.now()), [app.rev, app.warp]);
   const [showAll, setShowAll] = useState(false);
   const [drug, setDrug] = useState('');
-  const [slot, setSlot] = useState(`${new Date().toISOString().slice(0, 10)} 08:00`);
+  const [time, setTime] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
+
+  /** The slots the circle confirmed for this medicine today, as the choices (no typing a slot). A medicine with no fixed times is recorded for the current hour in the circle's own time zone. */
+  const slotsFor = (d: string) => (today.data?.items ?? []).filter((i) => i.drug === d);
+  const hourNow = (): string => {
+    const tz = today.data?.tz ?? 'UTC';
+    const h = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hour12: false }).format(new Date()).slice(0, 2);
+    return `${today.data?.date ?? new Date().toISOString().slice(0, 10)} ${h}:00`;
+  };
 
   async function give(d: string): Promise<void> {
     try {
-      const r = await app.api.give(d, slot);
+      const slots = slotsFor(d);
+      const pick = slots.find((i) => i.time === time) ?? slots[0];
+      const r = pick ? await app.api.giveSlot(pick.dose_id, pick.time) : await app.api.give(d, hourNow());
       if (r.given) { setMsg(null); toast('Recorded'); app.bump(); } else setMsg(`Already recorded by ${nameOf(r.already_given_by ?? '')}. ${r.note ?? ''}`);
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Could not record');
@@ -174,8 +185,16 @@ function Doses(): React.JSX.Element {
             <label className="field">{tr('Medicine')}
               <select value={drug || r[0]?.drug || ''} onChange={(e) => setDrug(e.target.value)}>{r.map((x) => <option key={x.id} value={x.drug}>{title(x.drug)}</option>)}</select>
             </label>
-            <label className="field">{tr('Slot')}
-              <input type="text" value={slot} onChange={(e) => setSlot(e.target.value)} />
+            <label className="field">{tr('Which dose')}
+              {(() => {
+                const cur = drug || r[0]?.drug || '';
+                const slots = slotsFor(cur);
+                return slots.length > 0 ? (
+                  <select value={time || slots[0].time} onChange={(e) => setTime(e.target.value)} data-testid="dose-time">
+                    {slots.map((i) => <option key={i.time} value={i.time}>{i.time}{i.state === 'given' ? ` (${tr('already given')})` : ''}</option>)}
+                  </select>
+                ) : <span className="muted small" data-testid="dose-asneeded">{tr('No fixed times: recorded for this hour, once.')}</span>;
+              })()}
             </label>
             <div className="row row--wrap">
               <button type="button" className="btn" disabled={!r.length} onClick={() => void give(drug || r[0]?.drug || '')}>Record as {nameOf(app.me)}</button>

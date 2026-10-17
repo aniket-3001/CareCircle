@@ -16,6 +16,9 @@ def tab(pg, name):
     if name == "Circle":                                         # the Circle screen keeps its secondary cards in one fold: open it
         pg.get_by_test_id("circle-more").wait_for(timeout=15000)
         pg.get_by_test_id("circle-more").evaluate("e => { e.open = true; }")
+    if name == "Today":                                          # the reading aids sit in one fold below the verdict: open it
+        pg.get_by_test_id("today-more").wait_for(timeout=20000)
+        pg.get_by_test_id("today-more").evaluate("e => { e.open = true; }")
 
 
 def sign_up(pg, name, email):
@@ -113,7 +116,6 @@ with sync_playwright() as p:
     pg.locator("[aria-labelledby=dose-title] select").select_option(label="Metformin")
     pg.locator("[aria-labelledby=dose-title] input[type=checkbox]").click()
     expect(pg.locator("[aria-labelledby=dose-title] input[type=checkbox]")).to_be_checked(timeout=15000)
-    pg.locator("[aria-labelledby=dose-title] input[type=text]").fill(_dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d") + " 21:00")
     pg.get_by_role("button", name="Record as Kavya").click()
     expect(pg.get_by_text("waiting for a second carer")).to_be_visible(timeout=15000)
     p2.reload()

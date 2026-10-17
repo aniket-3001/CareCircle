@@ -53,17 +53,26 @@ export function Flags({ check }: { check: CheckResult }): React.JSX.Element {
           <code>{f.path}</code>
         </div>
       ))}
-      {check.unrated.map((f) => (
-        <div key={f.drugs.join('+')} className="flag flag--unknown">
-          <div className="row row--wrap">
-            <b>
-              {title(f.drugs[0])} + {title(f.drugs[1])}
-            </b>
-            <Pill>listed, severity unrated</Pill>
+      {check.unrated.length > 0 && (
+        <details className="unrated-fold" data-testid="unrated-fold">
+          <summary>
+            {check.unrated.length} {check.unrated.length === 1 ? tr('pair is listed by the source without a severity') : tr('pairs are listed by the source without a severity')} ({tr('unrated is not the same as safe')})
+          </summary>
+          <div className="stack">
+            {check.unrated.map((f) => (
+              <div key={f.drugs.join('+')} className="flag flag--unknown">
+                <div className="row row--wrap">
+                  <b>
+                    {title(f.drugs[0])} + {title(f.drugs[1])}
+                  </b>
+                  <Pill>listed, severity unrated</Pill>
+                </div>
+                <span className="muted small">Unrated is not the same as safe. Source: {f.source}</span>
+              </div>
+            ))}
           </div>
-          <span className="muted small">Unrated is not the same as safe. Source: {f.source}</span>
-        </div>
-      ))}
+        </details>
+      )}
     </div>
   );
 }

@@ -94,18 +94,23 @@ export function TodayScreen(): React.JSX.Element {
               </section>
             </div>
             <div className="col">
-              <Scale check={c} />
               <ProfileCard />
-              <Counts />
-              <Readings />
               <Recalls />
-              <section className="card" aria-labelledby="sources-title">
-                <h2 id="sources-title">{t('Where the flags come from')}</h2>
-                <ul className="steps">
-                  <li><span><b>Direct pairs:</b> DDInter 2.0, a curated interaction database, with its severity.</span></li>
-                  <li><span><b>Enzyme paths:</b> one medicine slows or speeds a liver enzyme that clears another (FDA table, a two-step graph path).</span></li>
-                </ul>
-              </section>
+              <details className="more" data-testid="today-more">
+                <summary className="more__summary">{t('More: how to read a flag, how the record adds up, readings, where the flags come from')}</summary>
+                <div className="stack">
+                  <Scale check={c} />
+                  <Counts />
+                  <Readings />
+                  <section className="card" aria-labelledby="sources-title">
+                    <h2 id="sources-title">{t('Where the flags come from')}</h2>
+                    <ul className="steps">
+                      <li><span><b>Direct pairs:</b> DDInter 2.0, a curated interaction database, with its severity.</span></li>
+                      <li><span><b>Enzyme paths:</b> one medicine slows or speeds a liver enzyme that clears another (FDA table, a two-step graph path).</span></li>
+                    </ul>
+                  </section>
+                </div>
+              </details>
             </div>
             {(c.direct.length > 0 || c.enzyme_paths.length > 0 || c.unrated.length > 0 || (c.duplicates?.length ?? 0) > 0) && (
               <section className="card wide" aria-labelledby="flags-title">

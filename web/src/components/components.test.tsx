@@ -42,7 +42,8 @@ describe('Flags', () => {
   it('lists an unrated pair as unrated and never as fine', () => {
     const out = html(<Flags check={check({ unrated: [{ kind: 'unrated', drugs: ['a', 'b'], level: 'Unknown', source: 'DDInter 2.0' }] })} />);
     expect(out.toLowerCase()).toContain('unrated');
-    expect(out.toLowerCase()).not.toMatch(/\bsafe\b.*\bsafe\b/);
+    expect(out.toLowerCase()).toContain('not the same as safe');                       // it says what unrated is not
+    expect(out.toLowerCase()).not.toMatch(/\b(is|are|was|were) safe\b/);               // and never that anything is
   });
 });
 

@@ -27,6 +27,9 @@ def tab(pg, name):
     if name == "Circle":                                         # the Circle screen keeps its secondary cards in one fold: open it
         pg.get_by_test_id("circle-more").wait_for(timeout=15000)
         pg.get_by_test_id("circle-more").evaluate("e => { e.open = true; }")
+    if name == "Today":                                          # the reading aids sit in one fold below the verdict: open it
+        pg.get_by_test_id("today-more").wait_for(timeout=20000)
+        pg.get_by_test_id("today-more").evaluate("e => { e.open = true; }")
 
 
 def new_page(browser, width=1280, height=900, errs=None):
@@ -458,6 +461,9 @@ def u13(w, b, r):
     pg.get_by_test_id("outcomes").locator("summary").click()
     expect(pg.get_by_test_id("out-given")).to_contain_text("doses due were marked as given", timeout=15000)      # the numbers depend on the hour the scenario runs: a slot still inside its window is not due yet
     r.check("doses due were marked as given" in pg.get_by_test_id("out-given").inner_text(), "the week in counts shows doses marked against doses due", pg.get_by_test_id("out-given").inner_text())
+    r.check(pg.locator("[aria-labelledby=dose-title] input[type=text]").count() == 0, "the dose card has no free-text slot box")
+    times = pg.get_by_test_id("dose-time").locator("option").all_inner_texts()
+    r.check(len(times) == 2 and times[0].startswith("08:00") and times[1].startswith("21:00"), "it offers the confirmed times of the medicine instead", times)
     r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
     ctx.close()
 

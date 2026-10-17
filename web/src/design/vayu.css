@@ -389,3 +389,6 @@ code, .code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: 
 .more { margin-top: var(--gap, 16px); }
 .more__summary { cursor: pointer; font-weight: 600; padding: 12px 4px; }
 .more[open] > .more__summary { margin-bottom: 8px; }
+
+.unrated-fold > summary { cursor: pointer; padding: 10px 4px; color: var(--muted, #5b6270); font-size: 0.92rem; }
+.unrated-fold[open] > summary { margin-bottom: 8px; }

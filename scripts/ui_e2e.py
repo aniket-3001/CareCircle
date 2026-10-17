@@ -19,6 +19,9 @@ def tab(pg, name):
     if name == "Circle":                                         # the Circle screen keeps its secondary cards in one fold: open it
         pg.get_by_test_id("circle-more").wait_for(timeout=15000)
         pg.get_by_test_id("circle-more").evaluate("e => { e.open = true; }")
+    if name == "Today":                                          # the reading aids sit in one fold below the verdict: open it
+        pg.get_by_test_id("today-more").wait_for(timeout=20000)
+        pg.get_by_test_id("today-more").evaluate("e => { e.open = true; }")
 
 
 def click_node(pg, label):

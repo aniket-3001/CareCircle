@@ -222,4 +222,11 @@ export const HI_MORE: Record<string, string> = {
   "That does not look like a kept line (a number, a colon and 64 letters or digits).": "यह रखी हुई पंक्ति जैसी नहीं दिखती (एक संख्या, कोलन और 64 अक्षर/अंक)।",
   "No entries yet.": "अभी कोई प्रविष्टि नहीं।",
   "More: appointments, other doses, the week in counts, and the person’s say": "और: अपॉइंटमेंट, अन्य खुराकें, सप्ताह की गिनती, और व्यक्ति की राय",
+  "Which dose": "कौन-सी खुराक",
+  "already given": "पहले ही दी जा चुकी",
+  "No fixed times: recorded for this hour, once.": "कोई तय समय नहीं: इस घंटे के लिए एक बार दर्ज होती है।",
+  "pair is listed by the source without a severity": "एक जोड़ी स्रोत में बिना गंभीरता के सूचीबद्ध है",
+  "pairs are listed by the source without a severity": "जोड़ियाँ स्रोत में बिना गंभीरता के सूचीबद्ध हैं",
+  "unrated is not the same as safe": "बिना रेटिंग का मतलब सुरक्षित नहीं",
+  "More: how to read a flag, how the record adds up, readings, where the flags come from": "और: फ़्लैग कैसे पढ़ें, रिकॉर्ड का जोड़, रीडिंग, फ़्लैग कहाँ से आते हैं",
 };
