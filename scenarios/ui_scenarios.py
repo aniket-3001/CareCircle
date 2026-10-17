@@ -33,8 +33,8 @@ def tab(pg, name):
         pg.get_by_test_id("today-more").evaluate("e => { e.open = true; }")
 
 
-def new_page(browser, width=1280, height=900, errs=None):
-    ctx = browser.new_context(viewport={"width": width, "height": height})
+def new_page(browser, width=1280, height=900, errs=None, tz=None):
+    ctx = browser.new_context(viewport={"width": width, "height": height}, **({"timezone_id": tz} if tz else {}))
     pg = ctx.new_page()
     pg.set_default_timeout(15000)
     if errs is not None:
@@ -696,6 +696,39 @@ def u19(w, b, r):
         open(os.getenv("U19_DUMP"), "w", encoding="utf-8").write(chr(10).join(dict.fromkeys(left)))
     r.check(not left, f"no English sentence is left on any screen in Hindi ({len(left)} found)", left[:6])
     r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
+    ctx.close()
+
+
+@scenario("U20", "A carer in New Jersey sets up the circle for a parent in Pune: the circle's time zone is asked for, not taken from the first browser, and can be changed")
+def u20(w, b, r):
+    errs = []
+    ctx, pg = new_page(b, errs=errs, tz="America/New_York")
+    email = f"u20-{rid()}@scenario.test"
+    ui_signup(pg, "Child abroad", email)
+    ui_circle(pg, "Mum's medicines", "Mum")
+    u = api_user(w, email)
+    c = circle_of(u)
+    e = u.ok(c, "care_record", person="mum", drug="metformin", dose_text="500 mg", freq_text="twice daily")
+    u.ok(c, "care_schedule_set", dose_id=e["id"], times=["08:00", "20:00"])
+    pg.goto(f"{BASE}/#/today")
+    pg.reload()
+    pg.get_by_test_id("checklist").wait_for(timeout=20000)
+    r.check(pg.get_by_test_id("tz-prompt").is_visible(), "the app asks which time zone the parent is in, since this browser is elsewhere")
+    r.check("Asia/Kolkata" in pg.get_by_test_id("checklist-zone").inner_text() and "not set yet" in pg.get_by_test_id("checklist-zone").inner_text(),
+            "until someone answers, the list says it is on India time and that this is not set", pg.get_by_test_id("checklist-zone").inner_text())
+    r.check(u.ok(c, "care_timezone")["set"] is False, "opening Today did not set the circle's time zone to the browser's")
+    pg.get_by_test_id("tz-keep").click()
+    pg.wait_for_timeout(1500)
+    r.check(u.ok(c, "care_timezone") == {"tz": "Asia/Kolkata", "set": True}, "answering 'keep' records India time for the circle")
+    r.check(pg.get_by_test_id("tz-prompt").count() == 0, "the question is not asked again")
+    pg.goto(f"{BASE}/#/account")
+    pg.reload()
+    pg.get_by_test_id("circle-timezone").wait_for(timeout=20000)
+    pg.get_by_test_id("tz-select").select_option("Asia/Dubai")
+    pg.get_by_test_id("tz-save").click()
+    pg.wait_for_timeout(1500)
+    r.check(u.ok(c, "care_timezone")["tz"] == "Asia/Dubai", "the Account screen can change the circle's time zone")
+    r.check(not [x for x in errs if x.startswith("pageerror")], "no errors", errs[:3])
     ctx.close()
 
 

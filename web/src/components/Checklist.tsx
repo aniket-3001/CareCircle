@@ -26,17 +26,14 @@ export function Checklist(): React.JSX.Element | null {
   const [setting, setSetting] = useState<TodayView['unscheduled'][number] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
-  // The circle's time zone decides which day a slot belongs to. If nobody has set it, take this device's, once.
-  useEffect(() => {
-    void (async () => {
-      try {
-        const z = await app.api.timezone();
-        const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        if (!z.set && here) { await app.api.setTimezone(here); app.bump(); }
-      } catch { /* a read-only member cannot set it: the default stays */ }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [app.session.circle]);
+  // The circle's time zone decides which day a slot belongs to. It is never taken silently from whoever opens this first: if nobody has set it and this device
+  // is somewhere else, we ask (a carer abroad is a common case), and it can be changed in the Account screen.
+  const zone = useLoad((a) => a.api.timezone(), [app.session.circle]);
+  const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const askZone = !!zone.data && !zone.data.set && !!here && here !== zone.data.tz;
+  async function chooseZone(z: string): Promise<void> {
+    try { await app.api.setTimezone(z); app.bump(); } catch (e) { toast(e instanceof Error ? e.message : 'Could not save'); }
+  }
 
   async function give(i: TodayItem): Promise<void> {
     setBusy(`${i.dose_id}|${i.time}`);
@@ -52,13 +49,14 @@ export function Checklist(): React.JSX.Element | null {
   }
 
   return (
-    <Checked today={today.data} error={today.error} onGive={give} busy={busy} onSet={setSetting} setting={setting} closeSet={() => setSetting(null)} t={t} />
+    <Checked today={today.data} error={today.error} onGive={give} busy={busy} onSet={setSetting} zone={{ set: zone.data?.set ?? true, circle: zone.data?.tz ?? '', here, ask: askZone, choose: chooseZone }} setting={setting} closeSet={() => setSetting(null)} t={t} />
   );
 }
 
-function Checked({ today, error, onGive, busy, onSet, setting, closeSet, t }: {
+function Checked({ today, error, onGive, busy, onSet, zone, setting, closeSet, t }: {
   today: TodayView | undefined; error: string | undefined; onGive: (i: TodayItem) => Promise<void>; busy: string | null;
-  onSet: (u: TodayView['unscheduled'][number]) => void; setting: TodayView['unscheduled'][number] | null; closeSet: () => void; t: (s: string) => string;
+  onSet: (u: TodayView['unscheduled'][number]) => void;
+  zone: { set: boolean; circle: string; here: string; ask: boolean; choose: (z: string) => Promise<void> }; setting: TodayView['unscheduled'][number] | null; closeSet: () => void; t: (s: string) => string;
 }): React.JSX.Element | null {
   if (error || !today) return null;
   const nothing = today.items.length === 0 && today.unscheduled.length === 0 && today.as_needed.length === 0;
@@ -70,6 +68,16 @@ function Checked({ today, error, onGive, busy, onSet, setting, closeSet, t }: {
         <h2 id="checklist-title"><CalendarClock size={20} strokeWidth={1.75} aria-hidden="true" /> {t("Today's doses")}</h2>
         <Pill tone={late ? 'warn' : 'info'}>{today.counts.given} / {today.items.length - today.counts.before} {t('marked given')}</Pill>
       </div>
+      <p className="muted small" data-testid="checklist-zone">{t('Times are in')} {today.tz}{!zone.set ? ` (${t('not set yet')})` : ''}. {t('Change it in Account.')}</p>
+      {zone.ask && (
+        <div className="banner" role="status" data-testid="tz-prompt">
+          <p>{t('This device is in')} <b>{zone.here}</b>, {t('but this circle uses')} <b>{zone.circle}</b>. {t('Which time zone is the person you look after in?')}</p>
+          <div className="row row--wrap">
+            <button type="button" className="btn btn--sm" onClick={() => void zone.choose(zone.here)} data-testid="tz-use-device">{t('Use')} {zone.here}</button>
+            <button type="button" className="btn btn--soft btn--sm" onClick={() => void zone.choose(zone.circle)} data-testid="tz-keep">{t('Keep')} {zone.circle}</button>
+          </div>
+        </div>
+      )}
       {late > 0 && <p className="muted" role="status" data-testid="checklist-late">{late === 1 ? t('1 dose is not marked as given yet.') : `${late} ${t('doses are not marked as given yet.')}`} {t('Check with the others before marking one.')}</p>}
       <div className="rows">
         {today.items.map((i) => (
