@@ -197,7 +197,7 @@ class Bot:
         who = await self._patient(self.gm.open(link["agent"], link["circle"])) if link else "mum"   # the circle's person
         sid = ""
         if link and kinds.get(src["kind"]):                          # keep what was read, so the saved entry can be checked against it and points back at it
-            sid = await self.gm.open(link["agent"], link["circle"]).care_store_source(src["kind"], src["text"])
+            sid = await self.gm.open(link["agent"], link["circle"]).care_store_source(src["kind"], src["text"], src.get("file_sha256", ""), src.get("file_bytes", 0))
         for p in props[:4]:
             cid = os.urandom(4).hex()
             top = p["drug_candidates"][0]["name"]

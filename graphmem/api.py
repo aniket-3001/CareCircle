@@ -353,7 +353,7 @@ def create_app(gm: Optional[GraphMem] = None, admin_key: Optional[str] = None,
         if src["status"] != "ok":
             return {"source": {k: src[k] for k in ("kind", "method", "status", "note")}, "text": "", "proposals": []}
         props = await asyncio.to_thread(ci.propose, src["text"], checker())            # the text only: the picture is never sent to a model
-        sid = await m.care_store_source(src["kind"], src["text"]) if src["kind"] in ("image", "voice", "document") else ""
+        sid = await m.care_store_source(src["kind"], src["text"], src.get("file_sha256", ""), src.get("file_bytes", 0)) if src["kind"] in ("image", "voice", "document") else ""
         return {"source": {k: src[k] for k in ("kind", "method", "status", "note")}, "source_id": sid, "text": src["text"], "proposals": props}
 
     @app.post("/v1/tenants/{tenant}/forks")

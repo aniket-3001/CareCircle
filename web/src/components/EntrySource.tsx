@@ -33,6 +33,7 @@ export function EntrySource({ dose }: { dose: string }): React.JSX.Element {
           {src && src !== 'error' && (
             <>
               {src.has_source ? <pre className="quote" style={{ whiteSpace: 'pre-wrap' }}>{shown(src)}</pre> : null}
+              {src.file_sha256 && <span className="muted small" data-testid="file-fingerprint">{tr('Fingerprint of the file that was read')}: {src.file_sha256.slice(0, 12)}… ({Math.max(1, Math.round(src.file_bytes / 1024))} KB). </span>}
               <span className="muted small">{src.has_source ? tr('This is the text the server read, kept so the quoted line can be checked. The picture or recording itself is not stored.') : tr('Typed in by hand, so there is no photo, voice note or document behind it.')}</span>
             </>
           )}

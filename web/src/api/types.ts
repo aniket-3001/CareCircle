@@ -50,6 +50,8 @@ export interface TodayItem {
 
 export interface EntrySource {
   id: string;
+  file_sha256: string;
+  file_bytes: number;
   how_entered: string;
   quote: string;
   has_source: boolean;

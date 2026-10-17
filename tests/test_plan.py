@@ -128,3 +128,22 @@ async def test_an_api_only_process_starts_no_background_loops(monkeypatch):
     for h in app.router.on_startup:
         await h()
     assert not hasattr(app.state, "tg") and not hasattr(app.state, "rem")
+
+
+async def test_a_stored_source_keeps_the_files_fingerprint_but_not_the_file(gm):
+    """The photo is not kept (it shows names and a doctor), but its SHA-256 and size are, so a carer who still has the photo can show it is the one that was read."""
+    import hashlib
+    from carecircle import intake
+    from conftest import tid
+    t = tid(gm, "fp")
+    await gm.grant("fp-a", t, ("read", "write", "admin"))
+    m = gm.open("fp-a", t)
+    data = b"METFORMIN 500 MG TABLETS\nTake one tablet twice daily"
+    src = intake.read_source(data, "label.txt", "text/plain")
+    assert src["file_sha256"] == hashlib.sha256(data).hexdigest() and src["file_bytes"] == len(data)
+    sid = await m.care_store_source("document", src["text"], src["file_sha256"], src["file_bytes"])
+    e = await m.care_record("asha", "metformin", dose_text="500 mg", freq_text="twice daily", source_type="document", source_ref=sid, quote="METFORMIN 500 MG TABLETS", confirm=True)
+    out = await m.care_entry_source(e["id"])
+    assert out["file_sha256"] == hashlib.sha256(data).hexdigest() and out["file_bytes"] == len(data) and out["text"] == src["text"]
+    raw = await m._q("MATCH (s:Source) RETURN keys(s)", scope="admin")
+    assert not any("image" in k or "data" in k or "blob" in k for ks in raw for k in ks[0])      # nothing of the file itself is stored

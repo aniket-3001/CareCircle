@@ -46,7 +46,7 @@ ctl     (agents, grants, hashed API keys, Telegram chat links, and accounts)
   (:Account)-[:MEMBER {role: owner|carer}]->(:Tenant {id, name, person, owner})        a circle;  (:Agent)-[:GRANTED {scopes}]->(:Tenant) is the engine's access check
   (:Invite {hash, circle, exp})   (:Throttle {key, n, exp})
 mem__<circle> also has  (:ChatMsg {by, role, text, at})  the helper conversation, per carer
-  (:Source {id, kind, text, sha256})<-[:READ_FROM]-(Dose)    the text the server read an entry from (never the picture)    (:Receipt {id, kind, hash})  what was erased, as a keyed HMAC
+  (:Source {id, kind, text, sha256, file_sha256, file_bytes})<-[:READ_FROM]-(Dose)    the text the server read an entry from, and the SHA-256 and size of the file it came from (never the picture or recording)    (:Receipt {id, kind, hash})  what was erased, as a keyed HMAC
   (:Consent {status, who, note, at})-[:FOR]->(Person)    (:Review {name, note, share, at})-[:FOR]->(Person)    (:Setting {key, value})  time zone, receipt key
   (:Measurement {kind, value, unit, at, by})-[:FOR]->(Person)    (:Appointment {title, at, place, who, bring, status})-[:FOR]->(Person)
   (:Condition {name})-[:FOR]->(Person)   (:Allergy {text, drug})-[:FOR]->(Person)   (:Schema {v})  the graph's version

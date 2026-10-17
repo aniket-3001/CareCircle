@@ -155,29 +155,30 @@ class CareMixin:
             out["warning"] = warning
         return out
 
-    async def care_store_source(self, kind: str, text: str) -> str:
+    async def care_store_source(self, kind: str, text: str, file_sha256: str = "", file_bytes: int = 0) -> str:
         """Keep the text the server read from a photo, voice note or document, and return its id. NOT an operation callers can reach: only the server's own
-        intake (OCR, speech to text, document reader) calls it, so a stored source is evidence of what was really read, not of what a caller says it read."""
+        intake (OCR, speech to text, document reader) calls it, so a stored source is evidence of what was really read, not of what a caller says it read.
+        The picture or recording itself is not kept (it shows names and a doctor); only a SHA-256 of the file and its size, so a carer who still holds the file can show it is the one that was read."""
         if kind not in SOURCE_KIND.values():
             raise ValueError("unknown source kind")
         text = (text or "")[:20000]
         sid = new_id("src")
         await self._q("MATCH (o:Source) WHERE o.at < $old AND NOT (:Dose)-[:READ_FROM]->(o) DELETE o", {"old": now_ms() - 7 * 24 * H})
-        await self._q("CREATE (:Source {id:$i, kind:$k, text:$t, sha256:$h, by:$by, at:$n})",
-                      {"i": sid, "k": kind, "t": text, "h": hashlib.sha256(text.encode("utf-8")).hexdigest(), "by": norm(self.agent), "n": now_ms()})
+        await self._q("CREATE (:Source {id:$i, kind:$k, text:$t, sha256:$h, file_sha256:$fh, file_bytes:$fb, by:$by, at:$n})",
+                      {"i": sid, "k": kind, "t": text, "h": hashlib.sha256(text.encode("utf-8")).hexdigest(), "fh": (file_sha256 or "")[:64], "fb": int(file_bytes or 0), "by": norm(self.agent), "n": now_ms()})
         return sid
 
     async def care_entry_source(self, dose_id: str) -> dict:
         """What an entry was read from: the full text the server read from the photo, voice note or document (not the image itself, which is never kept),
         the kind, and when. An entry typed in by hand has none."""
-        rows = await self._q("MATCH (x:Dose {id:$i}) OPTIONAL MATCH (x)-[:READ_FROM]->(s:Source) RETURN x.quote, x.source_type, s.kind, s.text, s.sha256, s.at",
+        rows = await self._q("MATCH (x:Dose {id:$i}) OPTIONAL MATCH (x)-[:READ_FROM]->(s:Source) RETURN x.quote, x.source_type, s.kind, s.text, s.sha256, s.at, s.file_sha256, s.file_bytes",
                              {"i": dose_id}, scope="read")
         if not rows:
             raise KeyError(dose_id)
-        quote, how, kind, text, sha, at = rows[0]
+        quote, how, kind, text, sha, at, fsha, fbytes = rows[0]
         return {"id": dose_id, "how_entered": how, "quote": quote or "", "has_source": text is not None, "kind": kind, "text": text or "",
-                "sha256": sha, "read_at": at,
-                "note": "This is the text the server read, kept so the quoted line can be checked. The picture or recording itself is not stored." if text is not None
+                "sha256": sha, "read_at": at, "file_sha256": fsha or "", "file_bytes": fbytes or 0,
+                "note": "This is the text the server read, kept so the quoted line can be checked. The picture or recording itself is not stored; only its fingerprint, so someone who still has the file can check it is the one that was read." if text is not None
                 else "Typed in by hand, so there is no photo, voice note or document behind it."}
 
     async def _source(self, ref: str, kind: str) -> Optional[dict]:

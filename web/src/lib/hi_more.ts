@@ -294,4 +294,5 @@ export const HI_MORE: Record<string, string> = {
   "person cared for": "जिसकी देखभाल हो रही है",
   "older entries were added to the log later, so they are covered only from then on": "पुरानी प्रविष्टियाँ बाद में लॉग में जोड़ी गईं, इसलिए वे केवल तभी से सुरक्षित हैं",
   "Add the older entries to the log": "पुरानी प्रविष्टियाँ लॉग में जोड़ें",
+  "Fingerprint of the file that was read": "पढ़ी गई फ़ाइल की फ़िंगरप्रिंट",
 };

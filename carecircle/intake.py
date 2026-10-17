@@ -10,6 +10,7 @@ The model only structures what is there. It never decides interactions or doses;
 """
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import os
@@ -29,7 +30,14 @@ _ocr = None
 
 # ---------------------------------------------------------------- source text
 def read_source(data: bytes, filename: str, content_type: str = "", language: Optional[str] = None) -> dict:
-    """{kind, text, method, status, note}. status 'ok' | 'empty' | 'unsupported'. Never raises for bad content."""
+    """{kind, text, method, status, note, file_sha256, file_bytes}. status 'ok' | 'empty' | 'unsupported'. Never raises for bad content.
+    The fingerprint is of the file as received; the file itself is not kept."""
+    out = _read_source(data, filename, content_type, language)
+    out["file_sha256"], out["file_bytes"] = hashlib.sha256(data).hexdigest(), len(data)
+    return out
+
+
+def _read_source(data: bytes, filename: str, content_type: str = "", language: Optional[str] = None) -> dict:
     if len(data) > MAX_BYTES:
         return {"kind": "unknown", "text": "", "method": "none", "status": "unsupported", "note": "file too large"}
     name, ct = filename.lower(), (content_type or "").lower()
