@@ -25,6 +25,29 @@ NOTICE = "Flags are for discussion with a prescriber or pharmacist. Different re
 class Checker:
     def __init__(self, host="localhost", port=6379):
         self.g = FalkorDB(host=host, port=port, password=os.getenv("GRAPHMEM_DB_PASSWORD") or None).select_graph(REF_GRAPH)
+        self.load_brands()
+
+    def load_brands(self) -> int:
+        """Read the combination brands from the reference graph, (:Brand)-[:CONTAINS {pos}]->(:Ingredient), and give them to the brand matcher. A reference
+        graph without brands (an older copy) leaves the built-in table in place. Returns how many brands came from the graph."""
+        from . import brands
+        try:
+            rows = self.g.ro_query("MATCH (b:Brand)-[c:CONTAINS]->(i:Ingredient) RETURN b.name, i.name ORDER BY b.name, c.pos").result_set
+        except Exception:
+            rows = []
+        if not rows:
+            return 0
+        table: dict = {}
+        for b, i in rows:
+            table.setdefault(b, []).append(i)
+        brands.set_table(table, from_graph=True)
+        return len(table)
+
+    def brands_containing(self, drug: str) -> list[dict]:
+        """Listed brands whose ingredients include `drug`, with the other ingredients: (:Brand)-[:CONTAINS]->(:Ingredient {name}) and back out again."""
+        return [{"brand": r[0], "ingredients": r[1]} for r in self.g.ro_query(
+            "MATCH (b:Brand)-[:CONTAINS]->(:Ingredient {name:$d}) MATCH (b)-[c:CONTAINS]->(o:Ingredient) WITH b, o ORDER BY c.pos "
+            "RETURN b.name, collect(o.name) ORDER BY b.name", {"d": norm(drug)}).result_set]
 
     def class_hits(self, text: str, drugs: list[str]) -> dict:
         """Which of these medicines belong to a class the typed allergy names, by walking (:Member)-[:IN_CLASS]->(:Class) in the reference graph.

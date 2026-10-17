@@ -242,34 +242,34 @@ class CareMixin:
         return [dict(id=r[0], drug=r[1], dose_text=r[2], freq_text=r[3], since=r[4], source=r[5], quote=r[6], by=r[7],
                      slots=list(r[8] or []), as_needed=bool(r[9]), ends_on=r[10] or None, product=r[11]) for r in rows]
 
-    @staticmethod
-    def _duplicates(reg: list[dict]) -> list[dict]:
-        """An ingredient that is on record on more than one entry, because it came as different products (a combination brand and a plain entry, or two brands).
-        The entries are kept apart on purpose (one per product), so this is where a second source of the same ingredient shows up."""
-        by: dict[str, list[dict]] = {}
-        for r in reg:
-            by.setdefault(r["drug"], []).append(r)
+    async def care_duplicates(self, person: str, as_of: Optional[int] = None) -> list[dict]:
+        """Ingredients recorded on more than one current entry (the same medicine reaching the person through two products: a combination brand and a plain
+        entry, or two brands). The entries are kept apart on purpose (one per product), so this is where a second source of the same ingredient shows up.
+        Found by the graph: the current entries of the person grouped on the (:Drug) they are OF, keeping the groups of two or more."""
+        t = now_ms() if as_of is None else as_of
+        from carecircle import schedule as sched
+        today = sched.local_date(t, await self._tz()).isoformat()
+        rows = await self._q(
+            """MATCH (x:Dose {status:'confirmed', action:'set'})-[:FOR]->(:Person {id:$p}), (x)-[:OF]->(d:Drug)
+               WHERE x.valid_from <= $t AND (x.valid_to IS NULL OR x.valid_to > $t) AND (x.ends_on IS NULL OR x.ends_on = '' OR x.ends_on >= $today)
+               WITH d.name AS drug, x, coalesce(x.product, '') AS pr ORDER BY pr, x.id
+               WITH drug, collect({id: x.id, product: pr, dose_text: x.dose_text, freq_text: x.freq_text, by: x.by}) AS es
+               WHERE size(es) > 1 RETURN drug, es ORDER BY drug""",
+            {"p": norm(person), "t": t, "today": today}, scope="read")
         out = []
-        for drug, rows in sorted(by.items()):
-            if len(rows) < 2:
-                continue
-            names = [(r.get("product") or "entered as the medicine itself") for r in rows]
+        for drug, es in rows:
+            names = [(e["product"] or "entered as the medicine itself") for e in es]
             title = drug[:1].upper() + drug[1:]
-            out.append({"kind": "duplicate", "ingredient": drug,
-                        "entries": [{"id": r["id"], "product": r.get("product") or "", "dose_text": r["dose_text"], "freq_text": r["freq_text"], "by": r["by"]} for r in rows],
-                        "meaning": f"{title} is on record {len(rows)} times: {'; '.join(names)}. It may be the same medicine from two sources.",
+            out.append({"kind": "duplicate", "ingredient": drug, "entries": list(es),
+                        "meaning": f"{title} is on record {len(es)} times: {'; '.join(names)}. It may be the same medicine from two sources.",
                         "source": "the entries on record (not a reference table)"})
         return out
-
-    async def care_duplicates(self, person: str, as_of: Optional[int] = None) -> list[dict]:
-        """Ingredients recorded on more than one current entry (the same medicine reaching the person through two products)."""
-        return self._duplicates(await self.care_regimen(person, as_of))
 
     async def care_check(self, person: str, as_of: Optional[int] = None) -> dict:
         """Interaction flags for the regimen at `as_of`, from the shared reference graph (sources attached; never 'safe')."""
         reg = await self.care_regimen(person, as_of)
         res = await asyncio.to_thread(checker().check, [r["drug"] for r in reg])
-        res["duplicates"] = self._duplicates(reg)
+        res["duplicates"] = await self.care_duplicates(person, as_of)
         res["regimen"] = reg
         res["judgement"] = judgement(res)
         return res

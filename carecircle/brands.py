@@ -77,8 +77,21 @@ def squash(s: str) -> str:
     return re.sub(r"[^a-z0-9]", "", (s or "").lower())
 
 
-_INDEX = {squash(k): (k, v) for k, v in COMBINATIONS.items()}
-_ORDER = sorted(_INDEX, key=len, reverse=True)                   # the longest name first: "ecosprin gold" before "ecosprin"
+_INDEX: dict = {}
+_ORDER: list = []
+FROM_GRAPH = False
+
+
+def set_table(table: dict, from_graph: bool = False) -> None:
+    """Use `table` (brand as printed -> ingredients) for matching. The reference graph holds the table as (:Brand)-[:CONTAINS]->(:Ingredient) and the
+    Checker passes what it reads there; the dict in this file is the source the graph is loaded from and the fallback when the graph has no brands."""
+    global _INDEX, _ORDER, FROM_GRAPH
+    _INDEX = {squash(k): (k, list(v)) for k, v in table.items()}
+    _ORDER = sorted(_INDEX, key=len, reverse=True)                   # the longest name first: "ecosprin gold" before "ecosprin"
+    FROM_GRAPH = from_graph
+
+
+set_table(COMBINATIONS)
 
 
 def find(text: str) -> list[tuple[str, list[str], int, int]]:

@@ -162,3 +162,26 @@ def test_no_listed_combination_loses_an_ingredient_on_a_multi_line_prescription(
         text = f"1. {a}\n   40/5\n   once daily\n2. {b}\n   at night"
         got = {(p["combination"], p["drug_candidates"][0]["name"]) for p in intake.rule_proposals(text, ch) if p.get("combination")}
         assert got == {(a, i) for i in ia} | {(b, i) for i in ib}, text
+
+
+def test_the_brand_table_the_reader_uses_is_the_one_in_the_reference_graph(ch):
+    """Brands are (:Brand)-[:CONTAINS {pos}]->(:Ingredient)-[:IS]->(:Drug) in cc_ref and the matcher reads them from there; the dict is only the loader's source."""
+    assert ch.load_brands() == len(brands.COMBINATIONS) and brands.FROM_GRAPH
+    for b, ings in brands.COMBINATIONS.items():
+        got = [r[0] for r in ch.g.ro_query("MATCH (:Brand {name:$b})-[c:CONTAINS]->(i:Ingredient) RETURN i.name ORDER BY c.pos", {"b": b}).result_set]
+        assert got == ings, b
+    rows = ch.g.ro_query("MATCH (b:Brand {name:'Telma-AM'})-[c:CONTAINS]->(i:Ingredient) RETURN i.name ORDER BY c.pos").result_set
+    assert [r[0] for r in rows] == ["telmisartan", "amlodipine"]
+    assert {x["brand"] for x in ch.brands_containing("amlodipine")} >= {"Telma-AM", "Concor-AM"}
+    linked = ch.g.ro_query("MATCH (:Ingredient {name:'telmisartan'})-[:IS]->(d:Drug) RETURN d.name").result_set
+    assert linked == [["telmisartan"]]
+
+
+def test_a_brand_added_only_to_the_graph_is_found_by_the_reader(ch):
+    ch.g.query("MERGE (b:Brand {key:'zzcombo'}) SET b.name='Zzcombo' WITH b MERGE (i:Ingredient {name:'metformin'}) CREATE (b)-[:CONTAINS {pos:0}]->(i)")
+    try:
+        ch.load_brands()
+        assert [f[0] for f in brands.find("Zzcombo 10 mg")] == ["Zzcombo"]
+    finally:
+        ch.g.query("MATCH (b:Brand {key:'zzcombo'}) DETACH DELETE b")
+        ch.load_brands()

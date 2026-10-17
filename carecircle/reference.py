@@ -17,7 +17,7 @@ from pathlib import Path
 from .curated import CURATED_SUBSTRATES
 
 REF_GRAPH = "cc_ref"
-REF_VERSION = 3          # bump when the shape of the reference graph changes: start-up reloads it when the stored version is older (2: laboratory and transporter tables)
+REF_VERSION = 4          # bump when the shape of the reference graph changes: start-up reloads it when the stored version is older (2: laboratory and transporter tables; 3: allergy classes; 4: combination brands)
 DATA = Path(__file__).resolve().parent.parent / "data" / "ref"
 
 
@@ -157,8 +157,15 @@ def load(host: str = "localhost", port: int = 6379, data_dir: Path = DATA) -> di
         mem = [{"m": m, "s": s} for m, s in c["members"].items()]
         for i in range(0, len(mem), 500):
             g.query("MATCH (c:Class {name:$n}) UNWIND $r AS x MERGE (m:Member {name:x.m}) CREATE (m)-[:IN_CLASS {source:x.s}]->(c)", {"n": name, "r": mem[i:i + 500]})
+    from .brands import COMBINATIONS, SOURCE as BRAND_SOURCE, squash
+    g.query("CREATE INDEX FOR (b:Brand) ON (b.key)")
+    g.query("CREATE INDEX FOR (i:Ingredient) ON (i.name)")
+    for brand, ings in COMBINATIONS.items():                         # (:Brand)-[:CONTAINS {pos}]->(:Ingredient)-[:IS]->(:Drug): the ingredient is linked to the interaction data where the data has it
+        g.query("MERGE (b:Brand {key:$k}) SET b.name = $n, b.source = $s WITH b UNWIND range(0, size($i) - 1) AS p "
+                "MERGE (i:Ingredient {name:$i[p]}) CREATE (b)-[:CONTAINS {pos:p}]->(i)", {"k": squash(brand), "n": brand, "s": BRAND_SOURCE, "i": ings})
+    g.query("MATCH (i:Ingredient) MATCH (d:Drug {name:i.name}) MERGE (i)-[:IS]->(d)")
     g.query("MERGE (m:Meta {key:'ref'}) SET m.version = $v, m.loaded_at = timestamp()", {"v": REF_VERSION})
-    return {"drugs": len(names), "interacts": len(rows), "enzymes": len(enzymes), "transporters": len(transporters), "classes": len(CLASS_TABLE), "fda": {k: len(v) for k, v in fda.items()}}
+    return {"drugs": len(names), "interacts": len(rows), "enzymes": len(enzymes), "transporters": len(transporters), "classes": len(CLASS_TABLE), "brands": len(COMBINATIONS), "fda": {k: len(v) for k, v in fda.items()}}
 
 
 if __name__ == "__main__":
