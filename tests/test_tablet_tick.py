@@ -100,3 +100,48 @@ async def test_the_double_dose_guard_still_refuses_an_ingredient_given_at_the_sa
     r = await a.care_give_slot("asha", combo[0], "08:00", at("08:10"))
     assert r["given"] is False and r["reason"] == "shared_ingredient"
     assert await gives(a) == [("metformin", "tk-b", "08:00")]
+
+
+async def test_b5_both_were_prescribed_records_the_second_source_only_after_a_refusal_and_says_so(gm):
+    """Round 3, B5: the guard treats the same molecule as the same dose, so a second source that really was prescribed could never be recorded."""
+    t, a, b = await circle(gm)
+    plain, combo = await glycomet_and_metformin(a)
+    now = at("08:10")
+    assert (await b.care_give_slot("asha", plain, "08:00", now))["given"] is True                              # Meena gives the plain metformin
+    refused = await a.care_give_slot("asha", combo[0], "08:00", now)
+    assert refused["given"] is False and refused["reason"] == "shared_ingredient"                                # the default is still a refusal that writes nothing
+    assert await gives(a) == [("metformin", "tk-b", "08:00")]
+    ok = await a.care_give_slot("asha", combo[0], "08:00", now, both_prescribed=True)                           # Ravi says both were prescribed
+    assert ok["given"] is True and ok["override"] is True and "second source" in ok["note"] and set(ok["ingredients"]) == {"glimepiride", "metformin"}
+    g = await a.care_gives("asha")
+    assert sorted((x["drug"], x["by"], x["second_source"]) for x in g) == [("glimepiride", "tk-a", True), ("metformin", "tk-a", True), ("metformin", "tk-b", False)]
+    rows = {(i.get("label") or i["drug"]): i for i in (await a.care_today("asha", now))["items"]}
+    assert rows["glycomet-gp"]["state"] == "given" and rows["glycomet-gp"]["given_by"] == "tk-a" and rows["metformin"]["given_by"] == "tk-b"
+    text = [e["text"] for e in await a.care_timeline("asha", limit=50, now=now) if e["kind"] == "give"]
+    assert any("second source (both were prescribed)" in x or "one tablet" in x for x in text) and any("second source" in x for x in text), text
+    again = await b.care_give_slot("asha", combo[0], "08:00", now, both_prescribed=True)                        # the second source can be claimed once
+    assert again["given"] is False and again["reason"] == "same_tablet" or again["given"] is False
+
+
+async def test_both_prescribed_changes_nothing_when_there_is_no_clash_and_works_for_a_plain_give_too(gm):
+    t, a, b = await circle(gm)
+    plain, combo = await glycomet_and_metformin(a)
+    free = await a.care_give_slot("asha", combo[0], "08:00", at("08:10"), both_prescribed=True)                  # nothing to override: an ordinary give
+    assert free["given"] is True and "override" not in free
+    assert {x["second_source"] for x in await a.care_gives("asha")} == {False}
+    second = await b.care_give_slot("asha", plain, "08:00", at("08:10"), both_prescribed=True)                  # now the plain metformin clashes with the tablet's: the override applies
+    assert second["given"] is True and second["override"] is True
+    dup = await a.care_give("asha", "metformin", "2026-09-20 08:00", True)
+    assert dup["given"] is False and dup["reason"] == "same_second_source"                                      # once per drug and slot
+
+
+async def test_the_override_is_in_the_operation_and_a_read_only_key_cannot_use_it(gm):
+    import pytest
+    from graphmem import ops
+    from graphmem.policy import PermissionDenied
+    t, a, b = await circle(gm)
+    await gm.grant("tk-ro", t, ("read",))
+    plain, combo = await glycomet_and_metformin(a)
+    with pytest.raises(PermissionDenied):
+        await ops.invoke(gm, "tk-ro", t, "care_give_slot", {"person": "asha", "dose_id": combo[0], "time": "08:00", "both_prescribed": True})
+    assert "both_prescribed" in [x["name"] for x in ops.describe()["care_give_slot"]["args"]]

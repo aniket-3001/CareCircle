@@ -91,6 +91,8 @@ export const HI_MORE: Record<string, string> = {
   'Notes about this entry': 'इस प्रविष्टि के बारे में टिप्पणियाँ', 'the entry has changed since': 'इसके बाद प्रविष्टि बदल गई है', 'Handover note from': 'हस्तांतरण टिप्पणी, भेजने वाला', 'Noted by': 'द्वारा नोट किया गया', 'unverified': 'असत्यापित',
   'Notes are not part of the record: an agent’s note is not confirmed by anyone and changes no dose, flag or history.': 'टिप्पणियाँ रिकॉर्ड का हिस्सा नहीं हैं: किसी एजेंट की टिप्पणी की किसी ने पुष्टि नहीं की है और वह कोई खुराक, चेतावनी या इतिहास नहीं बदलती।',
   'About': 'के बारे में', 'Nothing in particular': 'कुछ खास नहीं', 'Whoever is next': 'जो अगला हो', 'for': 'किसके लिए', 'regarding': 'के संबंध में', 'accepted by': 'स्वीकार किया', 'waiting to be accepted': 'स्वीकार होने की प्रतीक्षा', 'Accept': 'स्वीकार करें',
+  'was not recorded.': 'दर्ज नहीं किया गया।', 'Both were prescribed: record it anyway': 'दोनों निर्धारित थे: फिर भी दर्ज करें',
+  'Choose this only if both products were really prescribed and both were given. The record will show two doses of the shared ingredient at this time, marked as a second source.': 'इसे तभी चुनें जब दोनों उत्पाद सचमुच निर्धारित थे और दोनों दिए गए। रिकॉर्ड में इस समय साझा घटक की दो खुराकें दिखेंगी, जिन पर दूसरा स्रोत लिखा होगा।',
   'This is a combination product.': 'यह एक संयुक्त (कॉम्बिनेशन) दवा है।', 'usually contains': 'में आम तौर पर होता है', 'printed strength': 'छपी हुई मात्रा',
   'Each ingredient is saved on its own, so confirm each one. From a hand-written list: check the pack.': 'हर घटक अलग से सहेजा जाता है, इसलिए हर एक की पुष्टि करें। यह हाथ से लिखी सूची से है: पैक देख लें।',
   'not checked': 'जाँचा नहीं गया', 'Another medicine: type its name': 'कोई और दवा: उसका नाम लिखें', 'Medicine name': 'दवा का नाम',

@@ -477,10 +477,13 @@ class CareMixin:
                 return slot, (s, by, at)
         return slot, None
 
-    async def care_give(self, person: str, drug: str, slot: str) -> dict:
+    async def care_give(self, person: str, drug: str, slot: str, both_prescribed: bool = False) -> dict:
         """Record that the calling carer gave `drug` for dose slot `slot` (e.g. '2026-10-16 08:00'). A slot can be claimed once:
         the claim is one query that looks for an earlier give of the same ingredient close to this time and, if there is none, MERGEs the slot, so two
-        carers racing get exactly one winner and the other is told who already recorded it."""
+        carers racing get exactly one winner and the other is told who already recorded it.
+
+        `both_prescribed` is for the one case the guard cannot know: the same ingredient really was prescribed twice (two products, two prescribers) and both were given.
+        It changes nothing unless the guard has refused; then the give is recorded as a SECOND SOURCE, once per drug and slot, labelled as such wherever it shows."""
         slot, slot_ms = parse_slot(slot)
         ing, names, times = await self._kin(person, drug)
         on_record = await self._q(
@@ -493,6 +496,10 @@ class CareMixin:
         slot_ms = parse_slot(slot)[1]
         key = f"{norm(person)}|{norm(drug)}|{norm(slot)}"
         window = 0 if times else (NEAR_MIN - 1) * 60_000
+        if both_prescribed:
+            clash = near or await self._near_give(person, ing, key, slot_ms, window) or await self._exact_give(key)
+            if clash:
+                return await self._also_give(person, drug, ing, slot, slot_ms, key)
         if not near:
             rows = await self._q(
                 """OPTIONAL MATCH (e:Give {person:$p, ing:$ing}) WHERE e.key <> $k AND e.slot_ms IS NOT NULL AND abs(e.slot_ms - $ms) <= $w
@@ -519,6 +526,24 @@ class CareMixin:
                 "note": f"a dose of this was recorded for {near[0]}, within {NEAR_MIN} minutes of this one; check with them before giving another dose" if not times else
                         f"a dose of this was recorded for {near[0]} under another name; check with them before giving another dose"}
 
+    async def _exact_give(self, key: str) -> Optional[tuple]:
+        rows = await self._q("MATCH (e:Give {key:$k}) RETURN e.slot, e.by, e.at LIMIT 1", {"k": key}, scope="read")
+        return tuple(rows[0]) if rows else None
+
+    async def _also_give(self, person: str, drug: str, ing: str, slot: str, slot_ms: int, key: str) -> dict:
+        """The second source: recorded under its own key, so it never collides with the give it sits beside, and claimed once per drug and slot."""
+        me = norm(self.agent)
+        rows = await self._q(
+            """MERGE (g:Give {key:$k}) ON CREATE SET g.by=$me, g.at=$t, g.person=$p, g.drug=$d, g.slot=$s, g.ing=$ing, g.slot_ms=$ms, g.override=true, g.won=true
+               WITH g, g.won AS fresh, g.by AS by, g.at AS at SET g.won=false RETURN fresh, by, at""",
+            {"k": key + "|also", "me": me, "t": now_ms(), "p": norm(person), "d": norm(drug), "s": norm(slot), "ing": ing, "ms": slot_ms})
+        fresh, by, at = rows[0]
+        if not fresh:
+            return {"given": False, "duplicate": True, "already_given_by": by, "at": at, "reason": "same_second_source",
+                    "note": "a second source of this was already recorded for this time; check with them before giving another dose"}
+        return {"given": True, "slot": slot, "override": True,
+                "note": "recorded as a second source: you said both were prescribed. The record shows two doses of this ingredient at this time."}
+
     async def _near_give(self, person: str, ing: str, key: str, slot_ms: int, window: int) -> Optional[tuple]:
         rows = await self._q("MATCH (e:Give {person:$p, ing:$ing}) WHERE e.key <> $k AND e.slot_ms IS NOT NULL AND abs(e.slot_ms - $ms) <= $w "
                              "RETURN e.slot, e.by, e.at ORDER BY e.at LIMIT 1", {"p": norm(person), "ing": ing, "k": key, "ms": slot_ms, "w": window}, scope="read")
@@ -526,9 +551,9 @@ class CareMixin:
 
     async def care_gives(self, person: str, limit: int = 50) -> list[dict]:
         rows = await self._q("MATCH (g:Give {person:$p}) OPTIONAL MATCH (w:Watch {key: g.person + '|' + g.drug}) "
-                             "RETURN g.drug, g.slot, g.by, g.at, g.witness, w IS NOT NULL ORDER BY g.at DESC LIMIT $n",
+                             "RETURN g.drug, g.slot, g.by, g.at, g.witness, w IS NOT NULL, coalesce(g.override, false) ORDER BY g.at DESC LIMIT $n",
                              {"p": norm(person), "n": limit}, scope="read")
-        return [dict(drug=r[0], slot=r[1], by=r[2], at=r[3], witness=r[4], needs_second_carer=bool(r[5]) and not r[4]) for r in rows]
+        return [dict(drug=r[0], slot=r[1], by=r[2], at=r[3], witness=r[4], needs_second_carer=bool(r[5]) and not r[4], second_source=bool(r[6])) for r in rows]
 
     async def care_drug_info(self, drug: str) -> dict:
         """What public sources say about one medicine on record: the official label's own words (openFDA / DailyMed), the RxNorm identifier, and

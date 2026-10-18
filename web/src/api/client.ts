@@ -106,7 +106,7 @@ export function apiFor(s: Session) {
     setStock: (dose_id: string, doses_left: number) => op<{ id: string; doses_left: number }>('care_stock_set', { dose_id, doses_left }),
     timezone: () => op<{ tz: string; set: boolean }>('care_timezone'),
     setTimezone: (tz: string) => op<{ tz: string }>('care_set_timezone', { tz }),
-    giveSlot: (dose_id: string, time: string) => op<GiveResult>('care_give_slot', { person: p, dose_id, time }),
+    giveSlot: (dose_id: string, time: string, both_prescribed = false) => op<GiveResult>('care_give_slot', { person: p, dose_id, time, ...(both_prescribed ? { both_prescribed: true } : {}) }),
     setSchedule: (dose_id: string, times: string[], as_needed: boolean, ends_on: string) => op<{ id: string }>('care_schedule_set', { dose_id, times, as_needed, ends_on }),
     markMistake: (dose_id: string, reason: string) => op<{ id: string }>('care_mark_mistake', { dose_id, reason }),
     restoreEntry: (dose_id: string) => op<{ id: string }>('care_restore_entry', { dose_id }),

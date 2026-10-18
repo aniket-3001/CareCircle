@@ -809,5 +809,37 @@ def u22(w, b, r):
     ctxo.close()
 
 
+@scenario("U23", "Two products sharing an ingredient at one time: the second tick is refused with the reason, and 'both were prescribed' records it as a second source")
+def u23(w, b, r):
+    errs = []
+    ctx, pg = new_page(b, errs=errs)
+    email = f"u23-{rid()}@scenario.test"
+    ui_signup(pg, "Dual", email)
+    ui_circle(pg)
+    u = api_user(w, email)
+    c = circle_of(u)
+    plain = u.ok(c, "care_record", person="mum", drug="metformin", dose_text="500 mg", freq_text="once daily")["id"]
+    combo = [u.ok(c, "care_record", person="mum", drug=d, freq_text="once daily", product="Glycomet-GP", product_strength="500/1 mg")["id"] for d in ("glimepiride", "metformin")]
+    u.ok(c, "care_schedule_set", dose_id=plain, times=["08:00"])
+    u.ok(c, "care_schedule_set", dose_id=combo[0], times=["08:00"])
+    u.ok(c, "care_give_slot", person="mum", dose_id=plain, time="08:00")                         # the plain metformin was given
+    pg.goto(f"{BASE}/#/today")
+    pg.reload()
+    pg.get_by_test_id("checklist").wait_for(timeout=20000)
+    row = pg.get_by_test_id("slot").filter(has_text="Glycomet-GP")
+    row.get_by_test_id("give-slot").click()
+    pg.get_by_test_id("clash").wait_for(timeout=15000)
+    r.check("already recorded" in pg.get_by_test_id("clash").inner_text().lower() and "another" in pg.get_by_test_id("clash").inner_text().lower(),
+            "the refusal says why: the shared ingredient was already recorded through another entry", pg.get_by_test_id("clash").inner_text()[:160])
+    r.check(not [g for g in u.ok(c, "care_gives", person="mum") if g["drug"] == "glimepiride"], "nothing was recorded for the tablet by the refusal")
+    pg.get_by_test_id("both-prescribed").click()
+    pg.wait_for_timeout(1500)
+    r.check(pg.get_by_test_id("slot").filter(has_text="Glycomet-GP").get_attribute("data-state") == "given", "after 'both were prescribed' the tablet shows as given")
+    g = u.ok(c, "care_gives", person="mum")
+    r.check(sorted((x["drug"], x["second_source"]) for x in g) == [("glimepiride", True), ("metformin", False), ("metformin", True)], "recorded as a second source, beside the first give", g)
+    r.check(not [x for x in errs if x.startswith("pageerror")], "no errors", errs[:3])
+    ctx.close()
+
+
 if __name__ == "__main__":
     sys.exit(1 if main() else 0)

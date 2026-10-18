@@ -299,13 +299,14 @@ class CareViewMixin:
                 acks[ak] = row
             out.append(row)
         gives: dict = {}
-        for (drug, slot, by, at, via) in await self._q("MATCH (g:Give {person:$p}) RETURN g.drug, g.slot, g.by, g.at, coalesce(g.via, '')", {"p": p}, scope="read"):
+        for (drug, slot, by, at, via, ov) in await self._q("MATCH (g:Give {person:$p}) RETURN g.drug, g.slot, g.by, g.at, coalesce(g.via, ''), coalesce(g.override, false)", {"p": p}, scope="read"):
             gk2 = (via, slot, by, at // 60_000) if via else None
             if gk2 and gk2 in gives:
                 gives[gk2]["drugs"].append(drug)
-                gives[gk2]["text"] = f"{who(by)} recorded {' + '.join(_title(d) for d in sorted(gives[gk2]['drugs']))} as given for the {slot} slot (one tablet)."
+                gives[gk2]["text"] = (f"{who(by)} recorded {' + '.join(_title(d) for d in sorted(gives[gk2]['drugs']))} as given for the {slot} slot (one tablet)"
+                                      f"{', as a second source (both were prescribed)' if ov else ''}.")
                 continue
-            row = {"at": at, "kind": "give", "who": who(by), "text": f"{who(by)} recorded {_title(drug)} as given for the {slot} slot.",
+            row = {"at": at, "kind": "give", "who": who(by), "text": f"{who(by)} recorded {_title(drug)} as given for the {slot} slot{', as a second source (both were prescribed)' if ov else ''}.",
                    "quote": "", "when": iso(at), "ago": ago(at, t)}
             if gk2:
                 row["drugs"] = [drug]

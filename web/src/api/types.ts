@@ -268,6 +268,10 @@ export interface GiveResult {
   duplicate?: boolean;
   already_given_by?: string;
   note?: string;
+  /** Why it was refused: the same tablet was already recorded, or another product holding the same ingredient was. */
+  reason?: 'same_tablet' | 'shared_ingredient' | 'same_second_source';
+  already?: string[];
+  override?: boolean;
 }
 
 export interface HubRow {

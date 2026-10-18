@@ -35,11 +35,18 @@ export function Checklist(): React.JSX.Element | null {
     try { await app.api.setTimezone(z); app.bump(); } catch (e) { toast(e instanceof Error ? e.message : 'Could not save'); }
   }
 
-  async function give(i: TodayItem): Promise<void> {
+  const [clash, setClash] = useState<{ item: TodayItem; note: string; by: string } | null>(null);
+
+  async function give(i: TodayItem, bothPrescribed = false): Promise<void> {
     setBusy(`${i.dose_id}|${i.time}`);
     try {
-      const r = await app.api.giveSlot(i.dose_id, i.time);
-      toast(r.given ? `${shown(i)} at ${i.time} marked as given.` : `Already marked as given by ${nameOf(r.already_given_by ?? '')}. Check with them before giving another.`);
+      const r = await app.api.giveSlot(i.dose_id, i.time, bothPrescribed);
+      if (!r.given && r.reason === 'shared_ingredient') {                    // another product with the same ingredient was recorded: say so, and let a carer who knows both were prescribed say it
+        setClash({ item: i, note: r.note ?? '', by: r.already_given_by ?? '' });
+        return;
+      }
+      setClash(null);
+      toast(r.given ? (r.override ? `${shown(i)} at ${i.time} recorded as a second source.` : `${shown(i)} at ${i.time} marked as given.`) : `Already marked as given by ${nameOf(r.already_given_by ?? '')}. Check with them before giving another.`);
       app.bump();
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Could not mark it');
@@ -49,12 +56,13 @@ export function Checklist(): React.JSX.Element | null {
   }
 
   return (
-    <Checked today={today.data} error={today.error} onGive={give} busy={busy} onSet={setSetting} zone={{ set: zone.data?.set ?? true, circle: zone.data?.tz ?? '', here, ask: askZone, choose: chooseZone }} setting={setting} closeSet={() => setSetting(null)} t={t} />
+    <Checked today={today.data} error={today.error} onGive={(i) => give(i)} clash={clash} onForce={(i) => give(i, true)} onCancelClash={() => setClash(null)} busy={busy} onSet={setSetting} zone={{ set: zone.data?.set ?? true, circle: zone.data?.tz ?? '', here, ask: askZone, choose: chooseZone }} setting={setting} closeSet={() => setSetting(null)} t={t} />
   );
 }
 
-function Checked({ today, error, onGive, busy, onSet, zone, setting, closeSet, t }: {
+function Checked({ today, error, onGive, clash, onForce, onCancelClash, busy, onSet, zone, setting, closeSet, t }: {
   today: TodayView | undefined; error: string | undefined; onGive: (i: TodayItem) => Promise<void>; busy: string | null;
+  clash: { item: TodayItem; note: string; by: string } | null; onForce: (i: TodayItem) => Promise<void>; onCancelClash: () => void;
   onSet: (u: TodayView['unscheduled'][number]) => void;
   zone: { set: boolean; circle: string; here: string; ask: boolean; choose: (z: string) => Promise<void> }; setting: TodayView['unscheduled'][number] | null; closeSet: () => void; t: (s: string) => string;
 }): React.JSX.Element | null {
@@ -76,6 +84,16 @@ function Checked({ today, error, onGive, busy, onSet, zone, setting, closeSet, t
             <button type="button" className="btn btn--sm" onClick={() => void zone.choose(zone.here)} data-testid="tz-use-device">{t('Use')} {zone.here}</button>
             <button type="button" className="btn btn--soft btn--sm" onClick={() => void zone.choose(zone.circle)} data-testid="tz-keep">{t('Keep')} {zone.circle}</button>
           </div>
+        </div>
+      )}
+      {clash && (
+        <div className="banner banner--warn" role="alert" data-testid="clash">
+          <p><b>{shown(clash.item)}</b> {t('was not recorded.')} {clash.note}</p>
+          <div className="row row--wrap">
+            <button type="button" className="btn btn--sm" onClick={() => void onForce(clash.item)} data-testid="both-prescribed">{t('Both were prescribed: record it anyway')}</button>
+            <button type="button" className="btn btn--soft btn--sm" onClick={onCancelClash} data-testid="clash-cancel">{t('Cancel')}</button>
+          </div>
+          <p className="muted small">{t('Choose this only if both products were really prescribed and both were given. The record will show two doses of the shared ingredient at this time, marked as a second source.')}</p>
         </div>
       )}
       {late > 0 && <p className="muted" role="status" data-testid="checklist-late">{late === 1 ? t('1 dose is not marked as given yet.') : `${late} ${t('doses are not marked as given yet.')}`} {t('Check with the others before marking one.')}</p>}

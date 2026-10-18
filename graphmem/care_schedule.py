@@ -112,7 +112,7 @@ class CareScheduleMixin:
                     if sched.slot_moment_ms(day, hhmm, tz) + 90 * 60_000 > t:        # a slot still inside its window is not a miss yet
                         continue
                     due += 1
-                    given += f"{p}|{norm(r['drug'])}|{day.isoformat()} {hhmm}" in gives
+                    given += f"{p}|{norm(r['drug'])}|{day.isoformat()} {hhmm}" in gives or f"{p}|{norm(r['drug'])}|{day.isoformat()} {hhmm}|also" in gives
         since_ms = sched.slot_moment_ms(first, "00:00", tz)
         rec = (await self._q("MATCH (x:Dose {status:'confirmed'})-[:FOR]->(:Person {id:$p}) WHERE x.created_at >= $s RETURN count(x)", {"p": p, "s": since_ms}, scope="read"))[0][0]
         mist = (await self._q("MATCH (x:Dose {status:'mistake'})-[:FOR]->(:Person {id:$p}) WHERE x.mistake_at >= $s RETURN count(x)", {"p": p, "s": since_ms}, scope="read"))[0][0]
@@ -239,7 +239,9 @@ class CareScheduleMixin:
             for hhmm in slots:
                 slot = f"{today.isoformat()} {hhmm}"
                 moment = sched.slot_moment_ms(today, hhmm, tz)
-                gots = [gives.get(f"{norm(person)}|{norm(m['drug'])}|{slot}") for m in ms]
+                tablet = len(ms) > 1                                  # a tablet's own give may be the second source of an ingredient another product also gave
+                gots = [(gives.get(f"{norm(person)}|{norm(m['drug'])}|{slot}|also") or gives.get(f"{norm(person)}|{norm(m['drug'])}|{slot}")) if tablet
+                        else (gives.get(f"{norm(person)}|{norm(m['drug'])}|{slot}") or gives.get(f"{norm(person)}|{norm(m['drug'])}|{slot}|also")) for m in ms]
                 got = next((x for x in gots if x), None)
                 every = all(gots)                                    # a combination is given only when every ingredient has been marked
                 items.append({**base, "time": hhmm, "slot": slot, "at": moment,
@@ -249,7 +251,7 @@ class CareScheduleMixin:
         counts = {k: sum(1 for i in items if i["state"] == k) for k in ("given", "due", "not_marked", "upcoming", "before")}
         return {"person": norm(person), "tz": tz, "date": today.isoformat(), "items": items, "counts": counts, "unscheduled": unscheduled, "as_needed": as_needed}
 
-    async def care_give_slot(self, person: str, dose_id: str, time: str, now: Optional[int] = None) -> dict:
+    async def care_give_slot(self, person: str, dose_id: str, time: str, now: Optional[int] = None, both_prescribed: bool = False) -> dict:
         """Mark one of today's confirmed slots as given. Same once-per-slot claim as care_give: if someone already marked it, this says who. A combination tablet is one claim over all its ingredients: every one is recorded or none is, and a refusal says whether the same tablet or a shared ingredient was already recorded."""
         t = now_ms() if now is None else now
         rows = await self._q("MATCH (x:Dose {id:$id, status:'confirmed', cur:true, action:'set'})-[:FOR]->(:Person {id:$p}) OPTIONAL MATCH (x)-[:VIA]->(pr:Product) "
@@ -267,10 +269,10 @@ class CareScheduleMixin:
             raise ValueError(f"{time} is not one of this medicine's times ({', '.join(allowed) or 'none set'})")
         day = sched.local_date(t, await self._tz())
         if len(members) == 1:
-            return await self.care_give(person, drug, f"{day.isoformat()} {time}")
-        return await self._give_tablet(person, [d for d, _sl in members], pkey, f"{day.isoformat()} {time}")
+            return await self.care_give(person, drug, f"{day.isoformat()} {time}", both_prescribed)
+        return await self._give_tablet(person, [d for d, _sl in members], pkey, f"{day.isoformat()} {time}", both_prescribed)
 
-    async def _give_tablet(self, person: str, drugs: list[str], pkey: str, slot: str) -> dict:
+    async def _give_tablet(self, person: str, drugs: list[str], pkey: str, slot: str, both_prescribed: bool = False) -> dict:
         """Mark one tablet of a combination as given: every ingredient, or none. It is ONE write that creates the gives only if no give of any of these ingredients
         is already on record for this slot, so two carers ticking at once have exactly one winner, and a tablet is never recorded as half given (an ingredient
         already given through another entry refuses the whole tick, and nothing at all is written)."""
@@ -297,6 +299,18 @@ class CareScheduleMixin:
             raise RuntimeError("the tablet could not be recorded; nothing was saved")
         same_tablet = all(c[3] == pkey for c in clash)
         first = clash[0]
+        if both_prescribed and not same_tablet:                       # the same ingredient from another product really was prescribed too: record this tablet as a second source, all or none
+            made2 = await self._q(
+                """UNWIND $rows AS x
+                   OPTIONAL MATCH (e:Give {key: x.key + '|also'})
+                   WITH collect(e) AS taken WHERE size(taken) = 0
+                   UNWIND $rows AS x
+                   CREATE (:Give {key: x.key + '|also', by:$me, at:$t, person:$p, drug:x.drug, slot:$s, ing:x.ing, slot_ms:$ms, via:$pk, override:true})
+                   RETURN count(*)""",
+                {"rows": rows, "p": p, "ms": slot_ms, "me": me, "t": now_ms(), "s": norm(slot), "pk": pkey})
+            if made2 and made2[0][0]:
+                return {"given": True, "slot": slot, "ingredients": names, "override": True,
+                        "note": "recorded as a second source: you said both were prescribed. The record shows two doses of the shared ingredient at this time."}
         await self._q("MERGE (v:Prevented {key:$k}) ON CREATE SET v.person=$p, v.drug=$d, v.slot=$s, v.by=$me, v.first_by=$by, v.at=$t",
                       {"k": f"{p}|{pkey}|{norm(slot)}|{me}", "p": p, "d": names[0], "s": norm(slot), "me": me, "by": first[1], "t": now_ms()}, checked=True)
         already = sorted({c[0] for c in clash})
