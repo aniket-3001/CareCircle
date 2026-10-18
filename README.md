@@ -6,7 +6,7 @@
 
 **Closing the loop, for the family who look after a loved one and the agents that work beside them.** One shared memory of their medicines: what is on record, who has seen each change, and what an agent noted about it. *Graph Hacks 2026 (WeMakeDevs x FalkorDB), Track 02: Agent Memory & Coordination.*
 
-It is 9 pm. Ravi has just changed his mother's warfarin dose by phone. His sister Meena is on the night shift and has not seen it. Tomorrow a pharmacist adds an antibiotic that interacts with it, and nobody holds the whole picture. Care Circle keeps that picture in one FalkorDB graph: carers add a medicine by **photo, voice note, PDF/Word or text** (web app or Telegram), and the circle knows what is on record, **who has seen each change**, which entries **interact** according to public sources, and which dose slots are **already given**.
+**What it is for.** When several family members look after one person's medicines, nobody has the full picture: a dose is changed by phone, someone is on a night shift, a second doctor adds a tablet. Care Circle gives the family one shared list. Anyone can add a medicine by photo, voice note, PDF/Word or text (on the web or in Telegram). Everyone can then see what the person takes, who has seen each change, which medicines are known to interact according to public sources, and which of today's doses have already been given.
 
 **It records and cross-checks. It never advises.** It never says what to take, stop or change; every flag shows its source and the graph path behind it, and "no flag" is never reported as "safe". All demo data is synthetic.
 
@@ -15,6 +15,8 @@ Live: **https://3-228-70-117.sslip.io** (press **Start a demo circle**) · The s
 ![Care Circle, Today screen: the day's doses, then the verdict with its flag count](docs/img/ui-today.png)
 
 ## The story it was built around
+
+It is 9 pm. Ravi has just changed his mother's warfarin dose by phone. His sister Meena is on the night shift and has not seen it. Tomorrow a pharmacist adds an antibiotic that interacts with it, and nobody holds the whole picture. Care Circle keeps that picture in one FalkorDB graph: carers add a medicine by **photo, voice note, PDF/Word or text** (web app or Telegram), and the circle knows what is on record, **who has seen each change**, which entries **interact** according to public sources, and which dose slots are **already given**.
 
 A cardiologist writes **Telma-AM** (telmisartan with amlodipine). A second doctor, months later, writes plain **amlodipine** for the ankle swelling. On the shelf they are two boxes; in the body it is amlodipine twice. Care Circle reads the Telma-AM line as *two* ingredients (a hand-written brand list, marked unverified, with "check the pack"), keeps the plain amlodipine as its own entry, and shows both under the same ingredient: "this may be the same medicine from two sources", with who recorded each and the quoted line. It says nothing about what to do. (Browser scenario U14 walks it; `tests/test_duplicates.py` holds the rule.)
 
