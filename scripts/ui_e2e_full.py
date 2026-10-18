@@ -136,8 +136,8 @@ with sync_playwright() as p:
 
     # ---- readings, conditions and allergies, appointments and the what-to-bring page
     tab(pg, "Today")
-    expect(pg.get_by_test_id("counts")).to_contain_text("not the validated", timeout=15000)
-    expect(pg.get_by_test_id("counts")).to_contain_text("not been rated as safe", timeout=15000)
+    expect(pg.get_by_test_id("counts")).to_contain_text("special direction", timeout=15000)
+    expect(pg.get_by_test_id("counts")).to_contain_text("pairs listed by the source", timeout=15000)
     pg.get_by_label("Add an allergy").fill("Warfarin")
     pg.get_by_label("Add an allergy").press("Enter")
     expect(pg.get_by_test_id("allergy-hit")).to_be_visible(timeout=15000)
