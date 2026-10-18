@@ -153,6 +153,7 @@ class CareMixin:
             MERGE (dr:Drug {name:$d})
             MERGE (au:Person {id:$by}) ON CREATE SET au.role='carer'
             MERGE (pr:Product {key:$pk}) ON CREATE SET pr.name=$pn, pr.kind=$pkind, pr.person=$p, pr.combo=$pcombo
+            MERGE (pr)-[:CONTAINS]->(dr)
             SET pr.strength = CASE WHEN $ps <> '' THEN $ps ELSE pr.strength END
             CREATE (x:Dose {id:$id, drug:$d, product:$pr, pstrength:$ps, dose_text:$dt, freq_text:$ft, valid_from:$ts, cur:false, action:$a, status:$st,
                             source_type:$src, quote:$q, verified:$v, by:$by, at:$ts, created_at:$now, edited:$ed})

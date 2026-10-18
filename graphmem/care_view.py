@@ -169,6 +169,25 @@ class CareViewMixin:
             if old and old in dose_by_id and include_history:
                 edge(f"dose:{did}", f"dose:{old}", "supersedes", "replaced", f"This entry replaced an older one for {_title(drug)}.")
 
+        prods = await self._q(
+            """MATCH (pr:Product {kind:'product'})-[:CONTAINS]->(d:Drug) WHERE pr.person = $p
+               RETURN pr.combo, coalesce(pr.strength, ''), collect(d.name)""", {"p": p}, scope="read")
+        via: dict = {}
+        for combo, did in await self._q("MATCH (x:Dose)-[:VIA]->(pr:Product {kind:'product'}) WHERE pr.person = $p RETURN pr.combo, x.id", {"p": p}, scope="read"):
+            via.setdefault(combo, set()).add(did)
+        for combo, strength, ings in prods:                       # a tablet is a node: the entries are "as" it, and it contains its molecules
+            members = [r for r in rows if (r[6] or include_history) and r[0] in via.get(combo, set())]
+            if not members:
+                continue
+            names = " + ".join(_title(i) for i in sorted(ings))
+            node(f"product:{combo}", "product", product_name(combo),
+                 f"{product_name(combo)} is one {'strip' if len(ings) > 1 else 'brand'} that contains {names}." + (f" Printed strength: {strength}." if strength else ""),
+                 [["Product", product_name(combo)], ["Contains", names], ["Printed strength", strength or "not recorded"], ["Entries that point at it", str(len(members))]],
+                 "(:Dose)-[:VIA]->(:Product)-[:CONTAINS]->(:Drug)", current=any(r[6] for r in members), short=strength or "")
+            for r in members:
+                edge(f"dose:{r[0]}", f"product:{combo}", "via", "as", f"This entry is {product_name(combo)}.", [], weak=True)
+            for i in ings:
+                edge(f"product:{combo}", f"drug:{i}", "contains", "contains", f"{product_name(combo)} contains {_title(i)}.", [], weak=True)
         all_drugs = sorted({r[1] for r in rows if r[6] or include_history} | set(drugs_now))
         for d in all_drugs:
             pr = profile.get(d, {"levels": {}, "total": 0})

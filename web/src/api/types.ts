@@ -300,8 +300,8 @@ export interface GPath { found: boolean; reason?: string; length?: number; path:
 
 export type Meta = [string, string][];
 
-export type NodeKind = 'patient' | 'carer' | 'dose' | 'dose_old' | 'drug' | 'drug_old' | 'enzyme';
-export type EdgeKind = 'for' | 'of' | 'recorded' | 'acked' | 'supersedes' | 'interacts' | 'inhibits' | 'induces' | 'substrate';
+export type NodeKind = 'patient' | 'carer' | 'dose' | 'dose_old' | 'drug' | 'drug_old' | 'enzyme' | 'product';
+export type EdgeKind = 'for' | 'of' | 'recorded' | 'acked' | 'supersedes' | 'interacts' | 'inhibits' | 'induces' | 'substrate' | 'via' | 'contains';
 
 export interface GraphNode {
   id: string;

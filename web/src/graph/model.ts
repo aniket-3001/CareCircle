@@ -22,9 +22,10 @@ export const KIND: Record<NodeKind, KindStyle> = {
   drug: { color: 'var(--c-drug)', r: 17, glyph: '', shape: 'capsule', word: 'medicine', ring: 0.64, order: 4 },
   drug_old: { color: 'var(--c-dose-old)', r: 14, glyph: '', shape: 'capsule', word: 'past medicine', ring: 0.78, order: 5 },
   enzyme: { color: 'var(--c-enzyme)', r: 15, glyph: 'E', shape: 'diamond', word: 'liver enzyme', ring: 0.97, order: 6 },
+  product: { color: 'var(--c-product)', r: 15, glyph: 'Tab', shape: 'capsule', word: 'tablet or brand', ring: 0.5, order: 3 },
 };
 
-const LAYER_OF: Record<NodeKind, Layer | null> = { patient: null, carer: 'people', dose: 'entries', dose_old: 'history', drug: null, drug_old: 'history', enzyme: 'enzymes' };
+const LAYER_OF: Record<NodeKind, Layer | null> = { patient: null, carer: 'people', dose: 'entries', dose_old: 'history', drug: null, drug_old: 'history', enzyme: 'enzymes', product: 'entries' };
 
 export interface Visible {
   nodes: GraphNode[];
@@ -67,6 +68,8 @@ const VERB: Record<EdgeKind, [string, string]> = {
   inhibits: ['slows', 'is slowed by'],
   induces: ['speeds up', 'is sped up by'],
   substrate: ['is cleared by', 'clears'],
+  via: ['is the tablet', 'has the entry'],
+  contains: ['contains', 'is contained in'],
 };
 export const relationWord = (e: GraphEdge, outgoing: boolean): string => VERB[e.kind][outgoing ? 0 : 1];
 

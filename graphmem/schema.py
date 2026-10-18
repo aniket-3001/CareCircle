@@ -32,6 +32,9 @@ MIGRATIONS: list[tuple[int, str, list[tuple]]] = [
                       WITH pr, x ORDER BY x.valid_from DESC
                       WITH pr, collect(x)[0] AS l SET pr.strength = l.pstrength"""),
     ]),
+    (6, "a tablet contains its molecules: (:Product)-[:CONTAINS]->(:Drug)", [
+        ("cypher", "MATCH (x:Dose)-[:VIA]->(pr:Product) MATCH (x)-[:OF]->(d:Drug) MERGE (pr)-[:CONTAINS]->(d)"),
+    ]),
 ]
 CURRENT = MIGRATIONS[-1][0]
 

@@ -7,7 +7,7 @@ import { Sheet } from '../components/Sheet';
 import { KIND, neighbours, relationWord } from './model';
 import type { Selection } from './KnowledgeGraph';
 
-const TONE: Record<string, Tone> = { patient: 'info', carer: 'info', dose: 'ok', dose_old: 'mute', drug: 'warn', drug_old: 'mute', enzyme: 'info' };
+const TONE: Record<string, Tone> = { patient: 'info', carer: 'info', dose: 'ok', dose_old: 'mute', drug: 'warn', drug_old: 'mute', enzyme: 'info', product: 'info' };
 
 export function useWide(): boolean {
   const q = '(min-width: 56rem)';

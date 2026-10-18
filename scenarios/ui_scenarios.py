@@ -760,6 +760,11 @@ def u21(w, b, r):
     r.check(pg.get_by_test_id("slot").first.get_attribute("data-state") == "given", "one tick marks the whole tablet as given")
     got = [x for x in u.ok(c, "care_gives", person="mum")]
     r.check(sorted(g["drug"] for g in got) == ["amlodipine", "telmisartan"], "both ingredients are recorded as given", got)
+    pg.goto(f"{BASE}/#/graph")
+    pg.reload()
+    pg.get_by_test_id("knowledge-graph").wait_for(timeout=20000)
+    pg.wait_for_timeout(2500)
+    r.check("Telma-AM" in (pg.get_by_test_id("knowledge-graph").text_content() or ""), "the Graph tab draws the tablet as a node of its own")
     r.check(not [e for e in errs if e.startswith("pageerror")], "no errors", errs[:3])
     ctx.close()
 

@@ -55,7 +55,7 @@ async def test_migration_5_gives_every_old_entry_a_product_and_moves_the_schedul
         except Exception as e:
             assert "already" in str(e).lower()
     out = await schema.migrate(g, mk)
-    assert out["from"] == 4 and out["applied"] == [5]
+    assert out["from"] == 4 and out["applied"] == [5, 6]
     rows = (await g.query("MATCH (x:Dose)-[:VIA]->(pr:Product) RETURN x.id, pr.key, pr.kind, pr.combo, pr.slots, pr.sched_first, pr.strength ORDER BY x.id")).result_set
     by = {r[0]: r for r in rows}
     assert len(rows) == 3 and (await g.query("MATCH (x:Dose) WHERE NOT (x)-[:VIA]->(:Product) RETURN count(x)")).result_set == [[0]]       # every entry has one product
@@ -63,5 +63,7 @@ async def test_migration_5_gives_every_old_entry_a_product_and_moves_the_schedul
     assert by["old-1"][2:5] == ["product", "telma-am", ["09:00"]] and by["old-1"][5] == 2 and by["old-1"][6] == "40/5 mg"       # times, earliest first-confirmed, strength
     met = [r for r in rows if r[2] == "medicine"][0]
     assert met[1] == "asha|medicine|metformin" and met[3] == "" and met[4] == ["08:00", "20:00"]
+    contains = {(r[0], r[1]) for r in (await g.query("MATCH (pr:Product)-[:CONTAINS]->(d:Drug) RETURN pr.key, d.name")).result_set}
+    assert ("asha|medicine|metformin", "metformin") in contains                                                          # migration 6: every product contains the molecule(s) of its entries
     again = await schema.migrate(g, mk)
     assert again["applied"] == [] and (await g.query("MATCH (pr:Product) RETURN count(pr)")).result_set == [[2]]                     # idempotent

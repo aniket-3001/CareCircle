@@ -150,3 +150,20 @@ async def test_the_invariant_check_can_fail(gm):
     await a._q("MATCH (:Dose {id:$i})-[v:VIA]->(:Product) DELETE v", {"i": e})
     with pytest.raises(AssertionError):
         await assert_invariants(a)                                                                       # an entry with no product
+
+
+async def test_the_tablet_contains_its_molecules_in_the_circle_graph_and_the_graph_tab_draws_it(gm):
+    """Round 3: 'make the product a node'. The tablet is a (:Product) that CONTAINS its (:Drug)s, and the circle graph shows it with the entries that are it."""
+    t, a, b = await circle(gm)
+    ids = [(await a.care_record("asha", i, freq_text="once daily", product="Telma-AM", product_strength="40/5 mg"))["id"] for i in ("telmisartan", "amlodipine")]
+    await a.care_record("asha", "metformin", dose_text="500 mg", freq_text="daily")
+    rows = await a._q("MATCH (pr:Product {kind:'product'})-[:CONTAINS]->(d:Drug) RETURN pr.combo, d.name ORDER BY d.name", scope="read")
+    assert rows == [["telma-am", "amlodipine"], ["telma-am", "telmisartan"]]
+    g = await a.care_graph("asha")
+    nodes = g["nodes"] if isinstance(g["nodes"], list) else list(g["nodes"].values())
+    prod = [n for n in nodes if n["kind"] == "product"]
+    assert [n["label"] for n in prod] == ["Telma-AM"] and "Amlodipine + Telmisartan" in prod[0]["summary"] and "40/5 mg" in prod[0]["summary"]
+    edges = g["edges"]
+    assert {(e["source"], e["kind"]) for e in edges if e["target"] == "product:telma-am"} == {(f"dose:{i}", "via") for i in ids}
+    assert {(e["target"]) for e in edges if e["source"] == "product:telma-am" and e["kind"] == "contains"} == {"drug:amlodipine", "drug:telmisartan"}
+    assert not [n for n in nodes if n["kind"] == "product" and "metformin" in n["id"]]             # a plain medicine is not drawn as a tablet of its own
