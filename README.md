@@ -55,6 +55,51 @@ More screens (flags, the circle as a graph, who has seen what, history): [`docs/
 - **Quote and verify.** The model only structures text the OCR already read; a quote not found in it leaves the entry *pending* until a person confirms it. 26% of DDInter pairs have severity "Unknown": shown as *unrated*.
 - What can go wrong, and the test behind each: [`docs/HAZARDS.md`](docs/HAZARDS.md). The review's own probes, run again: [`docs/REVIEW_PROBES.md`](docs/REVIEW_PROBES.md).
 
+## Graph data model
+
+Three graphs (FalkorDB): `cc_ref` is shared public knowledge, `mem__<circle>` is one graph per family, `ctl` holds accounts and keys. Full model with every property: [`docs/DETAILS.md`](docs/DETAILS.md#graph-data-model).
+
+```
+cc_ref    (Drug {name}) -[:INTERACTS {level, source}]-> (Drug)           ~218,000 DDInter pairs
+          (Drug) -[:HAZARD {w}]-> (Drug)                                 moderate/major only, for algorithms
+          (Drug) -[:INHIBITS|INDUCES {strength}]-> (Enzyme) <-[:SUBSTRATE_OF]- (Drug)     FDA CYP table
+          (Brand)-[:CONTAINS {pos}]->(Ingredient)-[:IS]->(Drug)          combination brands
+          (Member)-[:IN_CLASS]->(Class)  (Member)-[:IS]->(Drug)          allergy classes (WHO ATC)
+
+mem__<circle>
+          (Person)  (Dose {drug, dose_text, freq_text, valid_from, valid_to, cur, status, source_type, quote})
+          (Dose)-[:FOR]->(Person)  (Dose)-[:OF]->(Drug)  (Dose)-[:SUPERSEDES]->(Dose)
+          (Dose)-[:VIA]->(Product {key, name, combo, strength, slots})-[:CONTAINS]->(Drug)
+          (Carer)-[:ACKED {at}]->(Dose)        who has seen which entry
+          (Give {key: person|drug|slot})       one per dose slot: the double-dose guard
+          (Episode)-[:ABOUT]->(Dose|Person)    notes and facts agents write, kept apart from the record
+          (Source)<-[:READ_FROM]-(Dose)        the text an entry was read from
+
+ctl       (Account)-[:MEMBER {role}]->(Tenant)   (Agent)-[:GRANTED {scopes}]->(Tenant)   (Session)  (Invite)
+```
+
+## Cypher queries and graph algorithms the product depends on
+
+| What it does | Query / algorithm | Code |
+|---|---|---|
+| Interactions in a regimen | `MATCH (x:Drug)-[m:INTERACTS]-(y:Drug) WHERE x.name IN $d AND y.name IN $d` | `carecircle/checks.py` |
+| Enzyme path (2 hops) | `(x)-[:INHIBITS\|INDUCES]->(e:Enzyme)<-[:SUBSTRATE_OF]-(y)` | `carecircle/checks.py` |
+| Allergy class to packs and interactions | `(Member)-[:IN_CLASS]->(Class)`, `(Member)-[:IS]->(Drug)`, `(Brand)-[:CONTAINS]->(Ingredient)-[:IS]->(Drug)` | `carecircle/checks.py` |
+| Atomic one-winner dose claim | `MERGE (g:Give {key:$k}) ON CREATE SET g.won = true` then `SET g.won = false` | `graphmem/care.py` `care_give` |
+| Who has not seen a change | absence of `(:Carer)-[:ACKED]->(:Dose)` per carer, age-weighted | `graphmem/care.py` |
+| History and "what did we know then?" | `valid_from <= $t AND (valid_to IS NULL OR valid_to > $t)` over `SUPERSEDES` chains | `graphmem/care.py` `care_regimen` |
+| Duplicate medicines | current `Dose` grouped on the `Drug` they are `OF`, groups of 2+ | `graphmem/care.py` `care_duplicates` |
+| Reminder sent once | `MERGE (n:Nudge {key:$k}) ON CREATE SET n.fresh = true` | `graphmem/care.py` |
+| Access check on every query | `(Agent)-[:GRANTED]->(Tenant)` | `graphmem/policy.py` |
+| Hub medicines | `CALL algo.pageRank('Drug','HAZARD')` | `carecircle/algos.py` |
+| Hazard clusters | `CALL algo.WCC({nodeLabels:['Drug'], relationshipTypes:['HAZARD']})` | `carecircle/algos.py` |
+| Flag order | severity, then connectedness inside this person's `HAZARD` subgraph (`order_flags`) | `carecircle/algos.py` |
+| Shared enzyme / transporter groups | medicines on record grouped by the `Enzyme` they share (`group_pathways`) | `carecircle/algos.py` |
+| Who the record depends on | weighted graph of carer to entries (`care_dependence`) | `graphmem/care.py` |
+| Agent graph tools | `algo.pageRank`, `algo.HarmonicCentrality`, `algo.WCC`, `algo.labelPropagation`, shortest path, neighbourhood on a circle's own graph | `graphmem/graph_algos.py` |
+
+Every table of queries with the test that checks each one: [`docs/DETAILS.md`](docs/DETAILS.md#queries-and-algorithms).
+
 ## Data and licences
 
 Interaction data: **DDInter 2.0**, CC BY-NC-SA 4.0 (**non-commercial**; attribution required), downloaded by `scripts/fetch_reference.py`, not stored in this repository. Enzyme data: the FDA drug-interaction table (a US government snapshot is bundled in `carecircle/snapshot/` as a fallback), and allergy classes from WHO ATC via NLM RxClass. Demo circles, labels and people are synthetic.
