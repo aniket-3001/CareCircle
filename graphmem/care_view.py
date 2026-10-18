@@ -14,8 +14,10 @@ import asyncio
 import hashlib
 import hmac
 import os
+import re
 import secrets
 import json
+import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -25,6 +27,7 @@ from .db import new_id, norm, now_ms
 from .textcheck import plural, product_name, shown_name
 
 H = 3_600_000
+TAG_SYSTEM = "urn:carecircle:fhir-tags"                # the `system` the bundle's own tags are codes in
 _secret_cache: dict = {}
 
 
@@ -539,8 +542,12 @@ class CareViewMixin:
             """MATCH (x:Dose {status:'confirmed', action:'set'})-[:FOR]->(:Person {id:$p})
                RETURN x.id, x.drug, x.dose_text, x.freq_text, x.valid_from, x.valid_to, x.cur, x.source_type, x.quote, x.verified, x.by
                ORDER BY x.valid_from""", {"p": p}, scope="read")
-        entries = [{"fullUrl": f"urn:uuid:patient-{p}", "resource": {"resourceType": "Patient", "id": p, "name": [{"text": _title(p)}],
-                                                                       "meta": {"tag": [{"code": "synthetic-or-user-entered"}]}}}]
+        # FHIR wants an id of letters, digits, '-' and '.' only, a fullUrl that is a real urn:uuid, and a reference that resolves to some entry's fullUrl
+        fid = lambda s: re.sub(r"[^A-Za-z0-9.-]", "-", str(s))[:64] or "x"
+        uid = lambda kind, s: "urn:uuid:" + str(uuid.uuid5(uuid.NAMESPACE_URL, f"carecircle:{self.tenant}:{kind}:{s}"))
+        patient_url = uid("patient", p)
+        entries = [{"fullUrl": patient_url, "resource": {"resourceType": "Patient", "id": fid(p), "name": [{"text": _title(p)}],
+                                                          "meta": {"tag": [{"system": TAG_SYSTEM, "code": "synthetic-or-user-entered"}]}}}]
         codes: dict[str, str] = {}
         if coded:
             from carecircle import external
@@ -553,14 +560,14 @@ class CareViewMixin:
             period = {"start": datetime.fromtimestamp(vf / 1000, tz=timezone.utc).isoformat()}
             if vt:
                 period["end"] = datetime.fromtimestamp(vt / 1000, tz=timezone.utc).isoformat()
-            res = {"resourceType": "MedicationStatement", "id": did, "status": "active" if cur else "stopped",
+            res = {"resourceType": "MedicationStatement", "id": fid(did), "status": "active" if cur else "stopped",
                    "medicationCodeableConcept": ({"coding": [{"system": "http://www.nlm.nih.gov/research/umls/rxnorm", "code": codes[drug], "display": _title(drug)}], "text": _title(drug)}
-                                                 if drug in codes else {"text": _title(drug)}), "subject": {"reference": f"Patient/{p}", "display": _title(p)},
+                                                 if drug in codes else {"text": _title(drug)}), "subject": {"reference": patient_url, "display": _title(p)},
                    "effectivePeriod": period, "informationSource": {"display": who(by)},
                    "dosage": [{"text": " ".join(x for x in (dt, ft) if x) or "not recorded"}],
                    "note": [{"text": f"Source: {SOURCE_WORDS.get(src, src)}." + (f" Quoted line: \"{quote}\"." if quote else "")
                                      + (" Quote verified against the source text." if verified else "")}]}
-            entries.append({"fullUrl": f"urn:uuid:{did}", "resource": res})
+            entries.append({"fullUrl": uid("dose", did), "resource": res})
         return {"resourceType": "Bundle", "type": "collection", "timestamp": datetime.now(timezone.utc).isoformat(),
-                "meta": {"tag": [({"code": "coded-where-exact", "display": f"{len(codes)} of {len({r[1] for r in rows})} medicines carry an RxNorm code (exact ingredient match only); the others are free text"}
-                                  if coded else {"code": "free-text-only", "display": "No medicine codes are assigned by Care Circle"})]}, "entry": entries}
+                "meta": {"tag": [({"system": TAG_SYSTEM, "code": "coded-where-exact", "display": f"{len(codes)} of {len({r[1] for r in rows})} medicines carry an RxNorm code (exact ingredient match only); the others are free text"}
+                                  if coded else {"system": TAG_SYSTEM, "code": "free-text-only", "display": "No medicine codes are assigned by Care Circle"})]}, "entry": entries}

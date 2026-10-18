@@ -6,6 +6,15 @@ import { useApp, useLoad } from '../state';
 
 const FALLBACK = ['Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'Europe/London', 'Europe/Berlin', 'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'Australia/Sydney', 'UTC'];
 
+/** Old names for zones that are the same place (a browser may report either). Calcutta and Kolkata are one zone; we show and store the current name. */
+const ALIASES: Record<string, string> = {
+  'Asia/Calcutta': 'Asia/Kolkata', 'Asia/Saigon': 'Asia/Ho_Chi_Minh', 'Asia/Katmandu': 'Asia/Kathmandu', 'Asia/Rangoon': 'Asia/Yangon', 'Asia/Dacca': 'Asia/Dhaka',
+  'Asia/Thimbu': 'Asia/Thimphu', 'Asia/Macao': 'Asia/Macau', 'Europe/Kiev': 'Europe/Kyiv', 'America/Buenos_Aires': 'America/Argentina/Buenos_Aires',
+  'Atlantic/Faeroe': 'Atlantic/Faroe', 'Pacific/Ponape': 'Pacific/Pohnpei', 'Pacific/Truk': 'Pacific/Chuuk', 'US/Eastern': 'America/New_York',
+  'US/Central': 'America/Chicago', 'US/Pacific': 'America/Los_Angeles', 'US/Mountain': 'America/Denver', 'Australia/ACT': 'Australia/Sydney',
+};
+export const canonicalZone = (z: string): string => ALIASES[z] ?? z;
+
 /** The zones this browser knows by name, with the usual few first; older browsers fall back to a short list. */
 export function zoneNames(): string[] {
   const all = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.('timeZone') ?? [];
@@ -21,7 +30,7 @@ export function CircleTimeZone(): React.JSX.Element {
   const [pick, setPick] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (tz.data) setPick(tz.data.tz); }, [tz.data]);
-  const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const here = canonicalZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
 
   async function save(zone: string): Promise<void> {
     setBusy(true);

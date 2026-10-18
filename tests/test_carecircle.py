@@ -389,7 +389,13 @@ async def test_fhir_bundle_shape_and_free_text_only(gm):
     b = await c["ravi"].care_export_fhir("asha")
     assert b["resourceType"] == "Bundle" and b["entry"][0]["resource"]["resourceType"] == "Patient"
     ms = [e["resource"] for e in b["entry"] if e["resource"]["resourceType"] == "MedicationStatement"]
-    assert len(ms) == 4 and all(m["status"] == "active" and m["subject"]["reference"] == "Patient/asha" for m in ms)
+    assert len(ms) == 4 and all(m["status"] == "active" and m["subject"]["reference"] == b["entry"][0]["fullUrl"] for m in ms)
+    # ids are FHIR ids, every fullUrl is a real urn:uuid, and every reference resolves to an entry in the bundle
+    import re, uuid
+    assert all(re.fullmatch(r"[A-Za-z0-9.-]{1,64}", e["resource"]["id"]) for e in b["entry"])
+    urls = [e["fullUrl"] for e in b["entry"]]
+    assert len(set(urls)) == len(urls) and all(u.startswith("urn:uuid:") and uuid.UUID(u[9:]) for u in urls)
+    assert all(m["subject"]["reference"] in urls for m in ms)
     cla = next(m for m in ms if m["medicationCodeableConcept"]["text"] == "Clarithromycin")
     assert "coding" not in cla["medicationCodeableConcept"] and cla["dosage"][0]["text"] == "500 mg twice daily"
     assert "Quote verified" in cla["note"][0]["text"] and "photo" in cla["note"][0]["text"]

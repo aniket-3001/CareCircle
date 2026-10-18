@@ -4,6 +4,7 @@ import type { StockRow, Suggestion, TodayItem, TodayView } from '../api/types';
 import { useT, tr } from '../lib/i18n';
 import { nameOf, productName, shown, title } from '../lib/format';
 import { useApp, useLoad } from '../state';
+import { canonicalZone } from './CircleTimeZone';
 import { Pill } from './Pill';
 import { Sheet } from './Sheet';
 import { useToast } from './Toast';
@@ -29,8 +30,8 @@ export function Checklist(): React.JSX.Element | null {
   // The circle's time zone decides which day a slot belongs to. It is never taken silently from whoever opens this first: if nobody has set it and this device
   // is somewhere else, we ask (a carer abroad is a common case), and it can be changed in the Account screen.
   const zone = useLoad((a) => a.api.timezone(), [app.session.circle]);
-  const here = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const askZone = !!zone.data && !zone.data.set && !!here && here !== zone.data.tz;
+  const here = canonicalZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const askZone = !!zone.data && !zone.data.set && !!here && here !== canonicalZone(zone.data.tz);
   async function chooseZone(z: string): Promise<void> {
     try { await app.api.setTimezone(z); app.bump(); } catch (e) { toast(e instanceof Error ? e.message : 'Could not save'); }
   }
@@ -78,7 +79,7 @@ function Checked({ today, error, onGive, clash, onForce, onCancelClash, busy, on
       </div>
       <p className="muted small" data-testid="checklist-zone">{t('Times are in')} {today.tz}{!zone.set ? ` (${t('not set yet')})` : ''}. {t('Change it in Account.')}</p>
       {zone.ask && (
-        <div className="banner" role="status" data-testid="tz-prompt">
+        <div className="banner banner--stack" role="status" data-testid="tz-prompt">
           <p>{t('This device is in')} <b>{zone.here}</b>, {t('but this circle uses')} <b>{zone.circle}</b>. {t('Which time zone is the person you look after in?')}</p>
           <div className="row row--wrap">
             <button type="button" className="btn btn--sm" onClick={() => void zone.choose(zone.here)} data-testid="tz-use-device">{t('Use')} {zone.here}</button>
@@ -87,7 +88,7 @@ function Checked({ today, error, onGive, clash, onForce, onCancelClash, busy, on
         </div>
       )}
       {clash && (
-        <div className="banner banner--warn" role="alert" data-testid="clash">
+        <div className="banner banner--warn banner--stack" role="alert" data-testid="clash">
           <p><b>{shown(clash.item)}</b> {t('was not recorded.')} {clash.note}</p>
           <div className="row row--wrap">
             <button type="button" className="btn btn--sm" onClick={() => void onForce(clash.item)} data-testid="both-prescribed">{t('Both were prescribed: record it anyway')}</button>

@@ -119,6 +119,12 @@ h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: var(--he
 .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
 .banner { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid var(--blue-line); border-radius: 12px; background: var(--blue-soft); color: #23507f; font-size: 14px; }
 .banner svg { flex: none; margin-top: 2px; }
+.banner--stack { flex-direction: column; align-items: stretch; gap: 10px; }
+.banner--stack > p { margin: 0; }
+.banner--stack .row { gap: 8px; }
+.banner--stack .row .btn { flex: 1 1 11rem; justify-content: center; }
+.banner--warn { border-color: #f2cfa4; background: var(--sev-moderate-soft); color: #7a4a14; }
+:root[data-theme='dark'] .banner--warn { border-color: #6a4a22; color: #f4c48b; }
 .banner--bad { border-color: #f0b4b4; background: var(--sev-major-soft); color: #7a2d2d; }
 .stack { display: grid; gap: 12px; }
 .row { display: flex; align-items: center; gap: 12px; }
@@ -172,6 +178,15 @@ h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; color: var(--he
 .btn--block { width: 100%; }
 .field { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .field input, .field select, .field textarea { width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); font-size: 16px; font-weight: 500; }
+/* Every text box, wherever it sits: the same shape as the boxes inside a .field (specificity kept low so more specific rules still win). */
+input:where(:not([type]), [type='text'], [type='search'], [type='email'], [type='url'], [type='number'], [type='password']), textarea, select {
+  min-height: 44px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); font-size: 16px; font-weight: 500; max-width: 100%;
+}
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.8; }
+input:where(:not([type]), [type='text'], [type='search'], [type='email'], [type='url'], [type='number'], [type='password']):focus, textarea:focus, select:focus { outline: 2px solid var(--blue); outline-offset: 0; border-color: var(--blue); }
+input:disabled, textarea:disabled, select:disabled { opacity: 0.6; cursor: not-allowed; }
+.row > input:where([type='text'], [type='search'], [type='number']), form.row > input { flex: 1 1 12rem; min-width: 0; }
+.stack > input:where([type='text']) { width: 100%; }
 .field textarea { min-height: 88px; resize: vertical; }
 .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--blue); outline-offset: 0; border-color: var(--blue); }
 .range { width: 100%; accent-color: var(--blue); }
@@ -243,6 +258,8 @@ code, .code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: 
 .person h3 { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
 .person-num { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
 .person-num strong { font-size: 40px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
+.person .item__title { color: var(--ink); }
+.person .item__sub, .person .item .muted { color: var(--ink); opacity: 0.72; }
 .person-unseen { padding: 10px 12px; border-radius: 12px; background: rgb(255 255 255 / 0.62); }
 .person-unseen .item { border-color: rgb(51 65 85 / 0.14); }
 .people-grid { display: grid; gap: 12px; }
@@ -393,3 +410,7 @@ code, .code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: 
 
 .unrated-fold > summary { cursor: pointer; padding: 10px 4px; color: var(--muted, #5b6270); font-size: 0.92rem; }
 .unrated-fold[open] > summary { margin-bottom: 8px; }
+:root[data-theme='dark'] .btn--ghost { color: var(--blue); }
+.inspect p[role='status'] { font-size: 14px; line-height: 1.5; margin: 0; color: var(--text); }
+.inspect code { font-size: 12.5px; line-height: 1.6; }
+.btn--ghost { justify-content: flex-start; }
