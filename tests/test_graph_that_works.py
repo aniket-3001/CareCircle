@@ -110,6 +110,7 @@ async def test_dependence_counts_the_lone_entries_of_each_carer_and_finds_the_fl
     assert all(v["score"] >= 1.0 for v in dep["carers"].values())
     pair = [s for s in dep["split_flags"] if set(s["drugs"]) == {"warfarin", "clarithromycin"}]
     assert len(pair) == 1 and pair[0]["knows_both"] == [] and "no carer knows both" in pair[0]["meaning"]
+    assert "Gw" in pair[0]["meaning"] and "gw-a" not in pair[0]["meaning"]                       # a person's name, not an agent id
     # once Meena (gw-b) has seen the warfarin entry, she holds both halves and the flag is no longer split
     await b.care_ack(next(r["id"] for r in await a.care_regimen("asha") if r["drug"] == "warfarin"))
     after = await a.care_dependence("asha")

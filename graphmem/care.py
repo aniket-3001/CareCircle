@@ -665,7 +665,7 @@ class CareMixin:
             ka, kb = knows_drug.get(a, set()), knows_drug.get(b, set())
             if ka and kb and not (ka & kb) and len(carers) > 1:
                 split.append({"drugs": [a, b], "level": f["level"], "source": f["source"], "knows_first": sorted(ka), "knows_second": sorted(kb), "knows_both": [],
-                              "meaning": f"{', '.join(sorted(ka))} knows {a} and {', '.join(sorted(kb))} knows {b}, but no carer knows both"})
+                              "meaning": f"{', '.join(c.split('-')[0].capitalize() for c in sorted(ka))} knows {a} and {', '.join(c.split('-')[0].capitalize() for c in sorted(kb))} knows {b}, but no carer knows both"})
         ranked = sorted(carers, key=lambda c: (-out[c]["score"], c))
         keystone = ranked[0] if ranked and out[ranked[0]]["score"] > 0 else None
         return {"carers": out, "keystone": keystone, "split_flags": split,
