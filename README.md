@@ -46,6 +46,7 @@ More screens (flags, the circle as a graph, who has seen what, history): [`docs/
 2. **Add → Sample label**: OCR reads a synthetic label; you see the proposed entry, the quoted line and a *quote verified* badge. Confirm it.
 3. **Today** flags clarithromycin with atorvastatin as *major*, with the enzyme path behind it. **Circle**: Meena has not acknowledged the change; slide the time warp 13 hours to see a reminder, then an escalation, each exactly once.
 4. **Graph**: click the clarithromycin node and the red line; both explain themselves in words. The full 90-second script is [The demo story](docs/DETAILS.md#the-demo-story-90-seconds).
+5. **The coordination story, in order of how much it shows**: [the agent demo](#handoffs-without-the-hand-wringing-the-track-02-demo-60-seconds) above; **Circle** (who has not seen what, handover notes addressed to a carer who accepts them); **Today** (one tick per tablet, one winner per slot); an entry's *Show what it was read from* (the notes agents wrote about it, and the reminders sent about it).
 
 ## Safety by design
 
