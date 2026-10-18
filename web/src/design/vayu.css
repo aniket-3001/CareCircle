@@ -434,3 +434,7 @@ code, .code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: 
 .meta { display: grid; gap: 16px; }
 .meta dt { margin-bottom: 10px; }
 section > p + ul.steps { margin-top: 20px; }
+
+/* a checkbox with a label: the box sits on the first line of the text, not in the middle of it */
+.check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.4; color: var(--muted); cursor: pointer; }
+.check input { flex: none; width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--blue); }

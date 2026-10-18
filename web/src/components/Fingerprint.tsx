@@ -28,7 +28,7 @@ export function Fingerprint(): React.JSX.Element {
       <Async state={d}>
         {(r) => (
           <>
-            <p className="muted small">{t('Keep this line somewhere safe. Later, paste it below to check that these entries are exactly as they were. It shows an entry was changed or removed after the fact; it does not show an entry is right.')}</p>
+            <p className="muted small">{t('Keep this line. Later, paste it below to check that these entries are exactly as they were.')}</p>
             <code className="tnum" data-testid="fingerprint-line" style={{ wordBreak: 'break-all' }}>{r.entries > 0 ? `${r.entries}:${r.head}` : t('No entries yet.')}</code>
             <div className="row">
               <input type="text" value={saved} onChange={(e) => { setSaved(e.target.value); setVerdict(null); }} aria-label={t('A line you kept earlier')} placeholder="12:ab34…" data-testid="fingerprint-input" />

@@ -213,9 +213,9 @@ function Doses(): React.JSX.Element {
             </label>
             <div className="row row--wrap">
               <button type="button" className="btn" disabled={!r.length} onClick={() => void give(drug || r[0]?.drug || '')}>Record as {nameOf(app.me)}</button>
-              <label className="row" style={{ gap: 6 }}>
+              <label className="check">
                 <input type="checkbox" checked={(watched.data ?? []).includes(drug || r[0]?.drug || '')} onChange={(e) => void app.api.watch(drug || r[0]?.drug || '', e.target.checked).then(() => app.bump())} />
-                <span className="muted small">{tr('A second carer confirms each dose of this medicine')}</span>
+                <span>{tr('A second carer confirms each dose of this medicine')}</span>
               </label>
             </div>
           </div>

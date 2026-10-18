@@ -25,4 +25,5 @@ export const HI_SHORT: Record<string, string> = {
   "with a special direction": "विशेष निर्देश के साथ",
   "Anticholinergic score": "एंटीकोलिनर्जिक स्कोर",
   "pairs listed by the source": "जोड़ियाँ स्रोत में दर्ज हैं",
+  "Keep this line. Later, paste it below to check that these entries are exactly as they were.": "इस पंक्ति को रखें। बाद में इसे नीचे चिपकाकर जाँचें कि ये प्रविष्टियाँ बिल्कुल वैसी ही हैं।",
 };
