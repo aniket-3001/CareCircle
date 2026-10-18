@@ -84,7 +84,7 @@ Read it as: a medicine entry (`Dose`) in a family's graph points at a `Drug`; th
 
 ![The three graphs: shared reference knowledge, one graph per family, and accounts and keys](docs/img/graph-map.png)
 
-<sub>Source of the diagram: [`docs/img/graph-map.mmd`](docs/img/graph-map.mmd) (Mermaid).</sub>
+<sub>Editable source: [`docs/img/graph-map.svg`](docs/img/graph-map.svg).</sub>
 
 ## Cypher queries and graph algorithms the product depends on
 

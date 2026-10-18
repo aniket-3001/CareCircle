@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="860" viewBox="0 0 1400 860" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#334155"/></marker></defs>
+<style>.pt{font-size:22px;font-weight:700;fill:#0f172a}.nt{font-size:19px;font-weight:600;fill:#0f172a}.ns{font-size:14px;fill:#475569}.el{font-size:16px;fill:#1e293b;paint-order:stroke;stroke:#fff;stroke-width:6px;stroke-linejoin:round}.tx{font-size:17px;fill:#334155}</style>
+<rect width="1400" height="860" fill="#ffffff"/>
+<rect x="20" y="20" width="700" height="600" rx="18" fill="#eef6ff" stroke="#94a3b8" stroke-width="2"/>
+<text x="42" y="54" class="pt">mem__&lt;circle&gt;: one graph per family</text>
+<rect x="50" y="80" width="110" height="46" rx="12" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+<text x="105.0" y="109.0" class="nt" text-anchor="middle">Carer</text>
+<rect x="250" y="80" width="210" height="46" rx="12" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+<text x="355.0" y="100.0" class="nt" text-anchor="middle">Give</text><text x="355.0" y="120.0" class="ns" text-anchor="middle">{person | drug | slot}</text>
+<rect x="500" y="80" width="190" height="46" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+<text x="595.0" y="100.0" class="nt" text-anchor="middle">Episode / Fact</text><text x="595.0" y="120.0" class="ns" text-anchor="middle">an agent's note</text>
+<rect x="280" y="215" width="160" height="50" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="360.0" y="237.0" class="nt" text-anchor="middle">Dose</text><text x="360.0" y="257.0" class="ns" text-anchor="middle">one medicine entry</text>
+<rect x="40" y="380" width="180" height="46" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="2"/>
+<text x="130.0" y="400.0" class="nt" text-anchor="middle">Source</text><text x="130.0" y="420.0" class="ns" text-anchor="middle">the quoted text</text>
+<rect x="250" y="380" width="110" height="46" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="305.0" y="409.0" class="nt" text-anchor="middle">Product</text>
+<rect x="470" y="380" width="130" height="46" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+<text x="535.0" y="409.0" class="nt" text-anchor="middle">earlier Dose</text>
+<rect x="620" y="380" width="90" height="46" rx="12" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+<text x="665.0" y="409.0" class="nt" text-anchor="middle">Person</text>
+<rect x="380" y="520" width="110" height="46" rx="12" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+<text x="435.0" y="549.0" class="nt" text-anchor="middle">Drug</text>
+<path d="M130 126 C 140 190, 230 215, 280 232" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="160" y="200" class="el" text-anchor="middle">ACKED {at}</text>
+<path d="M355 126 L 358 215" fill="none" stroke="#334155" stroke-width="2.2" stroke-dasharray="3 7"/>
+<text x="440" y="168" class="el" text-anchor="middle">one winner per slot</text>
+<path d="M600 126 C 590 190, 500 215, 440 232" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="560" y="200" class="el" text-anchor="middle">ABOUT</text>
+<path d="M310 265 C 270 310, 190 330, 150 380" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="168" y="322" class="el" text-anchor="middle">READ_FROM</text>
+<path d="M335 265 L 308 380" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="296" y="322" class="el" text-anchor="middle">VIA</text>
+<path d="M395 265 C 400 330, 480 340, 520 380" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="506" y="322" class="el" text-anchor="middle">SUPERSEDES</text>
+<path d="M425 265 C 520 300, 640 330, 665 380" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="612" y="312" class="el" text-anchor="middle">FOR</text>
+<path d="M312 426 C 320 470, 370 500, 395 520" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="305" y="478" class="el" text-anchor="middle">CONTAINS</text>
+<path d="M418 265 C 420 380, 430 440, 436 520" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="452" y="460" class="el" text-anchor="middle">OF</text>
+<rect x="780" y="20" width="600" height="600" rx="18" fill="#fff7ed" stroke="#94a3b8" stroke-width="2"/>
+<text x="802" y="54" class="pt">cc_ref: shared public knowledge</text>
+<rect x="810" y="80" width="120" height="46" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="2"/>
+<text x="870.0" y="109.0" class="nt" text-anchor="middle">Brand</text>
+<rect x="810" y="200" width="140" height="46" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="2"/>
+<text x="880.0" y="229.0" class="nt" text-anchor="middle">Ingredient</text>
+<rect x="1190" y="80" width="120" height="46" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="2"/>
+<text x="1250.0" y="109.0" class="nt" text-anchor="middle">Class</text>
+<rect x="1190" y="200" width="120" height="46" rx="12" fill="#f1f5f9" stroke="#475569" stroke-width="2"/>
+<text x="1250.0" y="229.0" class="nt" text-anchor="middle">Member</text>
+<rect x="1000" y="330" width="120" height="50" rx="12" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+<text x="1060.0" y="361.0" class="nt" text-anchor="middle">Drug</text>
+<rect x="1000" y="490" width="120" height="50" rx="12" fill="#fae8ff" stroke="#a21caf" stroke-width="2"/>
+<text x="1060.0" y="521.0" class="nt" text-anchor="middle">Enzyme</text>
+<path d="M870 126 L 880 200" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="915" y="168" class="el" text-anchor="middle">CONTAINS</text>
+<path d="M920 246 C 950 290, 980 320, 1000 340" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="944" y="306" class="el" text-anchor="middle">IS</text>
+<path d="M1250 246 C 1240 290, 1180 320, 1120 340" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="1222" y="296" class="el" text-anchor="middle">IS</text>
+<path d="M1250 126 L 1250 200" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="1300" y="168" class="el" text-anchor="middle">IN_CLASS</text>
+<path d="M1070 330 C 1060 280, 1130 270, 1110 328" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="1090" y="268" class="el" text-anchor="middle">INTERACTS {level}</text>
+<path d="M1030 380 C 975 420, 975 470, 1010 490" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="928" y="440" class="el" text-anchor="middle">INHIBITS / INDUCES</text>
+<path d="M1090 380 C 1150 420, 1150 470, 1110 490" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="1195" y="440" class="el" text-anchor="middle">SUBSTRATE_OF</text>
+<rect x="900" y="580" width="0" height="0" rx="12" fill="#ffffff" stroke="#475569" stroke-width="2"/>
+<text x="900.0" y="586.0" class="nt" text-anchor="middle"></text>
+<path d="M490 546 C 700 565, 880 360, 1000 352" fill="none" stroke="#334155" stroke-width="2.2" stroke-dasharray="3 7"/>
+<text x="560" y="598" class="el" text-anchor="middle">same drug name, joined at query time</text>
+<rect x="20" y="650" width="700" height="190" rx="18" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+<text x="42" y="684" class="pt">ctl: accounts and keys</text>
+<rect x="50" y="720" width="130" height="46" rx="12" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+<text x="115.0" y="749.0" class="nt" text-anchor="middle">Account</text>
+<rect x="300" y="720" width="130" height="46" rx="12" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+<text x="365.0" y="740.0" class="nt" text-anchor="middle">Tenant</text><text x="365.0" y="760.0" class="ns" text-anchor="middle">a circle</text>
+<rect x="570" y="720" width="130" height="46" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+<text x="635.0" y="749.0" class="nt" text-anchor="middle">Agent</text>
+<path d="M180 743 L 300 743" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="240" y="712" class="el" text-anchor="middle">MEMBER {role}</text>
+<path d="M570 743 L 430 743" fill="none" stroke="#334155" stroke-width="2.2" marker-end="url(#a)"/>
+<text x="500" y="712" class="el" text-anchor="middle">GRANTED {scopes}</text>
+<text x="50" y="810" class="tx">Sessions and invites live here too. No health data.</text>
+<text x="800" y="680" class="pt" style="font-size:20px">How to read it</text>
+<text x="800" y="716" class="tx">A medicine entry (Dose) points at a Drug.</text>
+<text x="800" y="744" class="tx">The same drug in the shared graph holds the</text>
+<text x="800" y="772" class="tx">interactions and enzyme paths: a flag is that join.</text>
+<text x="800" y="800" class="tx">Who has seen a change = an ACKED edge from a carer.</text>
+<text x="800" y="828" class="tx">One Give node per dose slot = one winner.</text>
+</svg>
