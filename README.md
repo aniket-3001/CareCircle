@@ -61,12 +61,6 @@ More screens (flags, the circle as a graph, who has seen what, history): [`docs/
 
 Three graphs (FalkorDB): `cc_ref` is shared public knowledge, `mem__<circle>` is one graph per family, `ctl` holds accounts and keys. Full model with every property: [`docs/DETAILS.md`](docs/DETAILS.md#graph-data-model).
 
-![The three graphs: shared reference knowledge, one graph per family, and accounts and keys](docs/img/graph-map.png)
-
-<sub>Source of the diagram: [`docs/img/graph-map.mmd`](docs/img/graph-map.mmd) (Mermaid).</sub>
-
-Read it as: a medicine entry (`Dose`) in a family's graph points at a `Drug`; the same drug in the shared graph carries the interactions and enzyme paths, so a flag is that join. Who has seen a change is an `ACKED` edge from a carer, and the dose-slot guard is one `Give` node per slot.
-
 ```
 cc_ref    (Drug {name}) -[:INTERACTS {level, source}]-> (Drug)           ~218,000 DDInter pairs
           (Drug) -[:HAZARD {w}]-> (Drug)                                 moderate/major only, for algorithms
@@ -85,6 +79,12 @@ mem__<circle>
 
 ctl       (Account)-[:MEMBER {role}]->(Tenant)   (Agent)-[:GRANTED {scopes}]->(Tenant)   (Session)  (Invite)
 ```
+
+Read it as: a medicine entry (`Dose`) in a family's graph points at a `Drug`; the same drug in the shared graph carries the interactions and enzyme paths, so a flag is that join. Who has seen a change is an `ACKED` edge from a carer, and the dose-slot guard is one `Give` node per slot.
+
+![The three graphs: shared reference knowledge, one graph per family, and accounts and keys](docs/img/graph-map.png)
+
+<sub>Source of the diagram: [`docs/img/graph-map.mmd`](docs/img/graph-map.mmd) (Mermaid).</sub>
 
 ## Cypher queries and graph algorithms the product depends on
 
