@@ -252,12 +252,7 @@ export function App(): React.JSX.Element {
                 <div><dt>Interactions</dt><dd>DDInter 2.0, licence CC BY-NC-SA 4.0 (non-commercial). About a quarter of pairs have no severity and are shown as unrated.</dd></div>
                 <div><dt>Enzyme paths</dt><dd>FDA drug-interaction index table (not exhaustive) plus a small list marked “curated (unverified)”.</dd></div>
                 <div><dt>Demo people</dt><dd>{t('The demo accounts and the throw-away demo use made-up people. Circles you create contain only what you add.')}</dd></div>
-                <div><dt>Design</dt><dd>Visual language from The Vayu Project (hrsh-kr/the-vayu-project).</dd></div>
               </dl>
-            </section>
-            <section>
-              <h3>{t('AI use')}</h3>
-              <p>An optional Amazon Bedrock model structures text that OCR or speech recognition already read, and may phrase a helper answer from the record's facts; every quoted line must appear in the source text, answers are checked for advice and invented numbers, and a person confirms every entry.</p>
             </section>
           </Sheet>
         </div>

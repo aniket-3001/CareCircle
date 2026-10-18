@@ -431,3 +431,6 @@ code, .code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: 
 .inspect form.grid-2 > .row .btn { white-space: nowrap; flex: 0 0 auto; }
 .inspect [data-testid='consent-status'] { font-size: 15px; font-weight: 600; }
 .row--end > .btn { min-height: 44px; }
+.meta { display: grid; gap: 16px; }
+.meta dt { margin-bottom: 10px; }
+section > p + ul.steps { margin-top: 20px; }
