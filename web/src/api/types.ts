@@ -124,6 +124,8 @@ export interface TodayView {
 
 export interface DirectFlag {
   kind: 'direct';
+  /** How connected the two medicines are inside this regimen (summed weight of the moderate and major lines they take part in): flags of one severity are read most-connected first. */
+  centrality?: number;
   drugs: [string, string];
   level: string;
   source: string;
@@ -286,9 +288,29 @@ export interface HubRow {
   weight?: number;
 }
 
+export interface Pathway {
+  enzyme: string;
+  kind: 'enzyme' | 'transporter';
+  drugs: string[];
+  /** The ones that slow or speed it up (the rest are cleared by it). */
+  acting: string[];
+  meaning: string;
+  members: { drug: string; roles: string[]; sources: string[] }[];
+}
+
 export interface Hubs {
   regimen_hubs: { cypher: string; rows: HubRow[] };
   global_hubs: { cypher: string; rows: HubRow[] };
+  /** The medicines on record grouped by the enzyme or transporter they share; `uncovered` are the ones the FDA tables say nothing about. */
+  pathways: { cypher: string; groups: Pathway[]; covered: string[]; uncovered: string[] };
+}
+
+/** How much of the record depends on each carer, and the flagged pairs no carer knows both halves of. */
+export interface Dependence {
+  carers: Record<string, { sole: { dose: string; drug: string; weight: number; connected: number }[]; score: number }>;
+  keystone: string | null;
+  split_flags: { drugs: [string, string]; level: string; source: string; knows_first: string[]; knows_second: string[]; knows_both: string[]; meaning: string }[];
+  note: string;
 }
 
 /** The graph-algorithm operations on a circle's own graph (graphmem/graph_algos.py). A node is named by its label and ref. */

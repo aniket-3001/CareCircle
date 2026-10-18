@@ -232,6 +232,21 @@ class CareViewMixin:
             edge(f"drug:{f['y']}", enz, "substrate", "cleared by",
                  f"{_title(f['y'])} is cleared by {f['enzyme']}.", [["Source", f["source"].split("; ")[-1]]], weight=0)
             nodes[enz]["meta"].append(["Path in this regimen", f["meaning"]])
+        have_edges = {e["id"] for e in edges}
+        for grp in (await asyncio.to_thread(algos.pathways, drugs_now))["groups"]:                  # a route two or more of her medicines share is drawn, flagged or not
+            enz = f"enzyme:{grp['enzyme']}"
+            if enz not in nodes:
+                what = ENZYMES.get(grp["enzyme"], "A transporter that moves some medicines in and out of cells." if grp["kind"] == "transporter" else "A liver enzyme that processes some medicines.")
+                node(enz, "enzyme", grp["enzyme"], what, [["What it is", what], ["Source", "FDA drug-interaction tables (not exhaustive)"]],
+                     "(:Drug)-[:INHIBITS|INDUCES|SUBSTRATE_OF]->(:Enzyme)", current=True)
+            nodes[enz]["meta"].append(["Medicines on record that share it", grp["meaning"]])
+            for m in grp["members"]:
+                for role in m["roles"]:
+                    k, lab, text = (("substrate", "cleared by", "is cleared by") if role == "is cleared by it" else ("inhibits", "slows", "slows") if role == "slows it" else ("induces", "speeds up", "speeds up"))
+                    eid = f"drug:{m['drug']}>{k}>{enz}"
+                    if eid not in have_edges and f"drug:{m['drug']}" in nodes:
+                        have_edges.add(eid)
+                        edge(f"drug:{m['drug']}", enz, k, lab, f"{_title(m['drug'])} {text} {grp['enzyme']}.", [["Source", (m["sources"] or ["FDA tables"])[0].split("; ")[0]]], weight=0)
         # one edge per kind/pair only (several paths can share the enzyme)
         seen, uniq = set(), []
         for e in edges:

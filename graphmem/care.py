@@ -306,6 +306,9 @@ class CareMixin:
         res = await asyncio.to_thread(checker().check, [r["drug"] for r in reg])
         res["duplicates"] = await self.care_duplicates(person, as_of)
         res["regimen"] = reg
+        if res["direct"] or res["unrated"] or res["enzyme_paths"]:
+            from carecircle.algos import order_flags
+            order_flags(res, await asyncio.to_thread(_get_algos().regimen_hubs, [r["drug"] for r in reg]))      # most-connected first within each severity; the set of flags is unchanged
         self._record_paths(norm(person), reg, res)
         res["judgement"] = judgement(res)
         return res
@@ -629,6 +632,45 @@ class CareMixin:
         keystone = max(load, key=lambda k: load[k]) if load else None
         return {"carers": carers, "sole": out, "keystone": keystone, "keystone_count": load.get(keystone, 0) if keystone else 0}
 
+    async def care_dependence(self, person: str) -> dict:
+        """How much of the record depends on each carer, measured on the graph of who knows which entry (a carer knows an entry if they recorded it or acknowledged it).
+        Two things come out of it, both about the record and not about any person's care:
+          * for each carer, the entries only they know, weighted by how connected each medicine is to the others in this regimen (a lone entry that takes part in
+            several interaction lines counts more), so 'who would leave the biggest gap by being away' has a number, with its parts;
+          * the flagged pairs where NO carer knows both medicines: each half is known to someone, but nobody holds the whole picture, which is the situation this
+            product exists to show."""
+        reg = await self.care_regimen(person)
+        carers = [r[0] for r in await self._q("MATCH (c:Person {role:'carer'}) RETURN c.id ORDER BY c.id", scope="read")]
+        rows = await self._q(
+            """MATCH (x:Dose {cur:true, status:'confirmed'})-[:FOR]->(:Person {id:$p})
+               OPTIONAL MATCH (c:Person)-[:ACKED]->(x)
+               RETURN x.id, x.drug, x.by, collect(DISTINCT c.id)""", {"p": norm(person)}, scope="read")
+        knows_entry = {did: sorted({norm(by), *[norm(a) for a in ackers]} & set(carers)) for did, _d, by, ackers in rows}
+        knows_drug: dict[str, set] = {}
+        for did, drug, _by, _a in rows:
+            knows_drug.setdefault(drug, set()).update(knows_entry[did])
+        hubs = await asyncio.to_thread(_get_algos().regimen_hubs, [r["drug"] for r in reg])
+        weight = {r["drug"]: float(r["weight"]) for r in hubs["rows"]}
+        out = {c: {"sole": [], "score": 0.0} for c in carers}
+        for did, drug, _by, _a in rows:
+            ks = knows_entry[did]
+            if len(carers) > 1 and len(ks) == 1:
+                part = round(1.0 + weight.get(drug, 0.0), 2)                    # every lone entry counts 1; one that sits in interaction lines counts more
+                out[ks[0]]["sole"].append({"dose": did, "drug": drug, "weight": part, "connected": round(weight.get(drug, 0.0), 2)})
+                out[ks[0]]["score"] = round(out[ks[0]]["score"] + part, 2)
+        chk = await self.care_check(person)
+        split = []
+        for f in chk["direct"] + chk["unrated"]:
+            a, b = f["drugs"]
+            ka, kb = knows_drug.get(a, set()), knows_drug.get(b, set())
+            if ka and kb and not (ka & kb) and len(carers) > 1:
+                split.append({"drugs": [a, b], "level": f["level"], "source": f["source"], "knows_first": sorted(ka), "knows_second": sorted(kb), "knows_both": [],
+                              "meaning": f"{', '.join(sorted(ka))} knows {a} and {', '.join(sorted(kb))} knows {b}, but no carer knows both"})
+        ranked = sorted(carers, key=lambda c: (-out[c]["score"], c))
+        keystone = ranked[0] if ranked and out[ranked[0]]["score"] > 0 else None
+        return {"carers": out, "keystone": keystone, "split_flags": split,
+                "note": "Describes who has seen which entries in this record. It is not a judgement of anyone, and not advice; a carer with a high figure is the one whose absence would leave the record least shared."}
+
     async def care_summary_counts(self, person: str) -> dict:
         """Plain counts over the record for a talk with a pharmacist: how complicated the regimen reads, a short anticholinergic list total (a subset), and
         how much of the regimen the interaction sources actually cover."""
@@ -661,4 +703,5 @@ class CareMixin:
         algos = _get_algos()
         reg = await self.care_regimen(person)
         return {"regimen_hubs": await asyncio.to_thread(algos.regimen_hubs, [r["drug"] for r in reg]),
-                "global_hubs": await asyncio.to_thread(algos.hub_drugs, 10)}
+                "global_hubs": await asyncio.to_thread(algos.hub_drugs, 10),
+                "pathways": await asyncio.to_thread(algos.pathways, [r["drug"] for r in reg])}

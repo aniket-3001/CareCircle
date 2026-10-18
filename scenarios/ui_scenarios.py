@@ -846,5 +846,61 @@ def u23(w, b, r):
     ctx.close()
 
 
+@scenario("U24", "The graph does work a carer reads: flags in order of how connected they are, a flag no carer holds whole, and the medicines that share a route")
+def u24(w, b, r):
+    errs = []
+    pe, oe = f"u24p-{rid()}@scenario.test", f"u24o-{rid()}@scenario.test"
+    ctxp, pp = new_page(b, errs=errs)
+    ui_signup(pp, "Pia", pe)
+    ui_circle(pp)
+    pu = api_user(w, pe)
+    c = circle_of(pu)
+    ctxo, po = new_page(b, errs=errs)
+    ui_signup(po, "Ola", oe)
+    expect(po.get_by_text("Set up your first circle")).to_be_visible()
+    ou = api_user(w, oe)
+    w.join(pu, c, ou)
+    for d in ("warfarin", "atorvastatin"):
+        pu.ok(c, "care_record", person="mum", drug=d, dose_text="5 mg", freq_text="once daily")
+    ou.ok(c, "care_record", person="mum", drug="clarithromycin", dose_text="500 mg", freq_text="twice daily")
+    # the order of the flags
+    chk = pu.ok(c, "care_check", person="mum")
+    order = [(f["level"].lower(), f["centrality"]) for f in chk["direct"]]
+    r.check(order == sorted(order, key=lambda x: ({"major": 0, "moderate": 1, "minor": 2}.get(x[0], 3), -x[1])), "the flags come back by severity, then most connected first", order)
+    pp.goto(f"{BASE}/#/today")
+    pp.reload()
+    tab(pp, "Today")
+    pp.get_by_test_id("flag-order").first.wait_for(timeout=20000)
+    r.check("severity" in pp.get_by_test_id("flag-order").first.inner_text(), "Today says in what order the flags are listed")
+    # a flag nobody holds whole
+    pp.goto(f"{BASE}/#/circle")
+    pp.reload()
+    pp.get_by_test_id("split-flags").wait_for(timeout=20000)
+    txt = pp.get_by_test_id("split-flags").inner_text()
+    r.check("Clarithromycin" in txt and "Warfarin" in txt and "knows" in txt, "Circle names the flagged pair no carer knows both halves of", txt[:200])
+    po.goto(f"{BASE}/#/circle")
+    po.reload()
+    po.get_by_role("button", name="I have seen this").first.wait_for(timeout=20000)
+    for _ in range(5):
+        if po.get_by_role("button", name="I have seen this").count() == 0:
+            break
+        po.get_by_role("button", name="I have seen this").first.click()
+        po.wait_for_timeout(700)
+    pp.reload()
+    pp.wait_for_timeout(1500)
+    r.check(pp.get_by_test_id("split-flags").count() == 0, "once the other carer has seen the entries, nobody is left holding half a flag")
+    # the shared route
+    pp.goto(f"{BASE}/#/graph")
+    pp.reload()
+    pp.get_by_test_id("inspect").wait_for(timeout=20000)
+    pp.get_by_test_id("inspect").evaluate("e => { e.open = true; }")
+    pp.get_by_test_id("pathways").wait_for(timeout=20000)
+    ptxt = pp.get_by_test_id("pathways").inner_text()
+    r.check("CYP3A" in ptxt and "Atorvastatin" in ptxt and "Clarithromycin" in ptxt, "the Graph tab lists the medicines that share an enzyme", ptxt[:200])
+    r.check(not [x for x in errs if x.startswith("pageerror")], "no errors in either browser", errs[:3])
+    ctxp.close()
+    ctxo.close()
+
+
 if __name__ == "__main__":
     sys.exit(1 if main() else 0)

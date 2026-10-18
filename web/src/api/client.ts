@@ -1,4 +1,4 @@
-import type { ChainCheck, EntryNotes, Digest, Review, ShareLink, ShareRow, ConsentView, PatientView, Outcomes, EntrySource, Candidate, StockRow, Counts, Followup, FollowupSuggestion, Handover, AllergyCheck, Appointment, CareProfile, Visit, DrugInfo, Reading, Trend, Recalls, SoleKnowers,
+import type { ChainCheck, Dependence, EntryNotes, Digest, Review, ShareLink, ShareRow, ConsentView, PatientView, Outcomes, EntrySource, Candidate, StockRow, Counts, Followup, FollowupSuggestion, Handover, AllergyCheck, Appointment, CareProfile, Visit, DrugInfo, Reading, Trend, Recalls, SoleKnowers,
   Account, AuthConfig, CareGraph, ChatMessage, CheckResult, Divergence, FhirBundle, GiveRecord, GiveResult, Hubs, GInfluence, GCommunities, GPath, IntakeResult, Invite, Member, Reminder, People,
   Profile, Receipt, RegimenEntry, Session, TimelineEvent, CircleInfo, TodayView,
 } from './types';
@@ -46,6 +46,7 @@ export function apiFor(s: Session) {
     drugInfo: (drug: string) => op<DrugInfo>('care_drug_info', { drug }),
     recalls: () => op<Recalls>('care_recalls', { person: p }),
     soleKnowers: () => op<SoleKnowers>('care_sole_knowers', { person: p }),
+    dependence: () => op<Dependence>('care_dependence', { person: p }),
     measure: (kind: string, value: number, unit: string, at?: number) => op<Reading>('care_measure', { person: p, kind, value, unit, ...(at ? { at } : {}) }),
     measures: (kind = '') => op<Reading[]>('care_measures', { person: p, kind, limit: 200 }),
     forgetMeasure: (id: string) => op<{ removed: string }>('care_forget_measure', { measure_id: id }),

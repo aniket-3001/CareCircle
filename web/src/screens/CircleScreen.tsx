@@ -23,6 +23,7 @@ const behind = (score: number, n: number): SeverityKey => (n === 0 ? 'none' : sc
 export function CircleScreen(): React.JSX.Element {
   const app = useApp();
   const sole = useLoad((a) => a.api.soleKnowers(), [app.rev]);
+  const dep = useLoad((a) => a.api.dependence(), [app.rev]);
   const toast = useToast();
   const t = app.now();
   const div = useLoad((a) => a.api.divergence(a.now()), [app.warp]);
@@ -50,6 +51,18 @@ export function CircleScreen(): React.JSX.Element {
                 <p className="muted">{tr('If that carer is away, nobody else has been told. Ask the others to open the change and press "I have seen this".')}</p>
                 <ul className="steps">{s.sole.map((x) => <li key={x.dose}><span><b>{title(x.drug)}</b>: only {nameOf(x.only)}</span></li>)}</ul>
                 {s.keystone && <p className="muted small">{nameOf(s.keystone)} is the only one who knows {plural(s.keystone_count, 'current entry', 'current entries')}.</p>}
+              </section>
+            )}
+          </Async>
+          <Async state={dep}>
+            {(d) => d.split_flags.length === 0 ? <></> : (
+              <section className="card" aria-labelledby="split-title" data-testid="split-flags">
+                <h2 id="split-title">{tr('A flag nobody holds whole')}</h2>
+                <p className="muted">{tr('Each carer below knows one of the two medicines, but no carer knows both. Until one of them has seen both entries, nobody has the whole picture of this flag.')}</p>
+                <ul className="steps">{d.split_flags.slice(0, 5).map((x) => (
+                  <li key={x.drugs.join('+')}><span><b>{title(x.drugs[0])} + {title(x.drugs[1])}</b> ({x.level.toLowerCase()}): {x.knows_first.map(nameOf).join(', ')} {tr('knows')} {title(x.drugs[0])}, {x.knows_second.map(nameOf).join(', ')} {tr('knows')} {title(x.drugs[1])}</span></li>
+                ))}</ul>
+                {d.keystone && <p className="muted small">{nameOf(d.keystone)} {tr('is the carer whose absence would leave the record least shared')} ({tr('weighted by how connected each lone entry is')}: {d.carers[d.keystone]?.score}).</p>}
               </section>
             )}
           </Async>

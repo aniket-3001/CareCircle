@@ -79,6 +79,26 @@ export function GraphScreen(): React.JSX.Element {
                 )}
                 <code className="code">{h.regimen_hubs.cypher}</code>
               </section>
+              <section className="card" aria-labelledby="pw-title" style={{ alignContent: 'start' }} data-testid="pathways">
+                <h2 id="pw-title">{tr('Medicines that share a route')}</h2>
+                <p className="muted small">{tr('Medicines on record that are cleared by, or slow or speed up, the same liver enzyme or transporter (FDA tables). Only medicines the tables cover can appear; a short list does not mean nothing is shared.')}</p>
+                {h.pathways.groups.length === 0 ? (
+                  <p className="muted">{tr('No two medicines on record share a route in the tables.')}</p>
+                ) : (
+                  <div className="rows">
+                    {h.pathways.groups.map((g) => (
+                      <div key={g.enzyme} className="item" data-testid="pathway">
+                        <div>
+                          <div className="item__title">{g.enzyme} <span className="muted small">({g.kind === 'transporter' ? tr('transporter') : tr('enzyme')})</span></div>
+                          <div className="item__sub">{g.members.map((m) => `${title(m.drug)} (${m.roles.join(', ')})`).join('; ')}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {h.pathways.uncovered.length > 0 && <p className="muted small">{tr('Not covered by the tables')}: {h.pathways.uncovered.map(title).join(', ')}.</p>}
+                <code className="code">{h.pathways.cypher}</code>
+              </section>
               <section className="card" aria-labelledby="gh-title" style={{ alignContent: 'start' }}>
                 <h2 id="gh-title">{tr('Hub medicines across the reference graph')}</h2>
                 <p className="muted small">{tr('PageRank over moderate and major interaction pairs: the medicines that sit in the most hazards.')} {tr('These rankings describe how the records are connected in this graph. They say nothing about which medicine matters medically.')}</p>
