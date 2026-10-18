@@ -305,8 +305,37 @@ class CareMixin:
         res = await asyncio.to_thread(checker().check, [r["drug"] for r in reg])
         res["duplicates"] = await self.care_duplicates(person, as_of)
         res["regimen"] = reg
+        self._record_paths(norm(person), reg, res)
         res["judgement"] = judgement(res)
         return res
+
+    @staticmethod
+    def _record_paths(person: str, reg: list[dict], res: dict) -> None:
+        """The record's side of every flag's path: from the person, through the entry and who recorded it, to the interacting pair. The reference graph can say that two medicines
+        interact; only the circle's own record can say that THIS person has them, as which entries, recorded by whom. Added as `record_path` and `entries` (the entry ids)."""
+        from graphmem.textcheck import product_name, shown_name
+        by: dict[str, list[dict]] = {}
+        for r in reg:
+            by.setdefault(r["drug"], []).append(r)
+
+        def side(drug: str) -> tuple[str, list[str]]:
+            rs = by.get(drug, [])
+            if not rs:
+                return shown_name(drug), []
+            parts = []
+            for r in rs:
+                label = f"{shown_name(drug)}{' (' + product_name(r['product']) + ')' if r.get('product') else ''}{' ' + r['dose_text'] if r.get('dose_text') else ''}"
+                parts.append(f"{label} [entry {r['id']}, recorded by {str(r['by']).split('-')[0].capitalize()}]")
+            return " / ".join(parts), [r["id"] for r in rs]
+
+        def joined(a: str, b: str, edge: str) -> tuple[str, list[str]]:
+            ta, ia = side(a)
+            tb, ib = side(b)
+            return f"{person} -> {ta} -[{edge}]- {tb} <- {person}", ia + ib
+        for f in res.get("direct", []) + res.get("unrated", []):
+            f["record_path"], f["entries"] = joined(f["drugs"][0], f["drugs"][1], f"INTERACTS {f.get('level') or 'unrated'}, {f['source']}")
+        for f in res.get("enzyme_paths", []):
+            f["record_path"], f["entries"] = joined(f["x"], f["y"], f"{f.get('target', 'enzyme')} path, {str(f['source']).split(';')[0]}")
 
     async def care_drug_search(self, text: str, n: int = 8) -> list[dict]:
         """Search the reference list by name (starts with, then contains). For a person who knows what the medicine is called."""

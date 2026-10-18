@@ -69,3 +69,18 @@ def test_the_verdict_tells_apart_unrated_pairs_and_medicines_that_were_not_check
     both = judgement({**base, "not_in_reference": ["becosules"], "unrated": [{"drugs": ["a", "b"]}]})
     assert both["headline"] == "Part of the list was not checked"                     # the more serious gap leads
     assert judgement(base)["state"] == "no_known_conflict" and "not a statement of safety" in judgement(base)["statement"]
+
+
+async def test_every_flag_carries_the_records_side_of_its_path_person_entry_and_carer(gm):
+    """Round 3: the path shown for a flag stopped at the pair of molecules; it never included the person, the entry or the carer who recorded it."""
+    t, a, b = await circle(gm)
+    e1 = (await a.care_record("asha", "atorvastatin", dose_text="20 mg", freq_text="at bedtime"))["id"]
+    e2 = (await b.care_record("asha", "clarithromycin", dose_text="500 mg", freq_text="twice daily", product="Clarimed"))["id"]
+    chk = await a.care_check("asha")
+    major = next(f for f in chk["direct"] if set(f["drugs"]) == {"atorvastatin", "clarithromycin"})
+    assert set(major["entries"]) == {e1, e2}
+    assert major["record_path"].startswith("asha -> ") and "Atorvastatin 20 mg [entry " + e1 + ", recorded by Dup]" in major["record_path"]
+    assert "Clarithromycin (Clarimed) 500 mg [entry " + e2 + ", recorded by Dup]" in major["record_path"] and "INTERACTS major, DDInter 2.0" in major["record_path"]
+    enz = chk["enzyme_paths"][0]
+    assert enz["record_path"].startswith("asha -> ") and set(enz["entries"]) == {e1, e2} and "path" in enz["record_path"]
+    assert all("record_path" in f for f in chk["direct"] + chk["unrated"] + chk["enzyme_paths"])

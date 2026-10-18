@@ -35,6 +35,7 @@ export function Flags({ check }: { check: CheckResult }): React.JSX.Element {
             </div>
             <span className="muted small">{tr('Source:')} {f.source}. {tr('Discuss with a prescriber or pharmacist.')}</span>
             <code>{`(a:Drug)-[:INTERACTS {level:'${f.level}'}]-(b:Drug)`}</code>
+            {f.record_path && <span className="muted small" data-testid="record-path">{tr('In this record:')} {f.record_path}</span>}
           </div>
         );
       })}
@@ -51,6 +52,7 @@ export function Flags({ check }: { check: CheckResult }): React.JSX.Element {
             {f.also_in_ddinter ? ' · also listed in DDInter' : ''}
           </span>
           <code>{f.path}</code>
+          {f.record_path && <span className="muted small" data-testid="record-path">{tr('In this record:')} {f.record_path}</span>}
         </div>
       ))}
       {check.unrated.length > 0 && (

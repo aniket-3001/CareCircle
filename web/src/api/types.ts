@@ -128,10 +128,15 @@ export interface DirectFlag {
   level: string;
   source: string;
   weight?: number;
+  /** The record's side of the path: this person, the entries (and who recorded them), and the interacting pair. */
+  record_path?: string;
+  entries?: string[];
 }
 
 export interface EnzymePath {
   kind: 'enzyme_path';
+  record_path?: string;
+  entries?: string[];
   path: string;
   meaning: string;
   weight: number;
