@@ -61,33 +61,9 @@ More screens (flags, the circle as a graph, who has seen what, history): [`docs/
 
 Three graphs (FalkorDB): `cc_ref` is shared public knowledge, `mem__<circle>` is one graph per family, `ctl` holds accounts and keys. Full model with every property: [`docs/DETAILS.md`](docs/DETAILS.md#graph-data-model).
 
-```mermaid
-graph LR
-  subgraph REF["cc_ref: shared public knowledge"]
-    D1((Drug)) -- "INTERACTS {level}" --- D2((Drug))
-    D1 -- "INHIBITS / INDUCES" --> E{{Enzyme}}
-    D2 -- "SUBSTRATE_OF" --> E
-    B[Brand] -- CONTAINS --> I[Ingredient] -- IS --> D1
-    M[Member] -- IN_CLASS --> C[Class]
-    M -- IS --> D2
-  end
-  subgraph FAM["mem__circle: one graph per family"]
-    P((Person)) 
-    X["Dose (an entry)"] -- FOR --> P
-    X -- OF --> D3((Drug))
-    X -- SUPERSEDES --> X0["earlier Dose"]
-    X -- VIA --> PR["Product"] -- CONTAINS --> D3
-    CA((Carer)) -- "ACKED {at}" --> X
-    G["Give {person|drug|slot}"] -. "one winner per slot" .- X
-    EP["Episode / Fact (agent note)"] -- ABOUT --> X
-    X -- READ_FROM --> S["Source (quoted text)"]
-  end
-  subgraph CTL["ctl: accounts and keys"]
-    A((Account)) -- "MEMBER {role}" --> T[Tenant]
-    AG((Agent)) -- "GRANTED {scopes}" --> T
-  end
-  D3 -. "same drug name, joined at query time" .- D1
-```
+![The three graphs: shared reference knowledge, one graph per family, and accounts and keys](docs/img/graph-map.png)
+
+<sub>Source of the diagram: [`docs/img/graph-map.mmd`](docs/img/graph-map.mmd) (Mermaid).</sub>
 
 Read it as: a medicine entry (`Dose`) in a family's graph points at a `Drug`; the same drug in the shared graph carries the interactions and enzyme paths, so a flag is that join. Who has seen a change is an `ACKED` edge from a carer, and the dose-slot guard is one `Give` node per slot.
 
