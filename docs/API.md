@@ -28,7 +28,7 @@ Content-Type: application/json
 | `sessions` | read | `limit` |  |
 | `search_episodes` | read | `query`*, `limit` |  |
 | `search_text` | read | `query`*, `limit` | Full-text search over episode content (FalkorDB full-text index, prefix match on every word, best score first). |
-| `assert_fact` | write | `subject`*, `predicate`*, `obj`*, `sources`, `conf`, `exclusive`, `valid_from`, `agent`, `at`, `inferred_from` | Create-or-reinforce a fact. `exclusive` predicates (one value at a time, e.g. 'lives_in') supersede |
+| `assert_fact` | write | `subject`*, `predicate`*, `obj`*, `sources`, `conf`, `exclusive`, `valid_from`, `agent`, `at`, `inferred_from`, `about` | Create-or-reinforce a fact. `exclusive` predicates (one value at a time, e.g. 'lives_in') supersede |
 | `recall` | read | `query`*, `as_of`, `hops`, `limit`, `mode`, `notes` | Entity-anchored graph recall. Every result carries its provenance (source episodes) and the graph path |
 | `fact_history` | read | `subject`*, `predicate`* | Full bi-temporal chain for (subject, predicate): every value ever held, oldest first. |
 | `embed_missing` | write | `limit` | Backfill vectors for current facts that have none (e.g. after enabling embeddings on an existing graph). |

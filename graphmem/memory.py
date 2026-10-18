@@ -246,9 +246,14 @@ class TenantMemory(GraphAlgoMixin, CareChainMixin, CareConsentMixin, CareReviewM
     async def assert_fact(self, subject: str, predicate: str, obj: str, *, sources: Iterable[str] = (),
                           conf: float = 1.0, exclusive: bool = False, valid_from: Optional[int] = None,
                           agent: Optional[str] = None, at: Optional[int] = None,
-                          inferred_from: Iterable[str] = ()) -> dict:
+                          inferred_from: Iterable[str] = (), about: str = "") -> dict:
         """Create-or-reinforce a fact. `exclusive` predicates (one value at a time, e.g. 'lives_in') supersede
-        the previous current value instead of coexisting; the old fact is kept, closed, and linked via SUPERSEDES."""
+        the previous current value instead of coexisting; the old fact is kept, closed, and linked via SUPERSEDES.
+
+        `about` (an entry id or the person of this circle) links the fact to that record with an ABOUT edge: a labelled, unverified fact BESIDE the record, found by recall
+        with the path to it. It never changes the record. The target is checked first and must exist in this circle."""
+        if about:
+            await self._note_target(about)
         for label, part in (("subject", subject), ("predicate", predicate), ("object", obj)):
             if not isinstance(part, str) or not part.strip():
                 raise ValueError(f"a fact needs a {label}")
@@ -271,6 +276,10 @@ class TenantMemory(GraphAlgoMixin, CareChainMixin, CareConsentMixin, CareReviewM
             {"skey": skey, "okey": okey, "pred": pred, "sname": subject.strip(), "oname": obj.strip(), "ts": ts,
              "fid": fid, "vf": valid_from or ts, "conf": float(conf), "excl": exclusive, "agent": agent or self.agent})
         fid, support = rows[0][0], rows[0][1]
+        if about:
+            linked = await self._q("MATCH (f:Fact {id:$fid}), (t {id:$a}) WHERE t:Dose OR t:Person MERGE (f)-[:ABOUT]->(t) RETURN count(t)", {"fid": fid, "a": about}, checked=True)
+            if not linked or not linked[0][0]:
+                raise ValueError("the record this fact is about is gone, so the fact was not attached")
         emb = get_embedder()
         if emb is not None and support == 1:        # new fact: store its vector (reinforcing an existing fact keeps the old one)
             vec = (await emb.embed([f"{subject} {predicate} {obj}"]))[0]
@@ -305,7 +314,7 @@ class TenantMemory(GraphAlgoMixin, CareChainMixin, CareConsentMixin, CareReviewM
         earlier one. At most MAX_BATCH items."""
         if not isinstance(facts, list) or not 1 <= len(facts) <= MAX_BATCH:
             raise ValueError(f"send between 1 and {MAX_BATCH} facts")
-        allowed = {"subject", "predicate", "obj", "sources", "conf", "exclusive", "valid_from", "at"}
+        allowed = {"subject", "predicate", "obj", "sources", "conf", "exclusive", "valid_from", "at", "about"}
         for i, f in enumerate(facts):
             if not isinstance(f, dict) or not {"subject", "predicate", "obj"} <= set(f) or set(f) - allowed:
                 raise ValueError(f"fact {i} must be an object with subject, predicate, obj (and optionally {', '.join(sorted(allowed - {'subject', 'predicate', 'obj'}))})")
@@ -401,9 +410,46 @@ class TenantMemory(GraphAlgoMixin, CareChainMixin, CareConsentMixin, CareReviewM
                 if r[1] is not None:
                     by[r[0]]["provenance"].append(dict(episode=r[1], session=r[2], seq=r[3], agent=r[4], ts=r[5],
                                                        redacted=r[6]))
+        if items:
+            ab = await self._q(
+                """MATCH (f:Fact)-[:ABOUT]->(t) WHERE f.id IN $ids OPTIONAL MATCH (t)-[:FOR]->(p:Person)
+                   RETURN f.id, labels(t)[0], t.id, t.drug, t.dose_text, t.freq_text, t.status, t.cur, p.id""", {"ids": [i["id"] for i in items]}, scope="read", checked=True)
+            by2 = {i["id"]: i for i in items}
+            for fid, lab, tid, drug, dose, freq, status, cur, person in ab:
+                by2[fid].update(self._about_fields(by2[fid].get("agent", ""), lab, tid, drug, dose, freq, status, cur, person))
         if notes:
-            items = items + await self._recall_notes(toks)
+            items = items + await self._recall_about_facts(toks, {i["id"] for i in items}) + await self._recall_notes(toks)
         return items
+
+    @staticmethod
+    def _about_fields(agent: str, lab: str, tid: str, drug, dose, freq, status, cur, person) -> dict:
+        """What a note or fact about a record carries: the label, that it is unverified, what it is about and the path to it."""
+        changed = lab == "Dose" and not cur
+        if lab == "Dose":
+            desc = " ".join(x for x in (drug, dose, freq) if x)
+            path = f"{person} -> {desc} (entry {tid}, {status}{', since changed' if changed else ''}) <- noted by {agent}, unverified"
+            about = {"type": "entry", "id": tid, "drug": drug, "dose_text": dose, "freq_text": freq, "status": status, "current": bool(cur), "person": person}
+        else:
+            path, about = f"{tid} <- noted by {agent}, unverified", {"type": "person", "id": tid}
+        return {"about": about, "about_path": path, "unverified": True, "label": f"noted by {agent}, unverified" + ("; the entry it is about has since changed" if changed else "")}
+
+    async def _recall_about_facts(self, toks: list, have: set, n: int = 5) -> list[dict]:
+        """Facts written ABOUT an entry or the person whose medicine matches the query, even when no word of the fact itself does."""
+        rows = await self._q(
+            """MATCH (f:Fact)-[:ABOUT]->(t) WHERE f.cur = true AND coalesce(f.forgotten, false) = false
+                 AND any(tok IN $toks WHERE toLower(coalesce(t.drug, t.id, '')) CONTAINS tok)
+               OPTIONAL MATCH (t)-[:FOR]->(p:Person)
+               RETURN f.id, f.sname, f.pred, f.otext, f.support, f.conf, f.valid_from, f.valid_to, f.cur, f.agent, labels(t)[0], t.id, t.drug, t.dose_text, t.freq_text, t.status, t.cur, p.id
+               LIMIT $n""", {"toks": toks, "n": n}, scope="read", checked=True)
+        out = []
+        for r in rows:
+            if r[0] in have:
+                continue
+            it = dict(id=r[0], subject=r[1], predicate=r[2], object=r[3], support=r[4], conf=r[5], valid_from=r[6], valid_to=r[7], current=r[8], hop=1, agent=r[9], provenance=[], score=0.0)
+            it.update(self._about_fields(r[9], r[10], r[11], r[12], r[13], r[14], r[15], r[16], r[17]))
+            it["path"] = it["about_path"]
+            out.append(it)
+        return out
 
     async def _recall_notes(self, toks: list, n: int = 5) -> list[dict]:
         """Notes (episodes written ABOUT an entry or the person) that match the query, each with the path to what it is about. They are labelled as unverified and, if the

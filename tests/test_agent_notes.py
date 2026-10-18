@@ -151,3 +151,55 @@ async def test_the_mcp_remember_tool_takes_about_and_the_catalogue_lists_it(gm):
     assert "error" in bad
     cat = ops.describe()
     assert "about" in [a["name"] for a in cat["add_episode"]["args"]] and "care_entry_notes" in cat
+
+
+async def test_a_fact_about_an_entry_is_checked_labelled_and_found_by_recall_with_its_path(gm):
+    """Round 3: engine facts pointed at nothing in the care record. A fact can now say what it is about, beside the record and never changing it."""
+    t, owner, agent, reader = await circle(gm)
+    t2, owner2, _, _ = await circle(gm)
+    e = (await owner.care_record("asha", "warfarin", dose_text="5 mg", freq_text="at bedtime"))["id"]
+    other = (await owner2.care_record("asha", "warfarin", dose_text="5 mg", freq_text="daily"))["id"]
+    for bad in ("dose_missing", other):
+        with pytest.raises(ValueError):
+            await agent.assert_fact("clinic", "lowered_dose_to", "3 mg", about=bad)
+    assert await agent._q("MATCH (f)-[:ABOUT]->() WHERE f.pred IS NOT NULL RETURN count(f)", scope="read") == [[0]]
+    before = await snapshot(owner)
+    f = await agent.assert_fact("clinic", "lowered_dose_to", "3 mg", about=e)
+    assert f["created"] is True
+    assert await snapshot(owner) == before                                                           # the record did not move
+    got = [x for x in await reader.recall("warfarin") if x.get("id") == f["id"]]                     # found through the entry's medicine, though no word of the fact says warfarin
+    assert len(got) == 1
+    g = got[0]
+    assert g["unverified"] is True and g["label"] == "noted by an-agent, unverified" and g["about"]["id"] == e and g["about"]["drug"] == "warfarin"
+    assert g["path"] == f"asha -> warfarin 5 mg at bedtime (entry {e}, confirmed) <- noted by an-agent, unverified"
+    by_words = [x for x in await reader.recall("clinic") if x.get("id") == f["id"]]
+    assert by_words and by_words[0]["about"]["id"] == e and by_words[0]["about_path"] == g["path"]     # found by its own words too, with the same path
+
+
+async def test_erasing_the_entry_retracts_the_facts_written_about_it(gm):
+    t, owner, agent, reader = await circle(gm)
+    e = (await owner.care_record("asha", "warfarin", dose_text="5 mg", freq_text="at bedtime"))["id"]
+    f = await agent.assert_fact("clinic", "lowered_dose_to", "3 mg", about=e)
+    await owner.care_forget(e, reason="entered twice")
+    assert [x for x in await reader.recall("warfarin") + await reader.recall("clinic") if x.get("id") == f["id"]] == []
+    assert (await agent._q("MATCH (f {id:$i}) RETURN f.otext", {"i": f["id"]}, scope="read")) == [["[forgotten]"]]
+
+
+async def test_a_fact_in_a_batch_can_be_about_an_entry_and_a_read_only_key_cannot_write_one(gm):
+    t, owner, agent, reader = await circle(gm)
+    e = (await owner.care_record("asha", "warfarin", dose_text="5 mg", freq_text="daily"))["id"]
+    out = await agent.assert_facts([{"subject": "inr", "predicate": "was", "obj": "2.4", "about": e}])
+    assert out["count"] == 1
+    with pytest.raises(PermissionDenied):
+        await reader.assert_fact("a", "b", "c", about=e)
+
+
+async def test_erasing_the_person_retracts_facts_about_her_entries_and_about_her(gm):
+    t, owner, agent, reader = await circle(gm)
+    e = (await owner.care_record("asha", "warfarin", dose_text="5 mg", freq_text="daily"))["id"]
+    f1 = await agent.assert_fact("clinic", "lowered_dose_to", "3 mg", about=e)
+    f2 = await agent.assert_fact("asha", "prefers", "evening doses", about="asha")
+    await owner.care_forget_person("asha", confirm="asha")
+    ids = {f1["id"], f2["id"]}
+    assert [x for x in await reader.recall("warfarin") + await reader.recall("evening") + await reader.recall("clinic") if x.get("id") in ids] == []
+    assert sorted(r[0] for r in await agent._q("MATCH (f) WHERE f.id IN $i RETURN f.otext", {"i": list(ids)}, scope="read")) == ["[forgotten]", "[forgotten]"]

@@ -335,6 +335,8 @@ class CareViewMixin:
         kdf = await self._receipt_kdf()
         digest = await self._receipt_mac([drug, dt, ft, quote, by, at], kdf)
         rid, t = new_id("rcpt"), now_ms()
+        for (fid,) in await self._q("MATCH (f)-[:ABOUT]->(:Dose {id:$id}) WHERE f.pred IS NOT NULL RETURN f.id", {"id": dose_id}, checked=True):
+            await self.forget_fact(fid, "the entry it was about was erased")                    # facts written about it are retracted with it
         await self._q("MATCH (e)-[:ABOUT]->(:Dose {id:$id}) WHERE e.content IS NOT NULL SET e.content='[removed]', e.redacted=true", {"id": dose_id})       # what was written about it goes with it
         await self._q("MATCH (h:Handover)-[:ABOUT]->(:Dose {id:$id}) DETACH DELETE h", {"id": dose_id})
         await self._q("MATCH (r:Reminder)-[:ABOUT]->(:Dose {id:$id}) DETACH DELETE r", {"id": dose_id})
@@ -394,7 +396,9 @@ class CareViewMixin:
             await self._q(f"MATCH (m:{lab})-[:FOR]->(:Person {{id:$p}}) DETACH DELETE m", {"p": p})
         if ids:
             await self._q("UNWIND $ids AS i MATCH (n:Nudge) WHERE n.key CONTAINS i DELETE n", {"ids": ids})
-            await self._q("MATCH (e)-[:ABOUT]->(:Dose)-[:FOR]->(:Person {id:$p}) WHERE e.content IS NOT NULL SET e.content='[removed]', e.redacted=true", {"p": p})
+        for (fid,) in await self._q("MATCH (f)-[:ABOUT]->(t) WHERE f.pred IS NOT NULL AND ((t:Dose AND (t)-[:FOR]->(:Person {id:$p})) OR (t:Person AND t.id = $p)) RETURN DISTINCT f.id", {"p": p}, checked=True):
+            await self.forget_fact(fid, "the person it was about was erased")
+        await self._q("MATCH (e)-[:ABOUT]->(:Dose)-[:FOR]->(:Person {id:$p}) WHERE e.content IS NOT NULL SET e.content='[removed]', e.redacted=true", {"p": p})
         await self._q("MATCH (e)-[:ABOUT]->(:Person {id:$p}) WHERE e.content IS NOT NULL SET e.content='[removed]', e.redacted=true", {"p": p})
         await self._q("MATCH (r:Reminder {person:$p}) DETACH DELETE r", {"p": p})
         await self._q("MATCH (x:Dose)-[:FOR]->(:Person {id:$p}) DETACH DELETE x", {"p": p})
