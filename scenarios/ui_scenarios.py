@@ -902,5 +902,28 @@ def u24(w, b, r):
     ctxo.close()
 
 
+@scenario("U25", "In the demo circle each carer is told which card is theirs, and can press 'I have seen this' on their own change")
+def u25(w, b, r):
+    errs = []
+    ctx, pg = new_page(b, errs=errs)
+    pg.goto(BASE)
+    pg.get_by_text("Start a demo circle").first.click()
+    pg.get_by_test_id("checklist").wait_for(timeout=40000)
+    tab(pg, "Circle")
+    pg.locator(".person").first.wait_for(timeout=20000)
+    heads = [h.inner_text() for h in pg.locator(".person h3").all()]
+    r.check(any(h.startswith("Ravi") and "(you)" in h for h in heads), "Ravi is marked as you", heads)
+    r.check(pg.get_by_role("button", name="I have seen this").count() == 1, "and has a button for the change he has not seen")
+    pg.get_by_role("button", name="I have seen this").first.click()
+    pg.wait_for_timeout(1800)
+    r.check(pg.get_by_role("button", name="I have seen this").count() == 0, "pressing it clears his unseen change")
+    pg.locator("button.actor", has_text="Meena").first.click()
+    pg.wait_for_timeout(1800)
+    heads = [h.inner_text() for h in pg.locator(".person h3").all()]
+    r.check(any(h.startswith("Meena") and "(you)" in h for h in heads) and not any(h.startswith("Ravi") and "(you)" in h for h in heads), "switching carer moves the marker", heads)
+    r.check(not [x for x in errs if x.startswith("pageerror")], "no errors", errs[:3])
+    ctx.close()
+
+
 if __name__ == "__main__":
     sys.exit(1 if main() else 0)

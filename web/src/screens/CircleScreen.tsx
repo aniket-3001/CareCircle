@@ -26,6 +26,8 @@ export function CircleScreen(): React.JSX.Element {
   const dep = useLoad((a) => a.api.dependence(), [app.rev]);
   const toast = useToast();
   const t = app.now();
+  // A demo circle's carers carry a per-circle suffix (ravi-3f9a1c2e) while the session knows them by label (ravi).
+  const isMe = (c: string): boolean => c === app.me || (!!app.session.demoCircle && c.replace(/-[0-9a-f]{8}$/, '') === app.me);
   const div = useLoad((a) => a.api.divergence(a.now()), [app.warp]);
   const nudges = useLoad((a) => a.api.reminders(a.now()), [app.warp]);
 
@@ -77,7 +79,7 @@ export function CircleScreen(): React.JSX.Element {
                     <motion.section key={c} className="person" style={{ ['--chip' as string]: lv.solid }} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} aria-label={`${nameOf(c)}: ${plural(packs.length, 'unseen change')}`}>
                       <div className="person-top">
                         <div>
-                          <h3>{nameOf(c)}{c === app.me ? ' (you)' : ''}</h3>
+                          <h3>{nameOf(c)}{isMe(c) ? ' (you)' : ''}</h3>
                           <div className="person-num">
                             <strong className="tnum">{packs.length}</strong>
                             <span>{packs.length === 1 ? 'change not seen' : 'changes not seen'}</span>
@@ -96,7 +98,7 @@ export function CircleScreen(): React.JSX.Element {
                                 <div className="item__title">{u.label} {u.action === 'stop' ? 'stopped' : 'changed'}{u.ingredients.length > 1 ? <span className="muted small"> ({u.ingredients.map(title).join(' + ')})</span> : null}</div>
                                 <div className="item__sub">{ago(t - u.age_hours * 3_600_000, t)}</div>
                               </div>
-                              {c === app.me && <button type="button" className="btn btn--sm" style={{ whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => void Promise.all(u.ids.map(ack))}>{tr('I have seen this')}</button>}
+                              {isMe(c) && <button type="button" className="btn btn--sm" style={{ whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => void Promise.all(u.ids.map(ack))}>{tr('I have seen this')}</button>}
                             </div>
                           ))}
                         </div>

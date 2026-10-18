@@ -5,7 +5,7 @@ Unit tests check that a function does what its author meant. A scenario checks t
 ```
 python -m graphmem.api &                                   # a server on :8000 (or set SCENARIO_URL)
 SCENARIO_URL=http://localhost:8000 python scenarios/run.py            # 47 scenarios through the API (about 685 checks)
-SCENARIO_URL=http://localhost:8000 python scenarios/ui_scenarios.py   # 24 scenarios in Chrome (120 checks)
+SCENARIO_URL=http://localhost:8000 python scenarios/ui_scenarios.py   # 25 scenarios in Chrome (125 checks)
 python scenarios/run.py M                                  # only the scenarios whose id starts with M
 ```
 
