@@ -179,6 +179,8 @@ export interface Unacknowledged {
   drug: string;
   action: string;
   age_hours: number;
+  /** The product it was recorded under, when it came as one ("telma-am"). */
+  product?: string;
 }
 
 export interface Divergence {

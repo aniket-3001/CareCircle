@@ -12,6 +12,7 @@ import type { TimelineEvent } from '../api/types';
 import { useToast } from '../components/Toast';
 import { Flags } from '../components/Flags';
 import { nameOf, plural, title, when, whenLocal } from '../lib/format';
+import { countPacks } from '../lib/packs';
 import { useApp, useLoad } from '../state';
 import { tr } from '../lib/i18n';
 
@@ -110,7 +111,7 @@ export function HistoryScreen(): React.JSX.Element {
             <Async state={past}>
               {(c) => (
                 <>
-                  <Hero check={c} chips={[{ Icon: ShieldCheck, text: plural(c.regimen.length, 'medicine') }, { Icon: ShieldCheck, text: asOf === null ? 'now' : when(asOf) }, { Icon: ShieldCheck, text: 'as recorded' }]} />
+                  <Hero check={c} chips={[{ Icon: ShieldCheck, text: plural(countPacks(c.regimen), 'medicine') }, { Icon: ShieldCheck, text: asOf === null ? 'now' : when(asOf) }, { Icon: ShieldCheck, text: 'as recorded' }]} />
                   <div className="rows">
                     {c.regimen.length ? c.regimen.map((r) => (
                       <div key={r.id} className="item"><div><div className="item__title">{title(r.drug)} <span className="muted">{r.dose_text} {r.freq_text}</span></div><div className="item__sub">added by {nameOf(r.by)}</div></div></div>

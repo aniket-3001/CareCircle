@@ -14,6 +14,7 @@ import { Readings } from '../components/Readings';
 import { Recalls } from '../components/Recalls';
 import { Scale } from '../components/Scale';
 import { ago, nameOf, plural, productName, title } from '../lib/format';
+import { countPacks, groupUnseen } from '../lib/packs';
 import { useT } from '../lib/i18n';
 import { useApp, useLoad } from '../state';
 
@@ -26,7 +27,7 @@ export function TodayScreen(): React.JSX.Element {
   const state = useLoad((a) => a.api.check());
   const div = useLoad((a) => a.api.divergence(a.now()), [app.warp]);
   const carers = div.data ? Object.keys(div.data.carers).length : 0;
-  const unseen = div.data ? Object.values(div.data.carers).reduce((n, c) => n + c.unacknowledged.length, 0) : 0;
+  const unseen = div.data ? Object.values(div.data.carers).reduce((n, c) => n + groupUnseen(c.unacknowledged).length, 0) : 0;
   return (
     <div className="screen">
       <PageHead crumb={`${title(app.session.person)} · ${t('shared medicines record')}`} title="Today" lede="What the record says, checked against public interaction data. It records and cross-checks; it never advises." />
@@ -39,7 +40,7 @@ export function TodayScreen(): React.JSX.Element {
                 <Hero
                   check={c}
                   chips={[
-                    { Icon: PillIcon, text: plural(c.regimen.length, 'medicine') },
+                    { Icon: PillIcon, text: plural(countPacks(c.regimen), 'medicine') },
                     { Icon: Users, text: plural(carers, 'carer') },
                     { Icon: Eye, text: unseen ? `${unseen} unseen` : 'all seen' },
                   ]}
@@ -48,7 +49,7 @@ export function TodayScreen(): React.JSX.Element {
               <section className="card" aria-labelledby="reg-title">
                 <div className="card-head">
                   <h2 id="reg-title">{t('On record for')} {title(app.session.person)}</h2>
-                  <Pill tone="info">{plural(c.regimen.length, 'medicine')}</Pill>
+                  <Pill tone="info">{plural(countPacks(c.regimen), 'medicine')}</Pill>
                 </div>
                 {c.regimen.length === 0 ? (
                   <div className="empty">

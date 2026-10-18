@@ -148,12 +148,37 @@ def _a_sole(f: Facts) -> str:
 
 
 # ------------------------------------------------------------------ rule answers
+def _packs(rows: list[dict], strength: bool = False) -> list[dict]:
+    """The entries grouped as the packs people hold: the entries of one product (Telma-AM's two ingredients) are one pack. A one-ingredient brand or a plain medicine is its own.
+    {label, ingredients, rows}."""
+    from graphmem.textcheck import product_name
+    out, by = [], {}
+    for r in rows:
+        k = (r.get("product") or "", r.get("action", ""))
+        if r.get("product") and k in by:
+            by[k]["rows"].append(r)
+            by[k]["ingredients"].append(r["drug"])
+            continue
+        p = {"label": (product_name(r["product"]) if r.get("product") else _title(r["drug"])), "ingredients": [r["drug"]], "rows": [r]}
+        out.append(p)
+        if r.get("product"):
+            by[k] = p
+    for p in out:                                                  # a one-ingredient brand keeps its medicine beside it: "Storvas (atorvastatin)"
+        if len(p["rows"]) == 1 and p["rows"][0].get("product"):
+            p["label"] = _named(p["rows"][0]["drug"], p["rows"][0]["product"])
+    return out
+
+
+def _unseen_text(u: list[dict]) -> str:
+    return "; ".join(f"{p['label']}{' (' + ' + '.join(_title(i) for i in p['ingredients']) + ')' if len(p['ingredients']) > 1 else ''} ({_h(max(x['age_hours'] for x in p['rows']))} h ago)" for p in _packs(u))
+
+
 def _a_unseen(f: Facts) -> str:
     lines = []
     for carer, v in f.div["carers"].items():
         u = v["unacknowledged"]
         if u:
-            lines.append(f"{_who(carer)} has not yet seen: " + "; ".join(f"{_named(x['drug'], x.get('product', ''))} ({_h(x['age_hours'])} h ago)" for x in u) + ".")
+            lines.append(f"{_who(carer)} has not yet seen: " + _unseen_text(u) + ".")
     if not lines:
         return "Everyone in the circle has seen every change on record."
     return " ".join(lines) + " They can open the Circle tab and press \"I have seen this\"."
@@ -162,8 +187,14 @@ def _a_unseen(f: Facts) -> str:
 def _a_regimen(f: Facts) -> str:
     if not f.regimen:
         return f"Nothing is on record for {_title(f.person)} yet. You can add a medicine from a photo, a voice note, a document or by typing it."
-    items = "; ".join(f"{_named(r['drug'], r.get('product', ''))} {r['dose_text']} {r['freq_text']}".strip() for r in f.regimen)
-    return f"On record for {_title(f.person)} now ({len(f.regimen)}): {items}."
+    packs = _packs(f.regimen)                                       # what people hold: a strip of two ingredients is one medicine
+    def line(p):
+        rs = p["rows"]
+        names = f" ({' + '.join(_title(i) for i in p['ingredients'])})" if len(rs) > 1 else ""
+        dose = (next((r.get("product_strength") for r in rs if r.get("product_strength")), "") if len(rs) > 1 else rs[0]["dose_text"])
+        return f"{p['label']}{names} {dose} {rs[0]['freq_text']}".replace("  ", " ").strip()
+    items = "; ".join(line(p) for p in packs)
+    return f"On record for {_title(f.person)} now ({len(packs)}): {items}."
 
 
 def _flags_shown(f: Facts, q: str) -> list:
@@ -440,7 +471,7 @@ def _a_unseen_for(f: Facts, carer: str) -> str:
     u = f.div["carers"][carer]["unacknowledged"]
     if not u:
         return f"{_who(carer)} has seen every change on record."
-    return f"{_who(carer)} has not yet seen: " + "; ".join(f"{_named(x['drug'], x.get('product', ''))} ({_h(x['age_hours'])} h ago)" for x in u) + "."
+    return f"{_who(carer)} has not yet seen: " + _unseen_text(u) + "."
 
 
 def _listed(last: dict) -> str:

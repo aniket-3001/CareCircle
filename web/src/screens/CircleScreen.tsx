@@ -16,6 +16,7 @@ import { SEVERITY, type SeverityKey } from '../design/levels';
 import { ago, nameOf, pct, plural, title, when } from '../lib/format';
 import { useApp, useLoad } from '../state';
 import { tr } from '../lib/i18n';
+import { groupUnseen } from '../lib/packs';
 
 const behind = (score: number, n: number): SeverityKey => (n === 0 ? 'none' : score < 0.2 ? 'minor' : score < 0.5 ? 'moderate' : 'major');
 
@@ -56,16 +57,17 @@ export function CircleScreen(): React.JSX.Element {
             {(d) => (
               <div className="people-grid">
                 {Object.entries(d.carers).map(([c, v], i) => {
-                  const k = behind(v.divergence, v.unacknowledged.length);
+                  const packs = groupUnseen(v.unacknowledged);                    // one strip of two ingredients is one change, not two
+                  const k = behind(v.divergence, packs.length);
                   const lv = SEVERITY[k];
                   return (
-                    <motion.section key={c} className="person" style={{ ['--chip' as string]: lv.solid }} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} aria-label={`${nameOf(c)}: ${plural(v.unacknowledged.length, 'unseen change')}`}>
+                    <motion.section key={c} className="person" style={{ ['--chip' as string]: lv.solid }} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }} aria-label={`${nameOf(c)}: ${plural(packs.length, 'unseen change')}`}>
                       <div className="person-top">
                         <div>
                           <h3>{nameOf(c)}{c === app.me ? ' (you)' : ''}</h3>
                           <div className="person-num">
-                            <strong className="tnum">{v.unacknowledged.length}</strong>
-                            <span>{v.unacknowledged.length === 1 ? 'change not seen' : 'changes not seen'}</span>
+                            <strong className="tnum">{packs.length}</strong>
+                            <span>{packs.length === 1 ? 'change not seen' : 'changes not seen'}</span>
                           </div>
                         </div>
                         <FaceIcon face={lv.face} size={56} />
@@ -73,15 +75,15 @@ export function CircleScreen(): React.JSX.Element {
                       <div className="bar" role="img" aria-label={`Out-of-date score ${pct(v.divergence)}`} style={{ background: 'rgb(255 255 255 / 0.5)' }}>
                         <i style={{ width: pct(v.divergence), background: 'var(--ink)' }} />
                       </div>
-                      {v.unacknowledged.length > 0 ? (
+                      {packs.length > 0 ? (
                         <div className="person-unseen">
-                          {v.unacknowledged.map((u) => (
-                            <div key={u.dose} className="item" style={{ alignItems: 'center', gap: 12 }}>
+                          {packs.map((u) => (
+                            <div key={u.key} className="item" style={{ alignItems: 'center', gap: 12 }}>
                               <div>
-                                <div className="item__title">{title(u.drug)} {u.action === 'stop' ? 'stopped' : 'changed'}</div>
+                                <div className="item__title">{u.label} {u.action === 'stop' ? 'stopped' : 'changed'}{u.ingredients.length > 1 ? <span className="muted small"> ({u.ingredients.map(title).join(' + ')})</span> : null}</div>
                                 <div className="item__sub">{ago(t - u.age_hours * 3_600_000, t)}</div>
                               </div>
-                              {c === app.me && <button type="button" className="btn btn--sm" style={{ whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => void ack(u.dose)}>{tr('I have seen this')}</button>}
+                              {c === app.me && <button type="button" className="btn btn--sm" style={{ whiteSpace: 'nowrap', flexShrink: 0 }} onClick={() => void Promise.all(u.ids.map(ack))}>{tr('I have seen this')}</button>}
                             </div>
                           ))}
                         </div>

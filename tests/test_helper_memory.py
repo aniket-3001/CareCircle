@@ -133,3 +133,14 @@ async def test_a_question_that_is_not_about_the_record_gets_no_confident_model_a
     assert out["source"] == "rules" and "can't answer that from the record" in out["text"] and called == []
     on = await ask(ravi, "Tell me about Meena's part in this")                                   # names a carer: the model may be asked
     assert called == [1] and on["source"] == "model"
+
+
+async def test_a_strip_of_two_ingredients_is_one_medicine_and_one_change_in_the_helpers_answers(gm):
+    """Round 3: the record said '6 medicines' for five packs and showed one new strip as two changes not seen."""
+    ravi, meena = await circle(gm, flagged=False)
+    for ing in ("telmisartan", "amlodipine"):
+        await ravi.care_record("asha", ing, freq_text="once daily", product="Telma-AM", product_strength="40/5 mg")
+    listed = (await ask(ravi, "What medicines are on record?"))["text"]
+    assert "Telma-AM (Amlodipine + Telmisartan) 40/5 mg once daily" in listed and "(5)" in listed, listed      # four packs before + the strip = 5, not 6
+    seen = (await ask(ravi, "Who has not seen the latest changes?"))["text"]
+    assert seen.count("Telma-AM (") == 1, seen                                       # one change for the strip
