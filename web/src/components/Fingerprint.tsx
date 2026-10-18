@@ -35,7 +35,7 @@ export function Fingerprint(): React.JSX.Element {
               <span>{r.entries > 0 ? `${r.entries} ${r.entries === 1 ? t('entry') : t('entries')}` : t('No entries yet.')}</span>
               {r.entries > 0 && <button type="button" className="btn btn--soft btn--sm" onClick={() => void navigator.clipboard?.writeText(`${r.entries}:${r.head}`).then(() => toast(t('Copied')), () => toast(t('Could not copy')))} data-testid="fingerprint-copy">{t('Copy fingerprint')}</button>}
             </div>
-            <code className="sr-only" data-testid="fingerprint-line">{r.entries > 0 ? `${r.entries}:${r.head}` : ''}</code>
+            <code className="sr-only" aria-hidden="true" data-testid="fingerprint-line">{r.entries > 0 ? `${r.entries}:${r.head}` : ''}</code>
             <div className="row">
               <input type="text" value={saved} onChange={(e) => { setSaved(e.target.value); setVerdict(null); }} aria-label={t('A fingerprint you kept earlier')} placeholder="12:ab34…" data-testid="fingerprint-input" />
               <button type="button" className="btn btn--soft btn--sm" onClick={() => void check()} disabled={!saved.trim()} data-testid="fingerprint-check">{t('Check')}</button>
