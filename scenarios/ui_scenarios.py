@@ -689,7 +689,7 @@ def u19(w, b, r):
             for (const e of document.querySelectorAll('[placeholder],[aria-label],[title]')) for (const a of ['placeholder', 'aria-label', 'title']) if (e.getAttribute(a)) out.push(e.getAttribute(a));
             return out; }""", DATA)
         for s in texts:
-            words = [x.lower() for x in re.findall(r"[A-Za-z']+", s)]
+            words = [x.lower() for x in re.findall(r"[A-Za-z']+", re.sub(r"\S+@\S+", " ", s))]            # an email address is data, and a random one can hold a lone "a" that looks like a word
             if len(words) >= 3 and sum(x in STOP for x in words) >= 2 and not re.search(r"[ऀ-ॿ]", s):
                 left.append(f"{t}: {s[:400]}")
     if left and os.getenv("U19_DUMP"):
