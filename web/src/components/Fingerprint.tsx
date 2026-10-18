@@ -3,6 +3,7 @@ import { useState } from 'react';
 import type { ChainCheck } from '../api/types';
 import { Async } from './Async';
 import { useT } from '../lib/i18n';
+import { useToast } from './Toast';
 import { useApp, useLoad } from '../state';
 
 /** A fingerprint of the history: keep the line it shows (or print it), and later check that the first entries are exactly as they were. It shows an entry
@@ -10,6 +11,7 @@ import { useApp, useLoad } from '../state';
 export function Fingerprint(): React.JSX.Element {
   const app = useApp();
   const t = useT();
+  const toast = useToast();
   const d = useLoad((a) => a.api.digest(), [app.rev]);
   const [saved, setSaved] = useState('');
   const [verdict, setVerdict] = useState<'same' | 'different' | 'bad' | null>(null);
@@ -28,10 +30,14 @@ export function Fingerprint(): React.JSX.Element {
       <Async state={d}>
         {(r) => (
           <>
-            <p className="muted small">{t('Keep this line. Later, paste it below to check that these entries are exactly as they were.')}</p>
-            <code className="tnum" data-testid="fingerprint-line" style={{ wordBreak: 'break-all' }}>{r.entries > 0 ? `${r.entries}:${r.head}` : t('No entries yet.')}</code>
+            <p className="muted small">{t('Copy and keep it. Later, paste it below to check these entries are unchanged.')}</p>
+            <div className="row row--between">
+              <span>{r.entries > 0 ? `${r.entries} ${r.entries === 1 ? t('entry') : t('entries')}` : t('No entries yet.')}</span>
+              {r.entries > 0 && <button type="button" className="btn btn--soft btn--sm" onClick={() => void navigator.clipboard?.writeText(`${r.entries}:${r.head}`).then(() => toast(t('Copied')), () => toast(t('Could not copy')))} data-testid="fingerprint-copy">{t('Copy fingerprint')}</button>}
+            </div>
+            <code className="sr-only" data-testid="fingerprint-line">{r.entries > 0 ? `${r.entries}:${r.head}` : ''}</code>
             <div className="row">
-              <input type="text" value={saved} onChange={(e) => { setSaved(e.target.value); setVerdict(null); }} aria-label={t('A line you kept earlier')} placeholder="12:ab34…" data-testid="fingerprint-input" />
+              <input type="text" value={saved} onChange={(e) => { setSaved(e.target.value); setVerdict(null); }} aria-label={t('A fingerprint you kept earlier')} placeholder="12:ab34…" data-testid="fingerprint-input" />
               <button type="button" className="btn btn--soft btn--sm" onClick={() => void check()} disabled={!saved.trim()} data-testid="fingerprint-check">{t('Check')}</button>
             </div>
             <div className="row">

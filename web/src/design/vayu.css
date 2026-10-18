@@ -438,3 +438,5 @@ section > p + ul.steps { margin-top: 20px; }
 /* a checkbox with a label: the box sits on the first line of the text, not in the middle of it */
 .check { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.4; color: var(--muted); cursor: pointer; }
 .check input { flex: none; width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--blue); }
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

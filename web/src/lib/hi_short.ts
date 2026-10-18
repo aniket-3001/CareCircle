@@ -26,4 +26,11 @@ export const HI_SHORT: Record<string, string> = {
   "Anticholinergic score": "एंटीकोलिनर्जिक स्कोर",
   "pairs listed by the source": "जोड़ियाँ स्रोत में दर्ज हैं",
   "Keep this line. Later, paste it below to check that these entries are exactly as they were.": "इस पंक्ति को रखें। बाद में इसे नीचे चिपकाकर जाँचें कि ये प्रविष्टियाँ बिल्कुल वैसी ही हैं।",
+  "Copy and keep it. Later, paste it below to check these entries are unchanged.": "इसे कॉपी करके रखें। बाद में नीचे चिपकाकर जाँचें कि प्रविष्टियाँ बदली नहीं हैं।",
+  "Copy fingerprint": "फ़िंगरप्रिंट कॉपी करें",
+  "Copied": "कॉपी हो गया",
+  "Could not copy": "कॉपी नहीं हो सका",
+  "entry": "प्रविष्टि",
+  "entries": "प्रविष्टियाँ",
+  "A fingerprint you kept earlier": "पहले रखा हुआ फ़िंगरप्रिंट",
 };
