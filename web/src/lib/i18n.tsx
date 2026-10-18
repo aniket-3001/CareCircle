@@ -51,7 +51,7 @@ const HI: Record<string, string> = {
   'What you can do in two minutes': 'दो मिनट में आप क्या कर सकते हैं',
   'Two carers who already share a circle for Asha. Sign in as one, then as the other in another window, to see how a change reaches the second carer. The password is public.':
     'दो देखभालकर्ता जो आशा के लिए पहले से एक सर्कल साझा करते हैं। एक के रूप में साइन इन करें, फिर दूसरी विंडो में दूसरे के रूप में, यह देखने के लिए कि बदलाव दूसरे तक कैसे पहुँचता है। पासवर्ड सार्वजनिक है।',
-  'A throw-away circle with fake data and two carers you can switch between. No account, nothing kept.': 'नकली डेटा और दो देखभालकर्ताओं वाला अस्थायी सर्कल। कोई खाता नहीं, कुछ सहेजा नहीं जाता।',
+  'A throw-away circle with fake data and two carers you can switch between.': 'नकली डेटा और दो देखभालकर्ताओं वाला अस्थायी सर्कल।',
   'An account keeps your circles, records and conversations on the server, so they follow you to any phone or laptop.':
     'खाता आपके सर्कल, रिकॉर्ड और बातचीत सर्वर पर रखता है, इसलिए वे किसी भी फ़ोन या लैपटॉप पर आपके साथ रहते हैं।',
   // today

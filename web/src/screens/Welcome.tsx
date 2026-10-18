@@ -231,7 +231,7 @@ export function Welcome({ onSession, request }: { onSession: (s: Session) => voi
           )}
           <section className="card" aria-labelledby="anon-title">
             <div className="card-head"><h2 id="anon-title">{t('Just look around')}</h2></div>
-            <p className="muted">{t('A throw-away circle with fake data and two carers you can switch between. No account, nothing kept.')}</p>
+            <p className="muted">{t('A throw-away circle with fake data and two carers you can switch between.')}</p>
             <button type="button" className="btn btn--soft" disabled={busy} onClick={() => void anonymous()} data-testid="start-demo"><Play size={18} aria-hidden="true" /> {t('Start a demo circle')}</button>
           </section>
           <section className="card">
