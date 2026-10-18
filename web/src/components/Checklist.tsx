@@ -102,7 +102,7 @@ function Checked({ today, error, onGive, clash, onForce, onCancelClash, busy, on
         {today.items.map((i) => (
           <div key={`${i.dose_id}|${i.time}`} className="item" data-testid="slot" data-state={i.state}>
             <div>
-              <div className="item__title"><Clock size={16} aria-hidden="true" /> {i.time} · {shown(i)} <span className="muted">{i.dose_text}</span></div>
+              <div className="item__title"><Clock size={16} aria-hidden="true" /> {i.time} · {shown(i)} <span className="muted">{i.dose_text.replace(/(\d) (?=[A-Za-z])/g, '$1 ')}</span></div>
               {i.brand && <div className="item__sub muted" data-testid="slot-brand">{t('as')} {productName(i.brand)}</div>}
               {i.ingredients && <div className="item__sub muted" data-testid="slot-ingredients">{t('one tablet of')} {i.ingredients.map(title).join(' + ')}</div>}
               <div className="item__sub">

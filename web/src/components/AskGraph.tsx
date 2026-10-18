@@ -104,7 +104,7 @@ export function AskGraph(): React.JSX.Element {
         <Async state={nodes}>
           {(r) => (
             <>
-              <div className="row row--wrap">
+              <div className="row row--wrap row--end">
                 <label className="field">{tr('From')}
                   <select value={from} onChange={(e) => setFrom(e.target.value)} data-testid="ag-from">
                     <option value="">{tr('Choose…')}</option>

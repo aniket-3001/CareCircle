@@ -38,7 +38,7 @@ export function Handover(): React.JSX.Element {
       <div className="card-head"><h2 id="hand-title">{tr('Handover notes')}</h2><NotebookPen size={20} aria-hidden="true" /></div>
       <form className="stack" onSubmit={add}>
         <input type="text" aria-label={tr('Write a note for the next carer')} placeholder={tr('Write a note for the next carer')} value={text} onChange={(e) => setText(e.target.value)} maxLength={400} />
-        <div className="row row--wrap">
+        <div className="row row--wrap row--end">
           <label className="field">{tr('About')}
             <select value={about} onChange={(e) => setAbout(e.target.value)} data-testid="handover-about">
               <option value="">{tr('Nothing in particular')}</option>

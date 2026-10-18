@@ -61,7 +61,7 @@ export function GraphScreen(): React.JSX.Element {
           <p className="muted small">{tr('These are how the stored records are connected. They are tools for looking at the graph, not advice, and they say nothing about which medicine matters medically.')}</p>
         <Async state={hubs}>
           {(h) => (
-            <div className="layout layout--even" style={{ marginTop: 0 }}>
+            <div className="layout layout--even">
               <section className="card" aria-labelledby="rh-title" style={{ alignContent: 'start' }}>
                 <h2 id="rh-title">{tr('Most hazard-connected in this regimen')}</h2>
                 <p className="muted small">{tr('Degree and summed weight inside the moderate and major interaction subgraph of the medicines on record.')}</p>

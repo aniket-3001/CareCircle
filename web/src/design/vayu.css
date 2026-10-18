@@ -414,3 +414,20 @@ code, .code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: 
 .inspect p[role='status'] { font-size: 14px; line-height: 1.5; margin: 0; color: var(--text); }
 .inspect code { font-size: 12.5px; line-height: 1.6; }
 .btn--ghost { justify-content: flex-start; }
+
+/* spacing and alignment pass */
+.item__title + .item__sub, .item__sub + .item__sub { margin-top: 6px; }
+.item__sub .pill { vertical-align: middle; }
+.item__title > svg { vertical-align: -2px; margin-right: 2px; }
+.row--end { align-items: flex-end; }
+.inspect { display: block; }
+.inspect > * + * { margin-top: 14px; }
+.inspect > summary { display: flex; align-items: center; gap: 8px; list-style: none; line-height: 1.35; }
+.inspect > summary::-webkit-details-marker { display: none; }
+.inspect > summary::before { content: ''; flex: none; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid currentColor; transform: rotate(-90deg); transition: transform .15s; }
+.inspect[open] > summary::before { transform: none; }
+.inspect > summary > svg { flex: none; margin: 0; }
+.inspect form.grid-2 > .row { grid-column: 1 / -1; flex-wrap: wrap; }
+.inspect form.grid-2 > .row .btn { white-space: nowrap; flex: 0 0 auto; }
+.inspect [data-testid='consent-status'] { font-size: 15px; font-weight: 600; }
+.row--end > .btn { min-height: 44px; }
