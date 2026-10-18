@@ -48,8 +48,7 @@ export function AskGraph(): React.JSX.Element {
     <div className="layout layout--even" style={{ marginTop: 0 }} data-testid="ask-graph">
       <section className="card" aria-labelledby="ag-infl" style={{ alignContent: 'start' }}>
         <h2 id="ag-infl">{tr('What the record hangs on')}</h2>
-        <p className="muted small">{tr('PageRank: records that many others point to. Reach: records from which the rest of the graph can be reached fastest, following the links. Bridges: records that many shortest routes between other records pass through.')}</p>
-        <p className="muted small" data-testid="ag-caption">{tr('These rankings describe how the records are connected in this graph. They say nothing about which medicine matters medically.')}</p>
+        <p className="muted small">{tr('PageRank: pointed to by many. Reach: fastest to everything else. Bridges: on many shortest routes.')}</p>
         <Segmented name="ag-metric" label={tr('Measure')} value={metric} onChange={setMetric}
           options={[{ value: 'pagerank', label: 'PageRank' }, { value: 'harmonic', label: tr('Reach') }, { value: 'betweenness', label: tr('Bridges') }]} />
         <Async state={influence}>
@@ -75,7 +74,7 @@ export function AskGraph(): React.JSX.Element {
 
       <section className="card" aria-labelledby="ag-groups" style={{ alignContent: 'start' }}>
         <h2 id="ag-groups">{tr('What belongs together')}</h2>
-        <p className="muted small">{tr('Groups of records that are linked to each other. Connected parts shows the separate islands; communities splits a large connected part.')}</p>
+        <p className="muted small">{tr('Linked groups of records. Communities splits a large group.')}</p>
         <Segmented name="ag-method" label={tr('Grouping')} value={method} onChange={setMethod}
           options={[{ value: 'wcc', label: tr('Connected parts') }, { value: 'labelpropagation', label: tr('Communities') }]} />
         <Async state={groups}>
@@ -100,7 +99,7 @@ export function AskGraph(): React.JSX.Element {
 
       <section className="card" aria-labelledby="ag-path" style={{ gridColumn: '1 / -1', alignContent: 'start' }}>
         <h2 id="ag-path">{tr('How are two records connected?')}</h2>
-        <p className="muted small">{tr('The shortest chain of links between them, whichever way the links point.')}</p>
+        <p className="muted small">{tr('The shortest chain of links between two records.')}</p>
         <Async state={nodes}>
           {(r) => (
             <>

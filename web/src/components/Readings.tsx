@@ -86,7 +86,7 @@ export function Readings(): React.JSX.Element {
   return (
     <section className="card" aria-labelledby="read-title" data-testid="readings">
       <div className="card-head"><h2 id="read-title">{tr('Readings')}</h2><Activity size={20} aria-hidden="true" /></div>
-      <p className="muted small">{tr('Blood pressure, sugar, INR and so on, kept next to the medicine changes. The app draws what was typed and never says whether a number is good or bad.')}</p>
+      <p className="muted small">{tr('Blood pressure, sugar, INR. Shown as typed, never judged.')}</p>
       <form className="grid-2" onSubmit={add}>
         <label className="field">{tr('What')}
           <select value={kind} onChange={(e) => { setKind(e.target.value); setUnit(KINDS[e.target.value].units[0]); }}>

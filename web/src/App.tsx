@@ -233,7 +233,7 @@ export function App(): React.JSX.Element {
             </section>
             <section>
               <h3>{t('What it will not do')}</h3>
-              <p>{t('It never tells anyone what to take, stop, skip or change. Flags are for discussion with a prescriber or pharmacist. No flag does not mean safe. The helper answers only from the record and refuses to advise.')}</p>
+              <p>{t('It never tells anyone what to take, stop, skip or change. No flag is not a guarantee of safety. The helper answers only from the record.')}</p>
             </section>
             <section>
               <h3>{t('Your data')}</h3>

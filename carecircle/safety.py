@@ -77,6 +77,6 @@ def judgement(check: dict) -> dict:
                 "statement": "Some medicines are not in our data, so nothing was checked for them. Ask a pharmacist."}
     if reasons:                                                    # only pairs the source lists without a severity: quiet, not an alarm that is always on
         return {"state": "partial", "reasons": reasons, "headline": "No rated flags",
-                "statement": "Nothing rated as a concern was found. Some pairs are listed without a severity, which is not the same as safe."}
+                "statement": "No rated interactions found. Unrated pairs are not the same as safe."}
     return {"state": "no_known_conflict", "reasons": [],
             "statement": "No known conflict in our data. This is not a statement of safety."}

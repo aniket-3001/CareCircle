@@ -74,7 +74,7 @@ export function Hero({ check, chips }: { check: CheckResult; chips: Chip[] }): R
           </li>
         ))}
       </ul>
-      <p className="hero-fine">{t('Flags are for discussion with a prescriber or pharmacist. No flag does not mean safe. DDInter 2.0 · FDA CYP table.')}</p>
+      <p className="hero-fine">{t('For discussion with a pharmacist. No flag is not a guarantee of safety. DDInter 2.0 · FDA CYP table.')}</p>
     </section>
   );
 }

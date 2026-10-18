@@ -48,7 +48,7 @@ export function CircleScreen(): React.JSX.Element {
             {(s) => s.sole.length === 0 ? <></> : (
               <section className="card" aria-labelledby="sole-title" data-testid="sole-knowers">
                 <h2 id="sole-title">{tr('Only one carer knows')}</h2>
-                <p className="muted">{tr('If that carer is away, nobody else has been told. Ask the others to open the change and press "I have seen this".')}</p>
+                <p className="muted">{tr('If they are away, nobody else knows. Ask the others to press "I have seen this".')}</p>
                 <ul className="steps">{s.sole.map((x) => <li key={x.dose}><span><b>{title(x.drug)}</b>: only {nameOf(x.only)}</span></li>)}</ul>
                 {s.keystone && <p className="muted small">{nameOf(s.keystone)} is the only one who knows {plural(s.keystone_count, 'current entry', 'current entries')}.</p>}
               </section>
@@ -134,7 +134,7 @@ export function CircleScreen(): React.JSX.Element {
               <section className="card" aria-labelledby="nudge-title">
                 <div className="row"><BellRing size={20} strokeWidth={1.75} aria-hidden="true" /><h2 id="nudge-title">{tr('Reminders due')}</h2></div>
                 {n.length === 0 ? (
-                  <p className="muted">{tr('None due. A reminder is produced once an unseen change is 4 hours old, and an escalation at 12 hours.')}</p>
+                  <p className="muted">{tr('None due. Reminders go out 4 hours after an unseen change, and again at 12.')}</p>
                 ) : (
                   <div className="rows">
                     {n.map((x) => (

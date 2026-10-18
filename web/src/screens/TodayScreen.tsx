@@ -98,26 +98,19 @@ export function TodayScreen(): React.JSX.Element {
               <ProfileCard />
               <Recalls />
               <details className="more" data-testid="today-more">
-                <summary className="more__summary">{t('More: how to read a flag, how the record adds up, readings, where the flags come from')}</summary>
+                <summary className="more__summary">{t('More: reading a flag, counts, readings')}</summary>
                 <div className="stack">
                   <Scale check={c} />
                   <Counts />
                   <Readings />
-                  <section className="card" aria-labelledby="sources-title">
-                    <h2 id="sources-title">{t('Where the flags come from')}</h2>
-                    <ul className="steps">
-                      <li><span><b>{t('Direct pairs:')}</b> {t('DDInter 2.0, a curated interaction database, with its severity.')}</span></li>
-                      <li><span><b>{t('Enzyme paths:')}</b> {t('one medicine slows or speeds a liver enzyme that clears another (FDA table, a two-step graph path).')}</span></li>
-                    </ul>
-                  </section>
-                </div>
+</div>
               </details>
             </div>
             {(c.direct.length > 0 || c.enzyme_paths.length > 0 || c.unrated.length > 0 || (c.duplicates?.length ?? 0) > 0) && (
               <section className="card wide" aria-labelledby="flags-title">
                 <h2 id="flags-title">{t('Flags, with their sources')}</h2>
                 <Flags check={c} />
-                <p className="muted small">{t(c.notice)}</p>
+                <p className="muted small">{t('For discussion with a pharmacist. No flag is not a statement of safety.')}</p>
               </section>
             )}
           </div>

@@ -1,6 +1,7 @@
 import { HI_PATTERNS } from './hi_patterns';
 import { useSyncExternalStore } from 'react';
 import { HI_MORE } from './hi_more';
+import { HI_SHORT } from './hi_short';
 
 /** English and Hindi. The English text is the key, so a string with no Hindi entry simply stays English. The choice is a per-browser convenience
  *  (it is not account data); the helper, voice input and read-aloud follow it too. */
@@ -91,7 +92,7 @@ function fromPattern(s: string): string {
 }
 
 export function translate(s: string, l: Lang = current): string {
-  return l === 'hi' ? HI[s] ?? HI_MORE[s] ?? fromPattern(s) : s;
+  return l === 'hi' ? HI[s] ?? HI_MORE[s] ?? HI_SHORT[s] ?? fromPattern(s) : s;
 }
 
 /** `const t = useT()`: re-renders when the language changes. */

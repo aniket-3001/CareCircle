@@ -188,7 +188,7 @@ function Packs({ today }: { today: TodayView }): React.JSX.Element | null {
           );
         })}
       </div>
-      <p className="muted small">{t('Count the doses in the pack and enter the number. Doses marked as given after that come off it. A pack can also be used another way, so check the pack itself.')}</p>
+      <p className="muted small">{t('Enter the doses you counted. Doses given after that come off it.')}</p>
     </details>
   );
 }

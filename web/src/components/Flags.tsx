@@ -20,10 +20,10 @@ export function Flags({ check }: { check: CheckResult }): React.JSX.Element {
             <b>{title(d.ingredient)} {tr('is on record more than once')}</b>
             <Pill tone="warn">{tr('possible duplicate')}</Pill>
           </div>
-          <span className="muted small">{d.entries.map((e) => `${e.product ? productName(e.product) : tr('recorded as the plain medicine')}${e.dose_text ? ` ${e.dose_text}` : ''}`).join(' · ')}. {tr('It may be the same medicine from two sources. Discuss with a prescriber or pharmacist.')}</span>
+          <span className="muted small">{d.entries.map((e) => `${e.product ? productName(e.product) : tr('recorded as the plain medicine')}${e.dose_text ? ` ${e.dose_text}` : ''}`).join(' · ')}. {tr('It may be the same medicine from two sources.')}</span>
         </div>
       ))}
-      {check.direct.length > 1 && <p className="muted small" data-testid="flag-order">{tr('In order of severity, and within a severity, the pair whose medicines take part in the most other interaction lines in this regimen first. Nothing is added or hidden by the order.')}</p>}
+      {check.direct.length > 1 && <p className="muted small" data-testid="flag-order">{tr('By severity, then by how connected. Nothing is hidden.')}</p>}
       {check.direct.map((f) => {
         const k = sevKey(f.level);
         return (
@@ -34,7 +34,7 @@ export function Flags({ check }: { check: CheckResult }): React.JSX.Element {
               </b>
               <Pill tone={TONE[k]}>{SEVERITY[k].name.toLowerCase()}</Pill>
             </div>
-            <span className="muted small">{tr('Source:')} {f.source}. {tr('Discuss with a prescriber or pharmacist.')}{f.centrality ? ` · ${tr('connected to other lines')}: ${f.centrality}` : ''}</span>
+            <span className="muted small">{tr('Source:')} {f.source}.{f.centrality ? ` · ${tr('connected to other lines')}: ${f.centrality}` : ''}</span>
             <code>{`(a:Drug)-[:INTERACTS {level:'${f.level}'}]-(b:Drug)`}</code>
             {f.record_path && <span className="muted small">{tr('In this record:')} <code data-testid="record-path">{f.record_path}</code></span>}
           </div>
@@ -68,9 +68,9 @@ export function Flags({ check }: { check: CheckResult }): React.JSX.Element {
                   <b>
                     {title(f.drugs[0])} + {title(f.drugs[1])}
                   </b>
-                  <Pill>listed, severity unrated</Pill>
+                  <Pill>{tr('unrated')}</Pill>
                 </div>
-                <span className="muted small">Unrated is not the same as safe. Source: {f.source}</span>
+                <span className="muted small">{tr('Source:')} {f.source}</span>
               </div>
             ))}
           </div>
