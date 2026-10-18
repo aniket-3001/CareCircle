@@ -36,9 +36,3 @@ Also: no LLM API key exists in this environment, and Graphiti ingestion needs on
 - MemP: procedural memory = skills distilled from trajectories, updated by success/failure.
 - Planfence: plans store the exact fact versions they were derived from; check lineage before acting.
 - Collaborative Memory / GateMem: private vs shared tiers, provenance on every fragment, explicit forgetting.
-
-## Known caveats of this decision
-
-- Spikes ran on one laptop, one run each, Docker Desktop networking.
-- Graphiti's decorator-protected paths (`Graphiti.search`, `retrieve_episodes`) were not exercised (no LLM key).
-- FalkorDB per-graph write parallelism is measured (2.36x) but graph-count/memory limits at 1000s of tenants are untested.

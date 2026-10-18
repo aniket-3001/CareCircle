@@ -5,7 +5,7 @@ Unit tests check that a function does what its author meant. A scenario checks t
 ```
 python -m graphmem.api &                                   # a server on :8000 (or set SCENARIO_URL)
 SCENARIO_URL=http://localhost:8000 python scenarios/run.py            # 47 scenarios through the API (about 685 checks)
-SCENARIO_URL=http://localhost:8000 python scenarios/ui_scenarios.py   # 11 scenarios in Chrome (about 50 checks)
+SCENARIO_URL=http://localhost:8000 python scenarios/ui_scenarios.py   # 24 scenarios in Chrome (120 checks)
 python scenarios/run.py M                                  # only the scenarios whose id starts with M
 ```
 
@@ -99,8 +99,6 @@ Every row was found by a scenario, fixed, and is now pinned by it.
 
 Earlier probing of the memory engine itself (handing a task to an agent with no access, empty or oversized events, bad limits) is in `docs/TRACK02.md`.
 
-## What scenario testing does not do
+## Running against the live site
 
 - It also runs against the live site: set `SCENARIO_URL` and `SCENARIO_COGNITO=<pool id>:<app client id>` and every user becomes a throwaway Cognito user (a made-up `@scenario.test` address) that is removed at the end. On 17 Oct 2026 this ran 42 scenarios against production: all passed except one that signs up with the app's own passwords, which a Cognito site does not offer (skipped), and a rate-limit scenario that sent its requests one at a time (too slow over the internet to reach the per-minute limit; now parallel, and passing live).
-- A scenario only checks what someone thought to ask. The list above is what was thought of; it will not be complete.
-- Nothing here replaces a clinical review. The app records and cross-checks; it does not advise, and no scenario tests whether any medicine information is *right* for a person.

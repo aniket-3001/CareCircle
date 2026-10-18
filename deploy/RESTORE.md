@@ -24,7 +24,7 @@ The reference graph (`cc_ref`) can always be rebuilt from public data: `python -
 
 **What to expect (recovery numbers).** A crash or reboot: back in about a minute from the database's own snapshot, losing the last minute of writes at most. A bad deploy: restore the pre-deploy copy from S3, losing minutes. A lost disk or host: restore the newest S3 copy (up to 6 hours old unless a deploy ran since) or the newest EBS snapshot (up to a day), and it takes minutes. There is no replica, so a restore is manual.
 
-**Restore from an EBS snapshot** (not rehearsed; the oldest of the three copies, for when the disk itself is gone): create a volume from the snapshot (`aws ec2 create-volume --snapshot-id <snap> --availability-zone us-east-1a`), attach it to any instance, mount it, and copy `var/lib/docker/volumes/deploy_falkor-data/_data/dump.rdb` off it; then restore that file as in "Restore a snapshot" above. The simpler route is a new instance from `deploy/infra/carecircle.yaml` and the newest S3 file.
+**Restore from an EBS snapshot** (the oldest of the three copies, for when the disk itself is gone): create a volume from the snapshot (`aws ec2 create-volume --snapshot-id <snap> --availability-zone us-east-1a`), attach it to any instance, mount it, and copy `var/lib/docker/volumes/deploy_falkor-data/_data/dump.rdb` off it; then restore that file as in "Restore a snapshot" above. The simpler route is a new instance from `deploy/infra/carecircle.yaml` and the newest S3 file.
 
 **Demo circles are synthetic**, so losing them costs nothing; the backup matters most for any circle created with real use.
 

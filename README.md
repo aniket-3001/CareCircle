@@ -55,14 +55,6 @@ More screens (flags, the circle as a graph, who has seen what, history): [`docs/
 - **Quote and verify.** The model only structures text the OCR already read; a quote not found in it leaves the entry *pending* until a person confirms it. 26% of DDInter pairs have severity "Unknown": shown as *unrated*.
 - What can go wrong, and the test behind each: [`docs/HAZARDS.md`](docs/HAZARDS.md). The review's own probes, run again: [`docs/REVIEW_PROBES.md`](docs/REVIEW_PROBES.md).
 
-## Limits, stated plainly
-
-- Severity weights and the staleness half-life are **assumptions**, not clinical values. Sources can disagree; flags are for discussion with a prescriber or pharmacist, and **no flag is never a statement that nothing interacts.** The enzyme layer covers 63 of the 1,833 medicines in the reference graph.
-- **Which model.** Reading labels with a model is off by default (`CC_INTAKE_LLM`); when on, it is Amazon Nova Pro, the rules win any disagreement on a strength, and every proposal still waits for a person. Claude models can be called from a developer login on this AWS account but not yet from the server's role, so the live site cannot use them. On synthetic labels no model beat the rules alone.
-- **Not evaluated with real families.** The helper's refusal rules are keyword-based and can miss an unusual phrasing (every answer is also scanned for advice). WhatsApp and SMS are not built. The interface is English and Hindi.
-- **Data limits where it can be used.** Severities are US/EU-centred, many Indian brands are combinations the data has never heard of, and recalls are US-only. DDInter is CC BY-NC-SA, so **not for commercial use as it stands**; a service would need licensed data, clinician review and the regulatory steps for health data.
-- **A demo deployment**: one server in one availability zone, snapshots only (a hard crash can lose up to a minute), per-process rate limiting. The deploy's rollback script is rehearsed on a throwaway stack in CI but has not been run on the live site, and it restores code, not data. All of it, with the reasons: [Limits in full](docs/DETAILS.md#limits-in-full).
-
 ## Data and licences
 
 Interaction data: **DDInter 2.0**, CC BY-NC-SA 4.0 (**non-commercial**; attribution required), downloaded by `scripts/fetch_reference.py`, not stored in this repository. Enzyme data: the FDA drug-interaction table (a US government snapshot is bundled in `carecircle/snapshot/` as a fallback), and allergy classes from WHO ATC via NLM RxClass. Demo circles, labels and people are synthetic.

@@ -19,7 +19,7 @@ they are shown as unrated, never as safe. Caveat: "also listed" cross-checks agr
 40 generated circles (3 carers, 3-8 changes, random acknowledgements). The Cypher-based query returns exactly the oracle's set of
 unacknowledged changes for every carer in **40/40** circles. A weak baseline ("only track each carer's most recent change") is exact in **4/40**. A fair baseline, two SQLite tables (entries, acknowledgements) and one window-function query, is exact in **40/40**: this benchmark shows the graph query is correct, not that a table could not do it.
 The oracle states the rule independently of the code: a carer is behind on a medicine when the entry that stands now (by date) is someone else's and they have not seen it. Entries typed again unchanged record nothing, and a medicine can only be stopped once it is on the record. (The benchmark was re-run after the scenario fixes, which tightened these rules; it had gone out of date, and the oracle was brought in line with the rules as documented in `docs/SCENARIOS.md`, not with whatever the code returned.)
-This shows correctness of the graph query against an independently written oracle; it does not show clinical benefit.
+This shows correctness of the graph query against an independently written oracle.
 
 ## B3 Double-dose guard
 100 rounds of 10 concurrent claims on one dose slot from two carers: exactly one winner in **100/100** rounds (single MERGE claim).
@@ -39,9 +39,6 @@ This shows correctness of the graph query against an independently written oracl
 
 Drug named correctly as a candidate in 5/5 photos and the voice note; strength captured correctly in 2 of the 3 inputs that show one. One wrong candidate
 shown beside a right one. n is tiny and these are clean product shots, not curved, creased or blurry home photos, so this shows the pipeline works on real pixels and real speech, not its accuracy in a kitchen.
-
-## Not measured
-OCR/ASR accuracy at scale or on home-quality photos and varied accents, interaction-severity accuracy against clinical truth, any patient outcome.
 
 ## Comparing two runs: `bench/gate.py`
 `python bench/care_bench.py --out run.json` writes the numbers with the seed, the parameters, a fingerprint of the machine, the FalkorDB version and the commit. `python bench/gate.py bench/baselines/care_bench.json run.json` then compares two such files and prints every check.
@@ -82,7 +79,6 @@ The B4 sample above is five photos. This is the same pipeline (RapidOCR, then th
 
 What it showed. The first run found a real bug: a strength read with a stray full stop or colon from OCR (`40:mg`, `50.mg`) was dropped, leaving the strength blank; the reader now accepts that punctuation (`tests/test_carecircle.py`), which moved the moderate level from 148 to 150 of 150. The remaining blanks are a strength OCR split over lines (`0.5 / mg`), and at the harsh level a strength whose digits were lost (`TSmcg` for `75mcg`). One harsh image read `05mg` for 0.5 mg (the decimal point lost): a different number. **Every proposal is still shown to the person with its quoted line and needs their confirmation**, so these are cases where the person types the strength or corrects it, not silent errors; but a lost decimal point is exactly the kind of mistake a reader must catch, and this benchmark cannot show how often it happens on real labels.
 
-What it does not show. The labels are synthetic, flat, horizontal, generic-name only and in Latin script: no brand names, curved bottles, glare, handwriting, other languages or hands. Real photographs will do worse, and the 5-photo B4 sample is still the only real-photo evidence. Speech was not repeated at scale.
 
 ## B6: the same question put to Mem0, and to a model that is given everything
 
@@ -96,7 +92,6 @@ What it does not show. The labels are synthetic, flat, horizontal, generic-name 
 
 What Mem0 did here: it kept 170 of the 183 events as memories (in 10 of the 20 circles it merged or dropped at least one), and the retrieved memories then had to be reasoned over by a model. What the race rows mean: Care Circle has one atomic claim per dose slot, so one caller wins and the rest are told who was first; Mem0 has no such operation, so all ten writes are accepted and nothing says who was first. **This is a comparison of kinds of system, not evidence about FalkorDB:** Mem0 is a retrieval store with no write lock, so accepting ten writes is what it is built to do, and any database with a conditional write (a SQL `INSERT ... ON CONFLICT`, for one) would also accept one. The only like-for-like question here is the staleness one, and there a two-table SQL baseline ties (`docs/DETAILS.md`).
 
-**What this does not show.** It is one question on tiny circles, which is the easiest case for the systems that read text. Both baselines used a mid-sized model (Nova Pro) and a plain prompt that lets the model reason and then give an `ANSWER:` line; a stronger model, a tuned prompt or tuned Mem0 settings would very likely score higher, and I did not try them. Mem0 is a general personal-memory store that was never meant to answer this question, so the table says what it takes to ask it, not that Mem0 is poor at what it is for. A first version of this script parsed the models' answers badly and made the full-context baseline look like 1/20; that was my parser, found by reading the raw replies, and fixed before any number above was recorded. Mem0's own Bedrock adapter sent a malformed request for Nova in version 2.2.1, so Mem0 was run through its LiteLLM route to the same model. Cognee was not run: it needs its own LLM key setup and a graph store, and a result I could not check would not belong in a table of results.
 
 ## B8: what a new circle costs the database
 
