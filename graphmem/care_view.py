@@ -22,7 +22,7 @@ from typing import Optional
 from carecircle.safety import scan_advice
 
 from .db import new_id, norm, now_ms
-from .textcheck import plural, shown_name
+from .textcheck import plural, product_name, shown_name
 
 H = 3_600_000
 _secret_cache: dict = {}
@@ -254,27 +254,63 @@ class CareViewMixin:
         t = now_ms() if now is None else now
         p = norm(person)
         out = []
-        for (did, drug, dt, ft, action, src, quote, by, at, status, vf, mby, mat, mwhy) in await self._q(
-                """MATCH (x:Dose)-[:FOR]->(:Person {id:$p})
+        grouped: dict = {}                                          # the entries of one product (the two ingredients of Telma-AM) typed together are ONE line, as they were one prescription
+        for (did, drug, dt, ft, action, src, quote, by, at, status, vf, mby, mat, mwhy, prod, pstrength) in await self._q(
+                """MATCH (x:Dose)-[:FOR]->(:Person {id:$p}) OPTIONAL MATCH (x)-[:VIA]->(pr:Product)
                    RETURN x.id, x.drug, x.dose_text, x.freq_text, x.action, x.source_type, x.quote, x.by, x.at, x.status, x.valid_from,
-                          x.mistake_by, x.mistake_at, x.mistake_reason""",
+                          x.mistake_by, x.mistake_at, x.mistake_reason, coalesce(pr.combo, x.product, ''), coalesce(pr.strength, x.pstrength, '')""",
                 {"p": p}, scope="read"):
+            gk = (prod, by, action, status, at // 60_000) if prod else None
+            if gk and gk in grouped:
+                grouped[gk]["ingredients"].append(drug)
+                grouped[gk]["doses"].append(did)
+                continue
             verb = "stopped" if action == "stop" else "recorded"
             pend = " (waiting for confirmation)" if status == "pending" else " (marked as entered by mistake)" if status == "mistake" else ""
             if status == "mistake" and mat:
                 out.append({"at": mat, "kind": "mistake", "dose": did, "who": who(mby),
                             "text": f"{who(mby)} marked the entry for {_title(drug)} as entered by mistake{': ' + mwhy if mwhy else ''}.",
                             "quote": "", "when": iso(mat), "ago": ago(mat, t)})
-            out.append({"at": at, "kind": "stop" if action == "stop" else "record", "dose": did, "status": status, "who": who(by),
-                        "text": f"{who(by)} {verb} {_title(drug)}{' ' + dt if dt else ''}{' ' + ft if ft else ''}, {SOURCE_WORDS.get(src, src)}{pend}.",
-                        "quote": quote or "", "when": iso(at), "ago": ago(at, t)})
-        for (c, did, drug, at) in await self._q(
-                "MATCH (c:Person)-[a:ACKED]->(x:Dose)-[:FOR]->(:Person {id:$p}) RETURN c.id, x.id, x.drug, a.at", {"p": p}, scope="read"):
-            out.append({"at": at, "kind": "ack", "dose": did, "who": who(c), "text": f"{who(c)} acknowledged the entry for {_title(drug)}.",
-                        "quote": "", "when": iso(at), "ago": ago(at, t)})
-        for (drug, slot, by, at) in await self._q("MATCH (g:Give {person:$p}) RETURN g.drug, g.slot, g.by, g.at", {"p": p}, scope="read"):
-            out.append({"at": at, "kind": "give", "who": who(by), "text": f"{who(by)} recorded {_title(drug)} as given for the {slot} slot.",
-                        "quote": "", "when": iso(at), "ago": ago(at, t)})
+            row = {"at": at, "kind": "stop" if action == "stop" else "record", "dose": did, "status": status, "who": who(by),
+                   "text": f"{who(by)} {verb} {_title(drug)}{' ' + dt if dt else ''}{' ' + ft if ft else ''}, {SOURCE_WORDS.get(src, src)}{pend}.",
+                   "quote": quote or "", "when": iso(at), "ago": ago(at, t)}
+            if gk:
+                row.update(_dt=dt or pstrength, _ft=ft, _src=src, _pend=pend, _verb=verb, product=prod, ingredients=[drug], doses=[did])
+                grouped[gk] = row
+            out.append(row)
+        for row in grouped.values():                                  # a product's one line names the product and its ingredients
+            if len(row["ingredients"]) > 1:
+                names = " + ".join(_title(i) for i in sorted(row["ingredients"]))
+                row["text"] = (f"{row['who']} {row['_verb']} {product_name(row['product'])} ({names})"
+                               f"{' ' + row['_dt'] if row['_dt'] else ''}{' ' + row['_ft'] if row['_ft'] else ''}, {SOURCE_WORDS.get(row['_src'], row['_src'])}{row['_pend']}.")
+            for k in ("_dt", "_ft", "_src", "_pend", "_verb"):
+                row.pop(k, None)
+        acks: dict = {}
+        for (c, did, drug, at, prod) in await self._q(
+                "MATCH (c:Person)-[a:ACKED]->(x:Dose)-[:FOR]->(:Person {id:$p}) OPTIONAL MATCH (x)-[:VIA]->(pr:Product) RETURN c.id, x.id, x.drug, a.at, coalesce(pr.combo, x.product, '')",
+                {"p": p}, scope="read"):
+            ak = (c, prod, at // 60_000) if prod else None
+            if ak and ak in acks:
+                acks[ak]["text"] = f"{who(c)} acknowledged the entry for {product_name(prod)}."
+                continue
+            row = {"at": at, "kind": "ack", "dose": did, "who": who(c), "text": f"{who(c)} acknowledged the entry for {_title(drug)}.",
+                   "quote": "", "when": iso(at), "ago": ago(at, t)}
+            if ak:
+                acks[ak] = row
+            out.append(row)
+        gives: dict = {}
+        for (drug, slot, by, at, via) in await self._q("MATCH (g:Give {person:$p}) RETURN g.drug, g.slot, g.by, g.at, coalesce(g.via, '')", {"p": p}, scope="read"):
+            gk2 = (via, slot, by, at // 60_000) if via else None
+            if gk2 and gk2 in gives:
+                gives[gk2]["drugs"].append(drug)
+                gives[gk2]["text"] = f"{who(by)} recorded {' + '.join(_title(d) for d in sorted(gives[gk2]['drugs']))} as given for the {slot} slot (one tablet)."
+                continue
+            row = {"at": at, "kind": "give", "who": who(by), "text": f"{who(by)} recorded {_title(drug)} as given for the {slot} slot.",
+                   "quote": "", "when": iso(at), "ago": ago(at, t)}
+            if gk2:
+                row["drugs"] = [drug]
+                gives[gk2] = row
+            out.append(row)
         for (kindm, val, unit, at, by) in await self._q("MATCH (m:Measurement)-[:FOR]->(:Person {id:$p}) RETURN m.kind, m.value, m.unit, m.at, m.by", {"p": p}, scope="read"):
             out.append({"at": at, "kind": "measure", "who": who(by), "text": f"{who(by)} recorded {kindm.replace('_', ' ')} {val:g} {unit}.", "quote": "", "when": iso(at), "ago": ago(at, t)})
         for (rid, kind, at, by) in await self._q("MATCH (r:Receipt) RETURN r.id, r.kind, r.at, r.by", scope="read"):
